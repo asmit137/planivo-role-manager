@@ -21,12 +21,19 @@ export const useUserRole = () => {
     queryFn: async () => {
       if (!user) return null;
 
+      console.log('Fetching roles for user:', user.id);
+      
       const { data, error } = await supabase
         .from('user_roles')
         .select('*')
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching user roles:', error);
+        throw error;
+      }
+      
+      console.log('User roles fetched:', data);
       return data as UserRole[];
     },
     enabled: !!user,
