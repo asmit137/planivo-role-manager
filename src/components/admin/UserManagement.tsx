@@ -188,7 +188,9 @@ const UserManagement = () => {
       facilityId?: string; 
       departmentId?: string; 
     }) => {
-      const { error } = await supabase
+      console.log('Adding role:', { userId, role, workspaceId, facilityId, departmentId });
+      
+      const { data, error } = await supabase
         .from('user_roles')
         .insert({
           user_id: userId,
@@ -196,9 +198,16 @@ const UserManagement = () => {
           workspace_id: workspaceId || null,
           facility_id: facilityId || null,
           department_id: departmentId || null,
-        });
+        })
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error adding role:', error);
+        throw error;
+      }
+      
+      console.log('Role added successfully:', data);
+      return data;
     },
     onSuccess: async () => {
       // Invalidate and refetch
