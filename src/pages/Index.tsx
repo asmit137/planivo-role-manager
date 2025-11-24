@@ -106,11 +106,20 @@ const Index = () => {
               Intelligent vacation planning and workforce management with multi-tiered approval workflows
             </p>
             <div className="flex flex-wrap gap-4 justify-center">
-              <Button size="lg" className="bg-gradient-primary shadow-medium hover:shadow-strong transition-all duration-300">
+              <Button 
+                size="lg" 
+                className="bg-gradient-primary shadow-medium hover:shadow-strong transition-all duration-300"
+                onClick={() => window.location.href = '/auth'}
+              >
                 Get Started
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-              <Button size="lg" variant="outline" className="border-2 hover:border-primary/50 transition-colors">
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="border-2 hover:border-primary/50 transition-colors"
+                onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+              >
                 Learn More
               </Button>
             </div>
@@ -119,7 +128,7 @@ const Index = () => {
       </section>
 
       {/* Features Section */}
-      <section className="container mx-auto px-4 py-20">
+      <section id="features" className="container mx-auto px-4 py-20">
         <div className="mx-auto max-w-6xl">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-display font-bold mb-4">Powerful Features</h2>
