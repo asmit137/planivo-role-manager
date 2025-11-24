@@ -63,17 +63,31 @@ const FacilityUserManagement = () => {
             facilities.map(async (facility) => {
               const { data: userRoles, error: rolesError } = await supabase
                 .from('user_roles')
-                .select('*, profiles(id, full_name, email)')
+                .select('*')
                 .eq('facility_id', facility.id);
               
               if (rolesError) throw rolesError;
 
+              // Fetch user profiles separately
+              const userIds = userRoles?.map(ur => ur.user_id) || [];
+              const { data: userProfiles, error: profilesError } = await supabase
+                .from('profiles')
+                .select('id, full_name, email')
+                .in('id', userIds);
+              
+              if (profilesError) throw profilesError;
+
               return {
                 ...facility,
-                users: userRoles.map((ur: any) => ({
-                  ...ur.profiles,
-                  role: ur.role,
-                })),
+                users: userRoles.map((ur: any) => {
+                  const profile = userProfiles?.find(p => p.id === ur.user_id);
+                  return {
+                    id: profile?.id,
+                    full_name: profile?.full_name,
+                    email: profile?.email,
+                    role: ur.role,
+                  };
+                }),
               };
             })
           );
