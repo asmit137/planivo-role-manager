@@ -5,7 +5,8 @@ import DashboardLayout from '@/components/DashboardLayout';
 import TaskManager from '@/components/tasks/TaskManager';
 import VacationApprovalWorkflow from '@/components/vacation/VacationApprovalWorkflow';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ClipboardList, CheckSquare } from 'lucide-react';
+import { ClipboardList, CheckSquare, AlertCircle } from 'lucide-react';
+import VacationConflictDashboard from '@/components/vacation/VacationConflictDashboard';
 
 const WorkplaceSupervisorDashboard = () => {
   const { user } = useAuth();
@@ -47,6 +48,10 @@ const WorkplaceSupervisorDashboard = () => {
             <CheckSquare className="h-4 w-4 mr-2" />
             Final Approvals
           </TabsTrigger>
+          <TabsTrigger value="conflicts">
+            <AlertCircle className="h-4 w-4 mr-2" />
+            Vacation Conflicts
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="tasks">
@@ -59,6 +64,10 @@ const WorkplaceSupervisorDashboard = () => {
             scopeType="workspace" 
             scopeId={userRole.workspace_id} 
           />
+        </TabsContent>
+
+        <TabsContent value="conflicts">
+          <VacationConflictDashboard scopeType="workspace" scopeId={userRole.workspace_id} />
         </TabsContent>
       </Tabs>
     </DashboardLayout>
