@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, UserPlus, Mail, Filter } from 'lucide-react';
+import { Plus, UserPlus, Mail, Filter, Pencil } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { Switch } from '@/components/ui/switch';
 
 const userSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -29,6 +30,8 @@ const UserManagement = () => {
   const [workspaceId, setWorkspaceId] = useState<string>('');
   const [filterWorkspace, setFilterWorkspace] = useState<string>('all');
   const [bulkCreateOpen, setBulkCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
   const queryClient = useQueryClient();
 
   const { data: workspaces } = useQuery({
@@ -120,6 +123,45 @@ const UserManagement = () => {
       password,
       full_name: fullName,
       role,
+    });
+  };
+
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ userId, fullName, isActive }: { userId: string; fullName: string; isActive: boolean }) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: fullName,
+          is_active: isActive,
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('User updated successfully');
+      setEditOpen(false);
+      setEditingUser(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to update user');
+    },
+  });
+
+  const handleEdit = (user: any) => {
+    setEditingUser(user);
+    setEditOpen(true);
+  };
+
+  const handleUpdateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    
+    updateUserMutation.mutate({
+      userId: editingUser.id,
+      fullName: editingUser.full_name,
+      isActive: editingUser.is_active,
     });
   };
 
@@ -217,6 +259,57 @@ const UserManagement = () => {
               </form>
             </DialogContent>
           </Dialog>
+
+          {/* Edit User Dialog */}
+          <Dialog open={editOpen} onOpenChange={setEditOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Edit User</DialogTitle>
+                <DialogDescription>
+                  Update user information and status
+                </DialogDescription>
+              </DialogHeader>
+              {editingUser && (
+                <form onSubmit={handleUpdateSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-full-name">Full Name</Label>
+                    <Input
+                      id="edit-full-name"
+                      value={editingUser.full_name}
+                      onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-email">Email</Label>
+                    <Input
+                      id="edit-email"
+                      type="email"
+                      value={editingUser.email}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="is-active">Active Status</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Enable or disable user access
+                      </p>
+                    </div>
+                    <Switch
+                      id="is-active"
+                      checked={editingUser.is_active}
+                      onCheckedChange={(checked) => setEditingUser({ ...editingUser, is_active: checked })}
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={updateUserMutation.isPending}>
+                    {updateUserMutation.isPending ? 'Updating...' : 'Update User'}
+                  </Button>
+                </form>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       </CardHeader>
       <CardContent>
@@ -252,8 +345,10 @@ const UserManagement = () => {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Roles</TableHead>
                     <TableHead>Workspaces</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -261,6 +356,11 @@ const UserManagement = () => {
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.full_name}</TableCell>
                       <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <Badge variant={user.is_active ? "default" : "secondary"}>
+                          {user.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {user.roles.map((roleData: any, idx: number) => (
@@ -286,6 +386,15 @@ const UserManagement = () => {
                             <span className="text-xs text-muted-foreground">System-wide</span>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(user)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

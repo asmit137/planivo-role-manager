@@ -262,6 +262,7 @@ export type Database = {
           force_password_change: boolean | null
           full_name: string
           id: string
+          is_active: boolean
           updated_at: string
         }
         Insert: {
@@ -271,6 +272,7 @@ export type Database = {
           force_password_change?: boolean | null
           full_name: string
           id: string
+          is_active?: boolean
           updated_at?: string
         }
         Update: {
@@ -280,6 +282,7 @@ export type Database = {
           force_password_change?: boolean | null
           full_name?: string
           id?: string
+          is_active?: boolean
           updated_at?: string
         }
         Relationships: []
