@@ -5,6 +5,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
 import PasswordChangeDialog from '@/components/PasswordChangeDialog';
 import SuperAdminDashboard from '@/components/dashboards/SuperAdminDashboard';
 import GeneralAdminDashboard from '@/components/dashboards/GeneralAdminDashboard';
@@ -57,11 +58,20 @@ const Dashboard = () => {
   if (!roles || roles.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center space-y-4">
           <h2 className="text-2xl font-semibold mb-2">No Role Assigned</h2>
           <p className="text-muted-foreground">
             Contact your administrator to get access
           </p>
+          <Button 
+            variant="outline" 
+            onClick={async () => {
+              await supabase.auth.signOut();
+              navigate('/');
+            }}
+          >
+            Log Out
+          </Button>
         </div>
       </div>
     );
