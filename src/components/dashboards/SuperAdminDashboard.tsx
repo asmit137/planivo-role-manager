@@ -13,6 +13,7 @@ import WorkspaceManagement from '@/components/admin/WorkspaceManagement';
 import UserManagement from '@/components/admin/UserManagement';
 import AccessManagement from '@/components/admin/AccessManagement';
 import VacationTypeManagement from '@/components/vacation/VacationTypeManagement';
+import FacilityUserManagement from '@/components/admin/FacilityUserManagement';
 
 const SuperAdminDashboard = () => {
   const { data: workspaces, isLoading: workspacesLoading } = useQuery({
@@ -138,6 +139,7 @@ const SuperAdminDashboard = () => {
           <TabsTrigger value="access">Access</TabsTrigger>
           <TabsTrigger value="workspaces">Workspaces</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="facilities">Facilities & Staff</TabsTrigger>
           <TabsTrigger value="vacation">Vacation Types</TabsTrigger>
         </TabsList>
 
@@ -348,6 +350,10 @@ const SuperAdminDashboard = () => {
 
         <TabsContent value="users">
           <UserManagement />
+        </TabsContent>
+
+        <TabsContent value="facilities">
+          <FacilityUserManagement />
         </TabsContent>
 
         <TabsContent value="vacation">
