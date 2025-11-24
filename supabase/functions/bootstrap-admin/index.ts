@@ -74,6 +74,34 @@ serve(async (req) => {
         console.log(`Cleaning up existing user: ${existingAuthUser.id}`);
         
         // First, delete all database records for this user
+        // Delete conversations and related data
+        const { data: userConvs } = await supabaseClient
+          .from('conversations')
+          .select('id')
+          .eq('created_by', existingAuthUser.id);
+        
+        if (userConvs && userConvs.length > 0) {
+          const convIds = userConvs.map(c => c.id);
+          
+          // Delete messages in conversations
+          await supabaseClient
+            .from('messages')
+            .delete()
+            .in('conversation_id', convIds);
+          
+          // Delete conversation participants
+          await supabaseClient
+            .from('conversation_participants')
+            .delete()
+            .in('conversation_id', convIds);
+          
+          // Delete conversations
+          await supabaseClient
+            .from('conversations')
+            .delete()
+            .in('id', convIds);
+        }
+        
         // Delete user roles
         await supabaseClient
           .from('user_roles')
