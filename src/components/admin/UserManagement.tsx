@@ -197,7 +197,7 @@ const UserManagement = () => {
                 {role !== 'super_admin' && workspaces && workspaces.length > 0 && (
                   <div className="space-y-2">
                     <Label htmlFor="workspace">Workspace (Optional)</Label>
-                    <Select value={workspaceId} onValueChange={setWorkspaceId}>
+                    <Select value={workspaceId || undefined} onValueChange={setWorkspaceId}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select workspace" />
                       </SelectTrigger>

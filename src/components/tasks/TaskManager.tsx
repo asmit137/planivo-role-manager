@@ -214,7 +214,7 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
                 <Label>Priority</Label>
                 <Select value={priority} onValueChange={(value: any) => setPriority(value)}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select priority" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="low">Low</SelectItem>
