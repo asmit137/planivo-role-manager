@@ -14,6 +14,7 @@ interface CreateUserRequest {
   workspace_id?: string;
   facility_id?: string;
   department_id?: string;
+  force_password_change?: boolean;
 }
 
 serve(async (req) => {
@@ -61,7 +62,7 @@ serve(async (req) => {
       );
     }
 
-    const { email, password, full_name, role, workspace_id, facility_id, department_id }: CreateUserRequest = await req.json();
+    const { email, password, full_name, role, workspace_id, facility_id, department_id, force_password_change }: CreateUserRequest = await req.json();
 
     // Validate required fields
     if (!email || !password || !full_name || !role) {
@@ -103,6 +104,7 @@ serve(async (req) => {
           email,
           full_name,
           created_by: requestingUser.id,
+          force_password_change: force_password_change ?? false,
         },
       ]);
 

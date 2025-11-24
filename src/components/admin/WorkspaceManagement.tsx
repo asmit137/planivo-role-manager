@@ -212,7 +212,21 @@ const WorkspaceManagement = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate(name);
+    
+    // Trim the workspace name
+    const trimmedName = name.trim();
+    
+    if (!trimmedName) {
+      toast.error('Workspace name cannot be empty');
+      return;
+    }
+    
+    if (trimmedName.length < 2) {
+      toast.error('Name must be at least 2 characters');
+      return;
+    }
+    
+    createMutation.mutate(trimmedName);
   };
 
   const isCategoryAssigned = (categoryId: string) => {

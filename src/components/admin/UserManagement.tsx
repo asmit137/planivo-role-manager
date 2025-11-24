@@ -203,6 +203,36 @@ const UserManagement = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('Role added successfully');
+      // Refresh the editing user's roles
+      if (editingUser) {
+        const userId = editingUser.id;
+        queryClient.invalidateQueries({ queryKey: ['users', filterWorkspace] });
+        // Wait for refetch and update editingUser
+        setTimeout(async () => {
+          const { data: updatedUsers } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          
+          const { data: updatedRoles } = await supabase
+            .from('user_roles')
+            .select('*, workspaces(name)')
+            .eq('user_id', userId);
+          
+          if (updatedUsers && updatedRoles) {
+            setEditingUser({
+              ...updatedUsers,
+              roles: updatedRoles,
+            });
+          }
+        }, 500);
+      }
+      // Reset form fields
+      setNewRole('general_admin');
+      setNewWorkspaceId('');
+      setNewFacilityId('');
+      setNewDepartmentId('');
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to add role');
@@ -221,6 +251,23 @@ const UserManagement = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('Role removed successfully');
+      // Refresh the editing user's roles
+      if (editingUser) {
+        const userId = editingUser.id;
+        setTimeout(async () => {
+          const { data: updatedRoles } = await supabase
+            .from('user_roles')
+            .select('*, workspaces(name)')
+            .eq('user_id', userId);
+          
+          if (updatedRoles) {
+            setEditingUser({
+              ...editingUser,
+              roles: updatedRoles,
+            });
+          }
+        }, 500);
+      }
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to remove role');
