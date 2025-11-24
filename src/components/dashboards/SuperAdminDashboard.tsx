@@ -1,7 +1,7 @@
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Building2, Settings, Plus, Calendar, ClipboardList, CheckCircle, XCircle, Clock, TrendingUp, Building, Briefcase, LayoutDashboard, Folders, UserCircle, UsersRound, FolderTree, AlertCircle } from 'lucide-react';
+import { Users, Building2, Settings, Plus, Calendar, ClipboardList, CheckCircle, XCircle, Clock, TrendingUp, Building, LayoutDashboard, Folders, UserCircle, UsersRound, FolderTree, AlertCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,8 +13,7 @@ import WorkspaceManagement from '@/components/admin/WorkspaceManagement';
 import UserManagement from '@/components/admin/UserManagement';
 import VacationTypeManagement from '@/components/vacation/VacationTypeManagement';
 import FacilityUserManagement from '@/components/admin/FacilityUserManagement';
-import DepartmentManagement from '@/components/admin/DepartmentManagement';
-import CategoryManagement from '@/components/admin/CategoryManagement';
+import CategoryDepartmentManagement from '@/components/admin/CategoryDepartmentManagement';
 import VacationConflictDashboard from '@/components/vacation/VacationConflictDashboard';
 
 const SuperAdminDashboard = () => {
@@ -137,7 +136,7 @@ const SuperAdminDashboard = () => {
     <DashboardLayout title="System Overview" roleLabel="Super Admin" roleColor="text-primary">
       <Tabs defaultValue="dashboard" className="space-y-6">
         <Card className="border-2">
-          <TabsList className="w-full h-auto p-2 bg-transparent grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
+          <TabsList className="w-full h-auto p-2 bg-transparent grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
             <TabsTrigger 
               value="dashboard" 
               className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
@@ -174,18 +173,11 @@ const SuperAdminDashboard = () => {
               <span className="hidden sm:inline">Vacation Types</span>
             </TabsTrigger>
             <TabsTrigger 
-              value="departments" 
+              value="structure" 
               className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
             >
               <FolderTree className="h-4 w-4" />
-              <span className="hidden sm:inline">Departments</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="categories" 
-              className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
-            >
-              <Briefcase className="h-4 w-4" />
-              <span className="hidden sm:inline">Categories</span>
+              <span className="hidden sm:inline">Categories & Departments</span>
             </TabsTrigger>
           </TabsList>
         </Card>
@@ -230,7 +222,7 @@ const SuperAdminDashboard = () => {
             <Card className="border-2 hover:border-primary/20 transition-colors">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">Departments</CardTitle>
-                <Briefcase className="h-5 w-5 text-primary" />
+                <FolderTree className="h-5 w-5 text-primary" />
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">{departments || 0}</div>
@@ -419,12 +411,8 @@ const SuperAdminDashboard = () => {
           <VacationTypeManagement />
         </TabsContent>
 
-        <TabsContent value="departments">
-          <DepartmentManagement />
-        </TabsContent>
-
-        <TabsContent value="categories">
-          <CategoryManagement />
+        <TabsContent value="structure">
+          <CategoryDepartmentManagement />
         </TabsContent>
       </Tabs>
     </DashboardLayout>
