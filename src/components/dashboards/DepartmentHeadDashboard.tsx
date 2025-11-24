@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import DashboardLayout from '@/components/DashboardLayout';
 import VacationPlanner from '@/components/vacation/VacationPlanner';
+import VacationPlansList from '@/components/vacation/VacationPlansList';
 import TaskManager from '@/components/tasks/TaskManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, ClipboardList } from 'lucide-react';
@@ -50,7 +51,10 @@ const DepartmentHeadDashboard = () => {
         </TabsList>
 
         <TabsContent value="vacation">
-          <VacationPlanner departmentId={userRole.department_id} />
+          <div className="space-y-6">
+            <VacationPlanner departmentId={userRole.department_id} />
+            <VacationPlansList departmentId={userRole.department_id} />
+          </div>
         </TabsContent>
 
         <TabsContent value="tasks">
