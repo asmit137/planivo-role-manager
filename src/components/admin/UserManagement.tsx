@@ -111,35 +111,27 @@ const UserManagement = () => {
 
   const createUserMutation = useMutation({
     mutationFn: async (userData: any) => {
-      try {
-        const validated = userSchema.parse(userData);
-        
-        const { data, error } = await supabase.functions.invoke('create-user', {
-          body: {
-            email: validated.email,
-            password: validated.password,
-            full_name: validated.full_name,
-            role: validated.role,
-            workspace_id: workspaceId || undefined,
-          },
-        });
+      const validated = userSchema.parse(userData);
+      
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: validated.email,
+          password: validated.password,
+          full_name: validated.full_name,
+          role: validated.role,
+          workspace_id: workspaceId || undefined,
+        },
+      });
 
-        if (error) {
-          throw new Error(error.message || 'Failed to create user');
-        }
-        
-        if (data?.error) {
-          throw new Error(data.error);
-        }
-        
-        return data;
-      } catch (error: any) {
-        if (error.name === 'ZodError') {
-          const firstError = error.errors[0];
-          throw new Error(firstError.message || 'Validation failed');
-        }
-        throw error;
+      if (error) {
+        throw new Error(error.message || 'Failed to create user');
       }
+      
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -152,6 +144,14 @@ const UserManagement = () => {
       setOpen(false);
     },
     onError: (error: any) => {
+      // Handle Zod validation errors
+      if (error.name === 'ZodError') {
+        const firstError = error.errors?.[0];
+        toast.error(firstError?.message || 'Validation failed');
+        return;
+      }
+      
+      // Handle all other errors
       toast.error(error.message || 'Failed to create user');
     },
   });
