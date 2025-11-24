@@ -150,7 +150,7 @@ const Bootstrap = () => {
             </Button>
           </form>
           <div className="mt-4 text-center">
-            <Button variant="link" onClick={() => navigate('/auth')} disabled={loading}>
+            <Button variant="link" onClick={() => navigate('/')} disabled={loading}>
               Already have an account? Sign in
             </Button>
           </div>

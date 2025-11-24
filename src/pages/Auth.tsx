@@ -65,17 +65,25 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-accent/5 to-background p-4">
-      <Card className="w-full max-w-md shadow-strong border-2">
-        <CardHeader className="space-y-1 text-center">
-          <div className="mb-4">
-            <h1 className="text-4xl font-display font-bold bg-gradient-primary bg-clip-text text-transparent">
-              Planivo
-            </h1>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4 relative overflow-hidden">
+      {/* Decorative background elements */}
+      <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
+      <div className="absolute top-20 left-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-20 right-20 w-96 h-96 bg-accent/10 rounded-full blur-3xl" />
+      
+      <Card className="w-full max-w-md shadow-strong border-2 backdrop-blur-sm bg-card/95 relative z-10">
+        <CardHeader className="space-y-1 text-center pb-8">
+          <div className="mb-6 flex justify-center">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-primary blur-xl opacity-50" />
+              <h1 className="text-5xl font-display font-bold bg-gradient-primary bg-clip-text text-transparent relative">
+                Planivo
+              </h1>
+            </div>
           </div>
-          <CardTitle className="text-2xl">Welcome Back</CardTitle>
-          <CardDescription>
-            Enter your credentials to access your account
+          <CardTitle className="text-2xl font-display">Welcome Back</CardTitle>
+          <CardDescription className="text-base">
+            Enterprise Workforce Management
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -121,9 +129,20 @@ const Auth = () => {
               )}
             </Button>
           </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Contact your administrator if you need an account
-          </p>
+          <div className="mt-6 pt-6 border-t border-border space-y-3">
+            <p className="text-center text-sm text-muted-foreground">
+              Don't have an account? Contact your administrator
+            </p>
+            <div className="text-center">
+              <Button 
+                variant="link" 
+                className="text-xs text-muted-foreground hover:text-primary"
+                onClick={() => navigate('/bootstrap')}
+              >
+                First time setup? Bootstrap system
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
