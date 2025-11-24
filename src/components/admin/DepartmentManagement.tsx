@@ -507,77 +507,95 @@ const DepartmentManagement = () => {
                   <AccordionContent className="px-4 pb-4">
                     {workspace.facilities?.length > 0 ? (
                       <div className="space-y-3 mt-2">
-                        {workspace.facilities.map((facility: any) => (
-                          <div key={facility.id} className="border rounded-lg p-3 bg-muted/30">
-                            <div className="flex items-center gap-2 mb-3">
-                              <Building2 className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-medium">{facility.name}</span>
-                              <Badge variant="outline">{facility.departments?.length || 0} departments</Badge>
-                            </div>
-                            {facility.departments?.length > 0 && (
-                              <div className="space-y-2 ml-6">
-                                {facility.departments.map((dept: any) => (
-                                  <div key={dept.id} className="space-y-2">
-                                    <div className="p-2 rounded bg-background text-sm group">
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-medium">{dept.name}</span>
-                                          {dept.category && (
-                                            <Badge variant="outline" className="text-xs capitalize">
-                                              {dept.category}
-                                            </Badge>
-                                          )}
-                                          <Badge variant="secondary" className="text-xs">
-                                            Min: {dept.min_staffing} staff
-                                          </Badge>
-                                        </div>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                          onClick={() => deleteDepartmentMutation.mutate(dept.id)}
-                                          disabled={deleteDepartmentMutation.isPending}
-                                        >
-                                          <Trash2 className="h-4 w-4 text-destructive" />
-                                        </Button>
+                        {workspace.facilities.map((facility: any) => {
+                          // Group departments by category
+                          const departmentsByCategory = facility.departments?.reduce((acc: any, dept: any) => {
+                            const cat = dept.category || 'uncategorized';
+                            if (!acc[cat]) acc[cat] = [];
+                            acc[cat].push(dept);
+                            return acc;
+                          }, {} as Record<string, any[]>) || {};
+
+                          const categories = Object.keys(departmentsByCategory).sort();
+
+                          return (
+                            <div key={facility.id} className="border rounded-lg p-3 bg-muted/30">
+                              <div className="flex items-center gap-2 mb-3">
+                                <Building2 className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-medium">{facility.name}</span>
+                                <Badge variant="outline">{facility.departments?.length || 0} departments</Badge>
+                              </div>
+                              {categories.length > 0 ? (
+                                <div className="space-y-3 ml-4">
+                                  {categories.map((category) => (
+                                    <div key={category} className="border-l-4 border-primary/40 pl-3 space-y-2">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <Badge className="capitalize font-semibold">{category}</Badge>
+                                        <span className="text-xs text-muted-foreground">
+                                          {departmentsByCategory[category].length} departments
+                                        </span>
                                       </div>
-                                    </div>
-                                    {dept.subdepartments && dept.subdepartments.length > 0 && (
-                                      <div className="ml-4 space-y-1">
-                                        {dept.subdepartments.map((subDept: any) => (
-                                          <div key={subDept.id} className="p-2 rounded bg-muted/50 text-sm border-l-2 border-primary/30 group">
-                                            <div className="flex items-center justify-between">
-                                              <div className="flex items-center gap-2">
-                                                <span className="text-sm">↳ {subDept.name}</span>
-                                                {subDept.category && (
-                                                  <Badge variant="outline" className="text-xs capitalize">
-                                                    {subDept.category}
+                                      <div className="space-y-2">
+                                        {departmentsByCategory[category].map((dept: any) => (
+                                          <div key={dept.id} className="space-y-2">
+                                            <div className="p-2 rounded bg-background text-sm group">
+                                              <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="font-medium">{dept.name}</span>
+                                                  <Badge variant="secondary" className="text-xs">
+                                                    <Users className="h-3 w-3 mr-1" />
+                                                    Min: {dept.min_staffing}
                                                   </Badge>
-                                                )}
-                                                <Badge variant="outline" className="text-xs">
-                                                  Min: {subDept.min_staffing} staff
-                                                </Badge>
+                                                </div>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                                  onClick={() => deleteDepartmentMutation.mutate(dept.id)}
+                                                  disabled={deleteDepartmentMutation.isPending}
+                                                >
+                                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
                                               </div>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                                onClick={() => deleteDepartmentMutation.mutate(subDept.id)}
-                                                disabled={deleteDepartmentMutation.isPending}
-                                              >
-                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                              </Button>
                                             </div>
+                                            {dept.subdepartments && dept.subdepartments.length > 0 && (
+                                              <div className="ml-4 space-y-1">
+                                                {dept.subdepartments.map((subDept: any) => (
+                                                  <div key={subDept.id} className="p-2 rounded bg-muted/50 text-sm border-l-2 border-primary/20 group">
+                                                    <div className="flex items-center justify-between">
+                                                      <div className="flex items-center gap-2">
+                                                        <span className="text-sm">↳ {subDept.name}</span>
+                                                        <Badge variant="outline" className="text-xs">
+                                                          <Users className="h-3 w-3 mr-1" />
+                                                          Min: {subDept.min_staffing}
+                                                        </Badge>
+                                                      </div>
+                                                      <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        onClick={() => deleteDepartmentMutation.mutate(subDept.id)}
+                                                        disabled={deleteDepartmentMutation.isPending}
+                                                      >
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                      </Button>
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
                                           </div>
                                         ))}
                                       </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-muted-foreground py-2 ml-4">No departments in this facility</p>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground py-2">No facilities in this workspace</p>
