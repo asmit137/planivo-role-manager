@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,32 @@ const Bootstrap = () => {
   const [bootstrapSecret, setBootstrapSecret] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkExistingSetup = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // If logged in, redirect to dashboard
+      if (session) {
+        navigate("/dashboard");
+        return;
+      }
+
+      // Check if super admin already exists
+      const { data: existingAdmins } = await supabase
+        .from("user_roles")
+        .select("id")
+        .eq("role", "super_admin")
+        .limit(1);
+
+      // If super admin exists, redirect to login
+      if (existingAdmins && existingAdmins.length > 0) {
+        toast.error("Super Admin already exists. Please log in at /");
+        navigate("/");
+      }
+    };
+    checkExistingSetup();
+  }, [navigate]);
 
   const handleBootstrap = async (e: React.FormEvent) => {
     e.preventDefault();
