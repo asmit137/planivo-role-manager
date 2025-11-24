@@ -68,10 +68,43 @@ const AccessManagement = () => {
                     .eq('department_id', dept.id)
                     .eq('role', 'staff');
 
+                  // Fetch subdepartments
+                  const { data: subdepartments, error: subDeptError } = await supabase
+                    .from('departments')
+                    .select('*')
+                    .eq('parent_department_id', dept.id)
+                    .order('name');
+                  
+                  if (subDeptError) throw subDeptError;
+
+                  // Get staff count for each subdepartment
+                  const subDeptsWithData = await Promise.all(
+                    (subdepartments || []).map(async (subDept) => {
+                      const { data: subDeptHeads } = await supabase
+                        .from('user_roles')
+                        .select('*, profiles(id, full_name, email)')
+                        .eq('department_id', subDept.id)
+                        .eq('role', 'department_head');
+
+                      const { count: subStaffCount } = await supabase
+                        .from('user_roles')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('department_id', subDept.id)
+                        .eq('role', 'staff');
+
+                      return {
+                        ...subDept,
+                        department_heads: subDeptHeads?.map((dh: any) => dh.profiles) || [],
+                        staff_count: subStaffCount || 0,
+                      };
+                    })
+                  );
+
                   return {
                     ...dept,
                     department_heads: deptHeads.map((dh: any) => dh.profiles),
                     staff_count: staffCount || 0,
+                    subdepartments: subDeptsWithData,
                   };
                 })
               );
@@ -97,11 +130,22 @@ const AccessManagement = () => {
   // Get filtered facilities based on workspace
   const facilities = organizationData?.find(w => w.id === selectedWorkspace)?.facilities || [];
   
-  // Get filtered departments based on facility
+  // Get filtered departments based on facility (including subdepartments)
   const departments = facilities.find(f => f.id === selectedFacility)?.departments || [];
   
+  // Flatten departments to include subdepartments
+  const allDepartments: any[] = [];
+  departments.forEach((dept: any) => {
+    allDepartments.push(dept);
+    if (dept.subdepartments && dept.subdepartments.length > 0) {
+      dept.subdepartments.forEach((subDept: any) => {
+        allDepartments.push({ ...subDept, isSubDepartment: true, parentName: dept.name });
+      });
+    }
+  });
+  
   // Get selected department details
-  const selectedDept = departments.find(d => d.id === selectedDepartment);
+  const selectedDept = allDepartments.find(d => d.id === selectedDepartment);
 
   const createStaffMutation = useMutation({
     mutationFn: async ({ emails, departmentId }: { emails: string[]; departmentId: string }) => {
@@ -219,16 +263,20 @@ const AccessManagement = () => {
 
               {selectedFacility && (
                 <div className="space-y-2">
-                  <Label>3. Select Department</Label>
+                  <Label>3. Select Department / Sub-Department</Label>
                   <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
                     <SelectTrigger>
                       <SelectValue placeholder="Choose department..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {departments.map((dept: any) => (
+                      {allDepartments.map((dept: any) => (
                         <SelectItem key={dept.id} value={dept.id}>
                           <div className="flex items-center justify-between w-full">
-                            <span>{dept.name}</span>
+                            <span className={dept.isSubDepartment ? "ml-4" : ""}>
+                              {dept.isSubDepartment && "↳ "}
+                              {dept.name}
+                              {dept.isSubDepartment && <span className="text-xs text-muted-foreground ml-1">({dept.parentName})</span>}
+                            </span>
                             <Badge variant="outline" className="ml-2">
                               {dept.staff_count} staff
                             </Badge>
@@ -353,22 +401,48 @@ const AccessManagement = () => {
                             {facility.departments?.length > 0 && (
                               <div className="space-y-2 ml-6">
                                 {facility.departments.map((dept: any) => (
-                                  <div key={dept.id} className="p-2 rounded bg-background text-sm">
-                                    <div className="flex items-center justify-between">
-                                      <span className="font-medium">{dept.name}</span>
-                                      <div className="flex items-center gap-2">
-                                        {dept.department_heads?.length > 0 && (
-                                          <Badge variant="secondary" className="text-xs">
-                                            <User className="h-3 w-3 mr-1" />
-                                            {dept.department_heads[0].full_name}
+                                  <div key={dept.id} className="space-y-2">
+                                    <div className="p-2 rounded bg-background text-sm">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-medium">{dept.name}</span>
+                                        <div className="flex items-center gap-2">
+                                          {dept.department_heads?.length > 0 && (
+                                            <Badge variant="secondary" className="text-xs">
+                                              <User className="h-3 w-3 mr-1" />
+                                              {dept.department_heads[0].full_name}
+                                            </Badge>
+                                          )}
+                                          <Badge className="text-xs">
+                                            <Users className="h-3 w-3 mr-1" />
+                                            {dept.staff_count} staff
                                           </Badge>
-                                        )}
-                                        <Badge className="text-xs">
-                                          <Users className="h-3 w-3 mr-1" />
-                                          {dept.staff_count} staff
-                                        </Badge>
+                                        </div>
                                       </div>
                                     </div>
+                                    {/* Subdepartments */}
+                                    {dept.subdepartments && dept.subdepartments.length > 0 && (
+                                      <div className="ml-4 space-y-1">
+                                        {dept.subdepartments.map((subDept: any) => (
+                                          <div key={subDept.id} className="p-2 rounded bg-muted/50 text-sm border-l-2 border-primary/30">
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-sm">↳ {subDept.name}</span>
+                                              <div className="flex items-center gap-2">
+                                                {subDept.department_heads?.length > 0 && (
+                                                  <Badge variant="outline" className="text-xs">
+                                                    <User className="h-3 w-3 mr-1" />
+                                                    {subDept.department_heads[0].full_name}
+                                                  </Badge>
+                                                )}
+                                                <Badge variant="outline" className="text-xs">
+                                                  <Users className="h-3 w-3 mr-1" />
+                                                  {subDept.staff_count} staff
+                                                </Badge>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                               </div>
