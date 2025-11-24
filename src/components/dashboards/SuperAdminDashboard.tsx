@@ -1,7 +1,7 @@
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Building2, Settings, Plus, Calendar, ClipboardList, CheckCircle, XCircle, Clock, TrendingUp, Building, Briefcase, LayoutDashboard, UserCog, Folders, UserCircle, UsersRound } from 'lucide-react';
+import { Users, Building2, Settings, Plus, Calendar, ClipboardList, CheckCircle, XCircle, Clock, TrendingUp, Building, Briefcase, LayoutDashboard, UserCog, Folders, UserCircle, UsersRound, FolderTree } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,6 +14,7 @@ import UserManagement from '@/components/admin/UserManagement';
 import AccessManagement from '@/components/admin/AccessManagement';
 import VacationTypeManagement from '@/components/vacation/VacationTypeManagement';
 import FacilityUserManagement from '@/components/admin/FacilityUserManagement';
+import DepartmentManagement from '@/components/admin/DepartmentManagement';
 
 const SuperAdminDashboard = () => {
   const { data: workspaces, isLoading: workspacesLoading } = useQuery({
@@ -135,7 +136,7 @@ const SuperAdminDashboard = () => {
     <DashboardLayout title="System Overview" roleLabel="Super Admin" roleColor="text-primary">
       <Tabs defaultValue="dashboard" className="space-y-6">
         <Card className="border-2">
-          <TabsList className="w-full h-auto p-2 bg-transparent grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+          <TabsList className="w-full h-auto p-2 bg-transparent grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
             <TabsTrigger 
               value="dashboard" 
               className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
@@ -177,6 +178,13 @@ const SuperAdminDashboard = () => {
             >
               <Calendar className="h-4 w-4" />
               <span className="hidden sm:inline">Vacation Types</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="departments" 
+              className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
+            >
+              <FolderTree className="h-4 w-4" />
+              <span className="hidden sm:inline">Departments</span>
             </TabsTrigger>
           </TabsList>
         </Card>
@@ -396,6 +404,10 @@ const SuperAdminDashboard = () => {
 
         <TabsContent value="vacation">
           <VacationTypeManagement />
+        </TabsContent>
+
+        <TabsContent value="departments">
+          <DepartmentManagement />
         </TabsContent>
       </Tabs>
     </DashboardLayout>

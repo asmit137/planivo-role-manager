@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       departments: {
         Row: {
+          category: string | null
           created_at: string
           created_by: string | null
           facility_id: string
@@ -26,6 +27,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           created_by?: string | null
           facility_id: string
@@ -36,6 +38,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           created_by?: string | null
           facility_id?: string
