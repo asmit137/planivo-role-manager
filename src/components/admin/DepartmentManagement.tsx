@@ -441,23 +441,42 @@ const DepartmentManagement = () => {
                   {selectedFacility && parentDepartments.length > 0 && (
                     <div className="space-y-2">
                       <Label htmlFor="parent">Parent Department (Optional)</Label>
-                      <Select value={parentDepartment} onValueChange={(val) => {
-                        setParentDepartment(val);
-                        setDepartmentName('');
-                        setUsePreset(false);
-                      }}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="None (main department)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">None (Main Department)</SelectItem>
-                          {parentDepartments.map(dept => (
-                            <SelectItem key={dept.id} value={dept.id}>
-                              {dept.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex gap-2">
+                        <Select value={parentDepartment || undefined} onValueChange={(val) => {
+                          setParentDepartment(val);
+                          setDepartmentName('');
+                          setUsePreset(false);
+                        }}>
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="None (create as main department)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {parentDepartments.map(dept => (
+                              <SelectItem key={dept.id} value={dept.id}>
+                                {dept.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {parentDepartment && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                              setParentDepartment('');
+                              setDepartmentName('');
+                              setUsePreset(false);
+                            }}
+                            title="Clear selection"
+                          >
+                            ×
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Leave empty to create a main department, or select a parent to create a subdepartment
+                      </p>
                     </div>
                   )}
 
