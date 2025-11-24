@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, UserPlus, Mail, Filter, Pencil } from 'lucide-react';
+import { Plus, UserPlus, Mail, Filter, Pencil, Trash2 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -40,6 +40,31 @@ const UserManagement = () => {
       const { data, error } = await supabase
         .from('workspaces')
         .select('*')
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: facilities } = useQuery({
+    queryKey: ['facilities'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('facilities')
+        .select('*, workspaces(name)')
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: departments } = useQuery({
+    queryKey: ['departments'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*, facilities(name, workspace_id)')
+        .is('is_template', false)
         .order('name');
       if (error) throw error;
       return data;
@@ -149,6 +174,59 @@ const UserManagement = () => {
     },
   });
 
+  const addRoleMutation = useMutation({
+    mutationFn: async ({ 
+      userId, 
+      role, 
+      workspaceId, 
+      facilityId, 
+      departmentId 
+    }: { 
+      userId: string; 
+      role: string; 
+      workspaceId?: string; 
+      facilityId?: string; 
+      departmentId?: string; 
+    }) => {
+      const { error } = await supabase
+        .from('user_roles')
+        .insert({
+          user_id: userId,
+          role: role as any,
+          workspace_id: workspaceId || null,
+          facility_id: facilityId || null,
+          department_id: departmentId || null,
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('Role added successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to add role');
+    },
+  });
+
+  const deleteRoleMutation = useMutation({
+    mutationFn: async (roleId: string) => {
+      const { error } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('id', roleId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('Role removed successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to remove role');
+    },
+  });
+
   const handleEdit = (user: any) => {
     setEditingUser(user);
     setEditOpen(true);
@@ -163,6 +241,45 @@ const UserManagement = () => {
       fullName: editingUser.full_name,
       isActive: editingUser.is_active,
     });
+  };
+
+  const [newRole, setNewRole] = useState('general_admin');
+  const [newWorkspaceId, setNewWorkspaceId] = useState<string>('');
+  const [newFacilityId, setNewFacilityId] = useState<string>('');
+  const [newDepartmentId, setNewDepartmentId] = useState<string>('');
+
+  const handleAddRole = () => {
+    if (!editingUser) return;
+
+    addRoleMutation.mutate({
+      userId: editingUser.id,
+      role: newRole,
+      workspaceId: newWorkspaceId || undefined,
+      facilityId: newFacilityId || undefined,
+      departmentId: newDepartmentId || undefined,
+    });
+
+    // Reset form
+    setNewRole('general_admin');
+    setNewWorkspaceId('');
+    setNewFacilityId('');
+    setNewDepartmentId('');
+  };
+
+  const handleDeleteRole = (roleId: string) => {
+    if (confirm('Are you sure you want to remove this role?')) {
+      deleteRoleMutation.mutate(roleId);
+    }
+  };
+
+  const getFilteredFacilities = () => {
+    if (!newWorkspaceId || !facilities) return [];
+    return facilities.filter(f => f.workspace_id === newWorkspaceId);
+  };
+
+  const getFilteredDepartments = () => {
+    if (!newFacilityId || !departments) return [];
+    return departments.filter(d => d.facility_id === newFacilityId);
   };
 
   return (
@@ -262,51 +379,178 @@ const UserManagement = () => {
 
           {/* Edit User Dialog */}
           <Dialog open={editOpen} onOpenChange={setEditOpen}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Edit User</DialogTitle>
                 <DialogDescription>
-                  Update user information and status
+                  Update user information, status, and roles
                 </DialogDescription>
               </DialogHeader>
               {editingUser && (
-                <form onSubmit={handleUpdateSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-full-name">Full Name</Label>
-                    <Input
-                      id="edit-full-name"
-                      value={editingUser.full_name}
-                      onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-email">Email</Label>
-                    <Input
-                      id="edit-email"
-                      type="email"
-                      value={editingUser.email}
-                      disabled
-                      className="bg-muted"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="is-active">Active Status</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Enable or disable user access
-                      </p>
+                <div className="space-y-6">
+                  {/* Basic Info Section */}
+                  <form onSubmit={handleUpdateSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-full-name">Full Name</Label>
+                      <Input
+                        id="edit-full-name"
+                        value={editingUser.full_name}
+                        onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
+                        required
+                      />
                     </div>
-                    <Switch
-                      id="is-active"
-                      checked={editingUser.is_active}
-                      onCheckedChange={(checked) => setEditingUser({ ...editingUser, is_active: checked })}
-                    />
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-email">Email</Label>
+                      <Input
+                        id="edit-email"
+                        type="email"
+                        value={editingUser.email}
+                        disabled
+                        className="bg-muted"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="is-active">Active Status</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Enable or disable user access
+                        </p>
+                      </div>
+                      <Switch
+                        id="is-active"
+                        checked={editingUser.is_active}
+                        onCheckedChange={(checked) => setEditingUser({ ...editingUser, is_active: checked })}
+                      />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={updateUserMutation.isPending}>
+                      {updateUserMutation.isPending ? 'Updating...' : 'Update User'}
+                    </Button>
+                  </form>
+
+                  {/* Roles Section */}
+                  <div className="space-y-4 border-t pt-4">
+                    <div>
+                      <h3 className="font-semibold mb-2">Current Roles</h3>
+                      {editingUser.roles && editingUser.roles.length > 0 ? (
+                        <div className="space-y-2">
+                          {editingUser.roles.map((roleData: any) => (
+                            <div key={roleData.id} className="flex items-center justify-between p-3 border rounded-lg">
+                              <div className="space-y-1">
+                                <Badge variant="outline">{roleData.role.replace('_', ' ')}</Badge>
+                                {roleData.workspaces && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Workspace: {roleData.workspaces.name}
+                                  </p>
+                                )}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteRole(roleData.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No roles assigned</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-3 border-t pt-4">
+                      <h3 className="font-semibold">Add New Role</h3>
+                      
+                      <div className="space-y-2">
+                        <Label>Role</Label>
+                        <Select value={newRole} onValueChange={setNewRole}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="super_admin">Super Admin</SelectItem>
+                            <SelectItem value="general_admin">General Admin</SelectItem>
+                            <SelectItem value="workplace_supervisor">Workplace Supervisor</SelectItem>
+                            <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
+                            <SelectItem value="department_head">Department Head</SelectItem>
+                            <SelectItem value="staff">Staff</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {newRole !== 'super_admin' && (
+                        <>
+                          <div className="space-y-2">
+                            <Label>Workspace</Label>
+                            <Select value={newWorkspaceId} onValueChange={(val) => {
+                              setNewWorkspaceId(val);
+                              setNewFacilityId('');
+                              setNewDepartmentId('');
+                            }}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select workspace" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {workspaces?.map((workspace) => (
+                                  <SelectItem key={workspace.id} value={workspace.id}>
+                                    {workspace.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {(newRole === 'facility_supervisor' || newRole === 'department_head') && newWorkspaceId && (
+                            <div className="space-y-2">
+                              <Label>Facility</Label>
+                              <Select value={newFacilityId} onValueChange={(val) => {
+                                setNewFacilityId(val);
+                                setNewDepartmentId('');
+                              }}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select facility" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {getFilteredFacilities().map((facility) => (
+                                    <SelectItem key={facility.id} value={facility.id}>
+                                      {facility.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
+                          {newRole === 'department_head' && newFacilityId && (
+                            <div className="space-y-2">
+                              <Label>Department</Label>
+                              <Select value={newDepartmentId} onValueChange={setNewDepartmentId}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select department" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {getFilteredDepartments().map((dept) => (
+                                    <SelectItem key={dept.id} value={dept.id}>
+                                      {dept.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      <Button 
+                        onClick={handleAddRole} 
+                        className="w-full"
+                        disabled={addRoleMutation.isPending}
+                      >
+                        {addRoleMutation.isPending ? 'Adding...' : 'Add Role'}
+                      </Button>
+                    </div>
                   </div>
-                  <Button type="submit" className="w-full" disabled={updateUserMutation.isPending}>
-                    {updateUserMutation.isPending ? 'Updating...' : 'Update User'}
-                  </Button>
-                </form>
+                </div>
               )}
             </DialogContent>
           </Dialog>
