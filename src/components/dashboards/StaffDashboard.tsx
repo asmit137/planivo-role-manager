@@ -1,5 +1,6 @@
 import DashboardLayout from '@/components/DashboardLayout';
 import StaffTaskView from '@/components/tasks/StaffTaskView';
+import VacationPlansList from '@/components/vacation/VacationPlansList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClipboardList, Calendar } from 'lucide-react';
 
@@ -23,13 +24,7 @@ const StaffDashboard = () => {
         </TabsContent>
 
         <TabsContent value="vacation">
-          <div className="text-center p-12 border-2 rounded-lg">
-            <Calendar className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-xl font-semibold mb-2">Vacation Schedule</h3>
-            <p className="text-muted-foreground">
-              Your vacation plans will appear here once submitted by your department head
-            </p>
-          </div>
+          <VacationPlansList staffView={true} />
         </TabsContent>
       </Tabs>
     </DashboardLayout>

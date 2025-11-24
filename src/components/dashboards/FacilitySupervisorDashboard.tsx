@@ -3,9 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import DashboardLayout from '@/components/DashboardLayout';
 import TaskManager from '@/components/tasks/TaskManager';
+import VacationApprovalWorkflow from '@/components/vacation/VacationApprovalWorkflow';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClipboardList, CheckSquare } from 'lucide-react';
-import { Card } from '@/components/ui/card';
 
 const FacilitySupervisorDashboard = () => {
   const { user } = useAuth();
@@ -54,13 +54,11 @@ const FacilitySupervisorDashboard = () => {
         </TabsContent>
 
         <TabsContent value="approvals">
-          <Card className="p-12 text-center">
-            <CheckSquare className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-xl font-semibold mb-2">Vacation Approvals</h3>
-            <p className="text-muted-foreground">
-              Vacation approval interface coming soon
-            </p>
-          </Card>
+          <VacationApprovalWorkflow 
+            approvalLevel={2} 
+            scopeType="facility" 
+            scopeId={userRole.facility_id} 
+          />
         </TabsContent>
       </Tabs>
     </DashboardLayout>
