@@ -440,29 +440,31 @@ const AccessManagement = () => {
                         {selectedDept.department_heads && selectedDept.department_heads.length > 0 ? (
                           <div className="space-y-2">
                             {selectedDept.department_heads.map((head: any) => (
-                          <div key={head.id} className="flex items-center justify-between p-2 bg-background rounded">
-                            <div>
-                              <p className="font-medium text-sm">{head.full_name}</p>
-                              <p className="text-xs text-muted-foreground">{head.email}</p>
-                            </div>
+                              <div key={head.id} className="flex items-center justify-between p-2 bg-background rounded">
+                                <div>
+                                  <p className="font-medium text-sm">{head.full_name}</p>
+                                  <p className="text-xs text-muted-foreground">{head.email}</p>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No department head assigned</p>
+                        )}
+                        <div className="pt-2 border-t">
+                          <p className="text-sm text-muted-foreground">
+                            Current Staff Count: <span className="font-semibold">{selectedDept.staff_count}</span>
+                          </p>
+                        </div>
                       </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No department head assigned</p>
-                    )}
-                    <div className="pt-2 border-t">
-                      <p className="text-sm text-muted-foreground">
-                        Current Staff Count: <span className="font-semibold">{selectedDept.staff_count}</span>
-                      </p>
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
       {/* Department Head Assignment */}
       {selectedFacility && mainDepartmentsOnly.length > 0 && (
@@ -707,8 +709,6 @@ const AccessManagement = () => {
           )}
         </CardContent>
       </Card>
-            </>
-          )}
     </div>
   );
 };
