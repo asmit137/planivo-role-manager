@@ -18,6 +18,13 @@ const AccessManagement = () => {
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [emails, setEmails] = useState('');
+  
+  // Department Head assignment states
+  const [selectedMainDepartment, setSelectedMainDepartment] = useState('');
+  const [deptHeadEmail, setDeptHeadEmail] = useState('');
+  const [deptHeadPassword, setDeptHeadPassword] = useState('');
+  const [deptHeadName, setDeptHeadName] = useState('');
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -139,19 +146,21 @@ const AccessManagement = () => {
     ? departments 
     : departments.filter((d: any) => d.category === selectedCategory);
   
-  // Flatten departments to include subdepartments
-  const allDepartments: any[] = [];
+  // Flatten to get ONLY subdepartments (for staff assignment)
+  const subdepartmentsOnly: any[] = [];
   filteredDepartments.forEach((dept: any) => {
-    allDepartments.push(dept);
     if (dept.subdepartments && dept.subdepartments.length > 0) {
       dept.subdepartments.forEach((subDept: any) => {
-        allDepartments.push({ ...subDept, isSubDepartment: true, parentName: dept.name });
+        subdepartmentsOnly.push({ ...subDept, isSubDepartment: true, parentName: dept.name });
       });
     }
   });
   
-  // Get selected department details
-  const selectedDept = allDepartments.find(d => d.id === selectedDepartment);
+  // Main departments only (for department head assignment)
+  const mainDepartmentsOnly = filteredDepartments.filter((dept: any) => !dept.parent_department_id);
+  
+  // Get selected subdepartment details
+  const selectedDept = subdepartmentsOnly.find(d => d.id === selectedDepartment);
   
   // Get unique categories from all departments
   const categories = Array.from(new Set(departments.map((d: any) => d.category).filter(Boolean)));
@@ -183,11 +192,52 @@ const AccessManagement = () => {
     },
   });
 
+  const createDeptHeadMutation = useMutation({
+    mutationFn: async ({ email, password, full_name, department_id }: { 
+      email: string; 
+      password: string; 
+      full_name: string; 
+      department_id: string;
+    }) => {
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: { 
+          email, 
+          password, 
+          full_name, 
+          role: 'department_head',
+          department_id 
+        },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Success',
+        description: 'Department Head created successfully',
+      });
+      setDeptHeadEmail('');
+      setDeptHeadPassword('');
+      setDeptHeadName('');
+      setSelectedMainDepartment('');
+      queryClient.invalidateQueries({ queryKey: ['organization-hierarchy'] });
+      queryClient.invalidateQueries({ queryKey: ['totalUsers'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handleSubmit = () => {
     if (!emails.trim() || !selectedDepartment) {
       toast({
         title: 'Missing Information',
-        description: 'Please select a department and enter email addresses',
+        description: 'Please select a subdepartment and enter email addresses',
         variant: 'destructive',
       });
       return;
@@ -213,6 +263,24 @@ const AccessManagement = () => {
     });
   };
 
+  const handleCreateDeptHead = () => {
+    if (!deptHeadEmail || !deptHeadPassword || !deptHeadName || !selectedMainDepartment) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please fill all fields and select a main department',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    createDeptHeadMutation.mutate({
+      email: deptHeadEmail,
+      password: deptHeadPassword,
+      full_name: deptHeadName,
+      department_id: selectedMainDepartment,
+    });
+  };
+
   return (
     <div className="space-y-6">
       <Card className="border-2">
@@ -226,6 +294,16 @@ const AccessManagement = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Hierarchy Rules Info */}
+          <div className="mb-6 p-4 rounded-lg bg-primary/5 border border-primary/20">
+            <h4 className="font-semibold mb-2">Assignment Rules:</h4>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              <li>✓ <strong>Department Heads</strong> → Assigned to <strong>Main Departments</strong> (e.g., Surgery, Emergency)</li>
+              <li>✓ <strong>Staff Members</strong> → Assigned to <strong>Subdepartments</strong> (e.g., General Surgery, Trauma Unit)</li>
+              <li>✓ Department Heads manage their team within their department category</li>
+            </ul>
+          </div>
+          
           <div className="space-y-6">
             {/* Hierarchy Selection */}
             <div className="space-y-4">
@@ -295,35 +373,43 @@ const AccessManagement = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>4. Select Department / Sub-Department</Label>
+                    <Label>4. Select Sub-Department (Staff Assignment)</Label>
                     <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Choose department..." />
+                        <SelectValue placeholder="Choose subdepartment for staff..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {allDepartments.map((dept: any) => (
-                          <SelectItem key={dept.id} value={dept.id}>
-                            <div className="flex items-center justify-between w-full">
-                              <span className={dept.isSubDepartment ? "ml-4" : ""}>
-                                {dept.isSubDepartment && "↳ "}
-                                {dept.name}
-                                {dept.isSubDepartment && <span className="text-xs text-muted-foreground ml-1">({dept.parentName})</span>}
-                              </span>
-                              <div className="flex items-center gap-1">
-                                {dept.category && (
-                                  <Badge variant="secondary" className="text-xs capitalize mr-1">
-                                    {dept.category}
+                        {subdepartmentsOnly.length > 0 ? (
+                          subdepartmentsOnly.map((dept: any) => (
+                            <SelectItem key={dept.id} value={dept.id}>
+                              <div className="flex items-center justify-between w-full">
+                                <span>
+                                  ↳ {dept.name}
+                                  <span className="text-xs text-muted-foreground ml-1">({dept.parentName})</span>
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  {dept.category && (
+                                    <Badge variant="secondary" className="text-xs capitalize mr-1">
+                                      {dept.category}
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="text-xs">
+                                    {dept.staff_count} staff
                                   </Badge>
-                                )}
-                                <Badge variant="outline" className="text-xs">
-                                  {dept.staff_count} staff
-                                </Badge>
+                                </div>
                               </div>
-                            </div>
-                          </SelectItem>
-                        ))}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="px-2 py-4 text-sm text-muted-foreground text-center">
+                            No subdepartments available. Create subdepartments first.
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Staff can only be assigned to subdepartments, not main departments
+                    </p>
                   </div>
                 </>
               )}
@@ -362,6 +448,97 @@ const AccessManagement = () => {
         </CardContent>
       </Card>
 
+      {/* Department Head Assignment */}
+      {selectedFacility && mainDepartmentsOnly.length > 0 && (
+        <Card className="border-2 border-blue-500/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Assign Department Head
+            </CardTitle>
+            <CardDescription>
+              Create and assign Department Head to a main department (not subdepartments)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Main Department</Label>
+              <Select value={selectedMainDepartment} onValueChange={setSelectedMainDepartment}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select main department..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {mainDepartmentsOnly.map((dept: any) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-medium">{dept.name}</span>
+                        <div className="flex items-center gap-1">
+                          {dept.category && (
+                            <Badge variant="secondary" className="text-xs capitalize mr-1">
+                              {dept.category}
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="text-xs">
+                            {dept.department_heads?.length || 0} heads
+                          </Badge>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedMainDepartment && (
+              <div className="space-y-4 p-4 rounded-lg bg-muted/30 border">
+                <div className="space-y-2">
+                  <Label htmlFor="dept-head-name">Full Name *</Label>
+                  <Input
+                    id="dept-head-name"
+                    placeholder="John Doe"
+                    value={deptHeadName}
+                    onChange={(e) => setDeptHeadName(e.target.value)}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="dept-head-email">Email *</Label>
+                  <Input
+                    id="dept-head-email"
+                    type="email"
+                    placeholder="john@example.com"
+                    value={deptHeadEmail}
+                    onChange={(e) => setDeptHeadEmail(e.target.value)}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="dept-head-password">Password *</Label>
+                  <Input
+                    id="dept-head-password"
+                    type="password"
+                    placeholder="Minimum 6 characters"
+                    value={deptHeadPassword}
+                    onChange={(e) => setDeptHeadPassword(e.target.value)}
+                  />
+                </div>
+
+                <Button
+                  onClick={handleCreateDeptHead}
+                  disabled={createDeptHeadMutation.isPending}
+                  className="w-full"
+                >
+                  {createDeptHeadMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Create Department Head
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Bulk Staff Creation */}
       {selectedDepartment && (
         <Card className="border-2 border-primary/20">
@@ -371,7 +548,7 @@ const AccessManagement = () => {
               Bulk Staff Creation
             </CardTitle>
             <CardDescription>
-              Add multiple staff members to <span className="font-semibold">{selectedDept?.name}</span> department. 
+              Add multiple staff members to <span className="font-semibold">{selectedDept?.name}</span> subdepartment ({selectedDept?.parentName}).
               Default password: 1234 (must be changed on first login)
             </CardDescription>
           </CardHeader>
