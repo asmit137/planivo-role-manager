@@ -12,6 +12,72 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+// Department presets organized by category
+const departmentPresets = {
+  medical: {
+    departments: [
+      { name: 'Emergency Department', min_staffing: 5, subdepartments: [] },
+      { name: 'Surgery', min_staffing: 8, subdepartments: ['General Surgery', 'Cardiovascular Surgery', 'Neurosurgery', 'Plastic Surgery'] },
+      { name: 'Intensive Care Unit (ICU)', min_staffing: 6, subdepartments: ['Medical ICU', 'Surgical ICU', 'Neonatal ICU'] },
+      { name: 'Cardiology', min_staffing: 4, subdepartments: [] },
+      { name: 'Pediatrics', min_staffing: 5, subdepartments: [] },
+      { name: 'Radiology', min_staffing: 3, subdepartments: ['X-Ray', 'MRI', 'CT Scan', 'Ultrasound'] },
+      { name: 'Neurology', min_staffing: 4, subdepartments: [] },
+      { name: 'Oncology', min_staffing: 4, subdepartments: [] },
+      { name: 'Orthopedics', min_staffing: 4, subdepartments: [] },
+      { name: 'Laboratory Services', min_staffing: 3, subdepartments: [] },
+      { name: 'Pharmacy', min_staffing: 3, subdepartments: [] },
+      { name: 'Obstetrics and Gynecology', min_staffing: 5, subdepartments: [] },
+      { name: 'Anesthesiology', min_staffing: 4, subdepartments: [] },
+      { name: 'Psychiatry', min_staffing: 3, subdepartments: [] },
+      { name: 'Dermatology', min_staffing: 2, subdepartments: [] },
+    ],
+  },
+  dental: {
+    departments: [
+      { name: 'General Dentistry', min_staffing: 3, subdepartments: [] },
+      { name: 'Orthodontics', min_staffing: 2, subdepartments: [] },
+      { name: 'Periodontics', min_staffing: 2, subdepartments: [] },
+      { name: 'Endodontics', min_staffing: 2, subdepartments: [] },
+      { name: 'Oral Surgery', min_staffing: 3, subdepartments: [] },
+      { name: 'Prosthodontics', min_staffing: 2, subdepartments: [] },
+      { name: 'Pediatric Dentistry', min_staffing: 2, subdepartments: [] },
+      { name: 'Cosmetic Dentistry', min_staffing: 2, subdepartments: [] },
+    ],
+  },
+  engineering: {
+    departments: [
+      { name: 'Software Engineering', min_staffing: 5, subdepartments: ['Frontend Development', 'Backend Development', 'DevOps', 'Quality Assurance', 'Mobile Development'] },
+      { name: 'Mechanical Engineering', min_staffing: 4, subdepartments: ['Design Engineering', 'Manufacturing', 'Thermal Systems'] },
+      { name: 'Electrical Engineering', min_staffing: 4, subdepartments: ['Power Systems', 'Control Systems', 'Electronics'] },
+      { name: 'Civil Engineering', min_staffing: 4, subdepartments: ['Structural Engineering', 'Transportation Engineering', 'Geotechnical Engineering', 'Water Resources'] },
+      { name: 'Chemical Engineering', min_staffing: 3, subdepartments: [] },
+      { name: 'Industrial Engineering', min_staffing: 3, subdepartments: [] },
+      { name: 'Aerospace Engineering', min_staffing: 3, subdepartments: [] },
+      { name: 'Biomedical Engineering', min_staffing: 3, subdepartments: [] },
+      { name: 'Environmental Engineering', min_staffing: 3, subdepartments: [] },
+      { name: 'Computer Engineering', min_staffing: 4, subdepartments: [] },
+    ],
+  },
+  administration: {
+    departments: [
+      { name: 'Human Resources', min_staffing: 2, subdepartments: ['Recruitment', 'Payroll', 'Benefits'] },
+      { name: 'Finance', min_staffing: 3, subdepartments: ['Accounting', 'Budgeting', 'Auditing'] },
+      { name: 'Legal', min_staffing: 2, subdepartments: [] },
+      { name: 'Marketing', min_staffing: 3, subdepartments: ['Digital Marketing', 'Brand Management', 'Communications'] },
+      { name: 'Customer Service', min_staffing: 4, subdepartments: [] },
+    ],
+  },
+  operations: {
+    departments: [
+      { name: 'Maintenance', min_staffing: 3, subdepartments: ['Electrical Maintenance', 'Mechanical Maintenance', 'Building Maintenance'] },
+      { name: 'Security', min_staffing: 4, subdepartments: [] },
+      { name: 'Housekeeping', min_staffing: 5, subdepartments: [] },
+      { name: 'Logistics', min_staffing: 3, subdepartments: ['Procurement', 'Inventory', 'Distribution'] },
+    ],
+  },
+};
+
 const DepartmentManagement = () => {
   const [open, setOpen] = useState(false);
   const [departmentName, setDepartmentName] = useState('');
@@ -19,6 +85,7 @@ const DepartmentManagement = () => {
   const [selectedFacility, setSelectedFacility] = useState('');
   const [parentDepartment, setParentDepartment] = useState<string>('');
   const [minStaffing, setMinStaffing] = useState<number>(1);
+  const [usePreset, setUsePreset] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: organizationData } = useQuery({
@@ -183,6 +250,29 @@ const DepartmentManagement = () => {
   const selectedFacilityData = facilities.find(f => f.id === selectedFacility);
   const parentDepartments = selectedFacilityData?.departments.filter(d => !d.parent_department_id) || [];
 
+  // Get preset departments for selected category
+  const categoryPresets = category ? departmentPresets[category as keyof typeof departmentPresets] : null;
+  
+  // Get subdepartment presets for selected parent department
+  const selectedParentDept = parentDepartments.find(d => d.id === parentDepartment);
+  const parentPreset = categoryPresets?.departments.find(d => d.name === selectedParentDept?.name);
+
+  // Handle preset selection
+  const handlePresetSelect = (presetName: string) => {
+    const preset = categoryPresets?.departments.find(d => d.name === presetName);
+    if (preset) {
+      setDepartmentName(preset.name);
+      setMinStaffing(preset.min_staffing);
+      setUsePreset(true);
+    }
+  };
+
+  const handleSubdepartmentPresetSelect = (subName: string) => {
+    setDepartmentName(subName);
+    setMinStaffing(2);
+    setUsePreset(true);
+  };
+
   return (
     <div className="space-y-6">
       <Card className="border-2">
@@ -245,25 +335,77 @@ const DepartmentManagement = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Select value={category} onValueChange={setCategory}>
+                    <Label htmlFor="category">Category *</Label>
+                    <Select value={category} onValueChange={(val) => {
+                      setCategory(val);
+                      setDepartmentName('');
+                      setParentDepartment('');
+                      setUsePreset(false);
+                    }}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select category (optional)" />
+                        <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="medical">Medical</SelectItem>
+                        <SelectItem value="dental">Dental</SelectItem>
                         <SelectItem value="engineering">Engineering</SelectItem>
                         <SelectItem value="administration">Administration</SelectItem>
-                        <SelectItem value="support">Support</SelectItem>
                         <SelectItem value="operations">Operations</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
+                  {/* Show preset departments when category is selected and no parent department */}
+                  {category && !parentDepartment && categoryPresets && (
+                    <div className="space-y-2">
+                      <Label>Department Presets (Optional)</Label>
+                      <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-2 bg-muted/30">
+                        {categoryPresets.departments.map((preset) => (
+                          <Button
+                            key={preset.name}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start text-left"
+                            onClick={() => handlePresetSelect(preset.name)}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span>{preset.name}</span>
+                              <Badge variant="secondary" className="text-xs">
+                                Min: {preset.min_staffing}
+                              </Badge>
+                            </div>
+                          </Button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Click a preset to auto-fill the department name and staffing
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="dept-name">Department Name *</Label>
+                    <Input
+                      id="dept-name"
+                      placeholder="e.g., Emergency Department"
+                      value={departmentName}
+                      onChange={(e) => {
+                        setDepartmentName(e.target.value);
+                        setUsePreset(false);
+                      }}
+                      required
+                    />
+                  </div>
+
                   {selectedFacility && parentDepartments.length > 0 && (
                     <div className="space-y-2">
                       <Label htmlFor="parent">Parent Department (Optional)</Label>
-                      <Select value={parentDepartment} onValueChange={setParentDepartment}>
+                      <Select value={parentDepartment} onValueChange={(val) => {
+                        setParentDepartment(val);
+                        setDepartmentName('');
+                        setUsePreset(false);
+                      }}>
                         <SelectTrigger>
                           <SelectValue placeholder="None (main department)" />
                         </SelectTrigger>
@@ -276,6 +418,30 @@ const DepartmentManagement = () => {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                  )}
+
+                  {/* Show subdepartment presets when parent department is selected */}
+                  {parentDepartment && parentPreset && parentPreset.subdepartments.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Subdepartment Presets (Optional)</Label>
+                      <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-2 bg-muted/30">
+                        {parentPreset.subdepartments.map((subName) => (
+                          <Button
+                            key={subName}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start"
+                            onClick={() => handleSubdepartmentPresetSelect(subName)}
+                          >
+                            ↳ {subName}
+                          </Button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Click a preset to auto-fill the subdepartment name
+                      </p>
                     </div>
                   )}
 
