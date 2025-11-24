@@ -7,20 +7,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Building2, FolderPlus, Plus, Users, Trash2, ChevronDown } from 'lucide-react';
+import { Building2, FolderPlus, Plus, Users, Trash2, ChevronDown, Pencil } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
+import { z } from 'zod';
+
+const departmentSchema = z.object({
+  name: z.string()
+    .trim()
+    .min(2, 'Name must be at least 2 characters')
+    .max(100, 'Name must be less than 100 characters'),
+  min_staffing: z.number()
+    .int()
+    .min(1, 'Minimum staffing must be at least 1')
+    .max(100, 'Minimum staffing must be less than 100'),
+});
 
 const DepartmentManagement = () => {
   const [createDeptOpen, setCreateDeptOpen] = useState(false);
   const [addSubDeptOpen, setAddSubDeptOpen] = useState(false);
+  const [editDeptOpen, setEditDeptOpen] = useState(false);
   const [departmentName, setDepartmentName] = useState('');
   const [subdepartmentName, setSubdepartmentName] = useState('');
   const [selectedFacility, setSelectedFacility] = useState('');
   const [selectedParentDept, setSelectedParentDept] = useState<any>(null);
+  const [editingDept, setEditingDept] = useState<any>(null);
   const [minStaffing, setMinStaffing] = useState<number>(1);
+  const [errors, setErrors] = useState<{ name?: string; min_staffing?: string }>({});
   const queryClient = useQueryClient();
 
   const { data: organizationData, isLoading, isError, error } = useQuery({
@@ -163,6 +178,37 @@ const DepartmentManagement = () => {
     },
   });
 
+  const updateDepartmentMutation = useMutation({
+    mutationFn: async (data: { id: string; name: string; min_staffing: number }) => {
+      // Validate input
+      const validated = departmentSchema.parse({
+        name: data.name,
+        min_staffing: data.min_staffing,
+      });
+
+      const { error } = await supabase
+        .from('departments')
+        .update({
+          name: validated.name,
+          min_staffing: validated.min_staffing,
+        })
+        .eq('id', data.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['departments-hierarchy'] });
+      queryClient.invalidateQueries({ queryKey: ['organization-hierarchy'] });
+      toast.success('Department updated successfully');
+      setEditDeptOpen(false);
+      setEditingDept(null);
+      setErrors({});
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to update department');
+    },
+  });
+
   const handleCreateDepartment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!departmentName.trim() || !selectedFacility) {
@@ -190,6 +236,42 @@ const DepartmentManagement = () => {
       parent_department_id: selectedParentDept.id,
       min_staffing: 1,
     });
+  };
+
+  const handleEditDepartment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDept) return;
+
+    // Validate input
+    try {
+      departmentSchema.parse({
+        name: editingDept.name,
+        min_staffing: editingDept.min_staffing,
+      });
+      setErrors({});
+
+      updateDepartmentMutation.mutate({
+        id: editingDept.id,
+        name: editingDept.name,
+        min_staffing: editingDept.min_staffing,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const fieldErrors: { name?: string; min_staffing?: string } = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            fieldErrors[err.path[0] as 'name' | 'min_staffing'] = err.message;
+          }
+        });
+        setErrors(fieldErrors);
+      }
+    }
+  };
+
+  const openEditDialog = (dept: any) => {
+    setEditingDept({ ...dept });
+    setErrors({});
+    setEditDeptOpen(true);
   };
 
   const facilities = organizationData?.flatMap(w => w.facilities) || [];
@@ -348,6 +430,13 @@ const DepartmentManagement = () => {
                                         <Button
                                           variant="ghost"
                                           size="sm"
+                                          onClick={() => openEditDialog(dept)}
+                                        >
+                                          <Pencil className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
                                           onClick={() => deleteDepartmentMutation.mutate(dept.id)}
                                           disabled={deleteDepartmentMutation.isPending}
                                         >
@@ -368,15 +457,23 @@ const DepartmentManagement = () => {
                                                 {subDept.min_staffing}
                                               </Badge>
                                             </div>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                              onClick={() => deleteDepartmentMutation.mutate(subDept.id)}
-                                              disabled={deleteDepartmentMutation.isPending}
-                                            >
-                                              <Trash2 className="h-3 w-3 text-destructive" />
-                                            </Button>
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => openEditDialog(subDept)}
+                                              >
+                                                <Pencil className="h-3 w-3" />
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => deleteDepartmentMutation.mutate(subDept.id)}
+                                                disabled={deleteDepartmentMutation.isPending}
+                                              >
+                                                <Trash2 className="h-3 w-3 text-destructive" />
+                                              </Button>
+                                            </div>
                                           </div>
                                         ))}
                                       </div>
@@ -431,6 +528,64 @@ const DepartmentManagement = () => {
               {createDepartmentMutation.isPending ? 'Adding...' : 'Add Subdepartment'}
             </Button>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Department Dialog */}
+      <Dialog open={editDeptOpen} onOpenChange={setEditDeptOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Department</DialogTitle>
+            <DialogDescription>
+              Update department name and minimum staffing requirements
+            </DialogDescription>
+          </DialogHeader>
+          {editingDept && (
+            <form onSubmit={handleEditDepartment} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-dept-name">Department Name *</Label>
+                <Input
+                  id="edit-dept-name"
+                  placeholder="e.g., Surgery, Emergency, Cardiology"
+                  value={editingDept.name}
+                  onChange={(e) => {
+                    setEditingDept({ ...editingDept, name: e.target.value });
+                    if (errors.name) setErrors({ ...errors, name: undefined });
+                  }}
+                  required
+                />
+                {errors.name && (
+                  <p className="text-xs text-destructive">{errors.name}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-min-staffing">Minimum Staff Required *</Label>
+                <Input
+                  id="edit-min-staffing"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={editingDept.min_staffing}
+                  onChange={(e) => {
+                    setEditingDept({ ...editingDept, min_staffing: parseInt(e.target.value) || 1 });
+                    if (errors.min_staffing) setErrors({ ...errors, min_staffing: undefined });
+                  }}
+                  required
+                />
+                {errors.min_staffing && (
+                  <p className="text-xs text-destructive">{errors.min_staffing}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Minimum number of staff required for this department
+                </p>
+              </div>
+
+              <Button type="submit" className="w-full" disabled={updateDepartmentMutation.isPending}>
+                {updateDepartmentMutation.isPending ? 'Updating...' : 'Update Department'}
+              </Button>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
