@@ -15,9 +15,9 @@ import { z } from 'zod';
 import { Switch } from '@/components/ui/switch';
 
 const userSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z.string().trim().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  full_name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  full_name: z.string().trim().min(2, 'Name must be at least 2 characters').max(100),
   role: z.enum(['super_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff']),
 });
 
@@ -377,7 +377,7 @@ const UserManagement = () => {
                     type="email"
                     placeholder="user@example.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => setEmail(e.target.value.trim())}
                     required
                   />
                 </div>
