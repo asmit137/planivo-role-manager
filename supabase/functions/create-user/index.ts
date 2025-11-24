@@ -82,8 +82,11 @@ serve(async (req) => {
 
     if (createError) {
       console.error("User creation error:", createError);
+      const errorMessage = createError.message.includes('already been registered') 
+        ? `Email ${email} is already registered. Please use a different email address.`
+        : createError.message;
       return new Response(
-        JSON.stringify({ error: createError.message }),
+        JSON.stringify({ error: errorMessage }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

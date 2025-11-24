@@ -124,7 +124,14 @@ const UserManagement = () => {
           },
         });
 
-        if (error) throw error;
+        if (error) {
+          throw new Error(error.message || 'Failed to create user');
+        }
+        
+        if (data?.error) {
+          throw new Error(data.error);
+        }
+        
         return data;
       } catch (error: any) {
         if (error.name === 'ZodError') {
