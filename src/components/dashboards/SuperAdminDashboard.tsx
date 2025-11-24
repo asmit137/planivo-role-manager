@@ -1,7 +1,7 @@
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Users, Building2, Settings, Plus, Calendar, ClipboardList, CheckCircle, XCircle, Clock, TrendingUp, Building, LayoutDashboard, Folders, UserCircle, UsersRound, FolderTree, AlertCircle } from 'lucide-react';
+import { Users, Building2, Plus, Calendar, ClipboardList, CheckCircle, XCircle, Clock, TrendingUp, Building, LayoutDashboard, Folders, UserCircle, UsersRound, FolderTree, AlertCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -358,27 +358,6 @@ const SuperAdminDashboard = () => {
               </CardContent>
             </Card>
           </div>
-
-          {/* System Status */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                System Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">All Systems Operational</p>
-                  <p className="text-xs text-muted-foreground">Last checked: {format(new Date(), 'PPp')}</p>
-                </div>
-                <Badge className="bg-success text-lg px-4 py-2">Active</Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Separator className="my-8" />
 
           {/* Vacation Conflicts */}
           <Card>
