@@ -57,21 +57,35 @@ const Dashboard = () => {
 
   if (!roles || roles.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-semibold mb-2">No Role Assigned</h2>
-          <p className="text-muted-foreground">
-            Contact your administrator to get access
-          </p>
-          <Button 
-            variant="outline" 
-            onClick={async () => {
-              await supabase.auth.signOut();
-              navigate('/');
-            }}
-          >
-            Log Out
-          </Button>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-accent/5 to-background">
+        <div className="text-center space-y-6 max-w-md p-8">
+          <div className="space-y-2">
+            <h2 className="text-3xl font-bold">No Role Assigned</h2>
+            <p className="text-muted-foreground text-lg">
+              Contact your administrator to get access
+            </p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <Button 
+              size="lg"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate('/');
+              }}
+            >
+              Log Out
+            </Button>
+            <Button 
+              variant="outline"
+              size="lg"
+              onClick={() => {
+                supabase.auth.signOut();
+                navigate('/bootstrap');
+              }}
+            >
+              Go to Bootstrap Setup
+            </Button>
+          </div>
         </div>
       </div>
     );
