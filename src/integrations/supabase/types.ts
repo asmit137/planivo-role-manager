@@ -417,6 +417,7 @@ export type Database = {
           facility_id: string | null
           id: string
           role: Database["public"]["Enums"]["app_role"]
+          specialty_id: string | null
           user_id: string
           workspace_id: string | null
         }
@@ -427,6 +428,7 @@ export type Database = {
           facility_id?: string | null
           id?: string
           role: Database["public"]["Enums"]["app_role"]
+          specialty_id?: string | null
           user_id: string
           workspace_id?: string | null
         }
@@ -437,6 +439,7 @@ export type Database = {
           facility_id?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          specialty_id?: string | null
           user_id?: string
           workspace_id?: string | null
         }
@@ -456,6 +459,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "user_roles_specialty_id_fkey"
+            columns: ["specialty_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "user_roles_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -469,7 +479,10 @@ export type Database = {
           approval_level: number
           approver_id: string
           comments: string | null
+          conflict_reason: string | null
+          conflicting_plans: Json | null
           created_at: string
+          has_conflict: boolean | null
           id: string
           status: string
           updated_at: string
@@ -479,7 +492,10 @@ export type Database = {
           approval_level: number
           approver_id: string
           comments?: string | null
+          conflict_reason?: string | null
+          conflicting_plans?: Json | null
           created_at?: string
+          has_conflict?: boolean | null
           id?: string
           status: string
           updated_at?: string
@@ -489,7 +505,10 @@ export type Database = {
           approval_level?: number
           approver_id?: string
           comments?: string | null
+          conflict_reason?: string | null
+          conflicting_plans?: Json | null
           created_at?: string
+          has_conflict?: boolean | null
           id?: string
           status?: string
           updated_at?: string
@@ -686,6 +705,10 @@ export type Database = {
       can_view_task: {
         Args: { _task_id: string; _user_id: string }
         Returns: boolean
+      }
+      check_vacation_conflicts: {
+        Args: { _department_id: string; _vacation_plan_id: string }
+        Returns: Json
       }
       get_user_workspaces: { Args: { _user_id: string }; Returns: string[] }
       has_role: {
