@@ -48,8 +48,37 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
 
   // Fetch all vacation plans with conflicts
   const { data: conflictData, isLoading } = useQuery({
-    queryKey: ['vacation-conflicts', scopeId, selectedDepartment, startDate, endDate],
+    queryKey: ['vacation-conflicts', scopeType, scopeId, selectedDepartment, startDate, endDate],
     queryFn: async () => {
+      // Get department IDs based on scope
+      let allowedDepartmentIds: string[] = [];
+      
+      if (scopeType === 'facility' && scopeId) {
+        // Facility Supervisor: only departments in their facility
+        const { data: depts } = await supabase
+          .from('departments')
+          .select('id')
+          .eq('facility_id', scopeId);
+        allowedDepartmentIds = depts?.map(d => d.id) || [];
+      } else if (scopeType === 'workspace' && scopeId) {
+        // Workplace Supervisor: departments in all facilities in their workspace
+        const { data: facilities } = await supabase
+          .from('facilities')
+          .select('id')
+          .eq('workspace_id', scopeId);
+        const facilityIds = facilities?.map(f => f.id) || [];
+        
+        const { data: depts } = await supabase
+          .from('departments')
+          .select('id')
+          .in('facility_id', facilityIds);
+        allowedDepartmentIds = depts?.map(d => d.id) || [];
+      } else if (scopeType === 'department' && scopeId) {
+        // Department Head: only their department
+        allowedDepartmentIds = [scopeId];
+      }
+      // else scopeType === 'all': Super Admin sees all departments
+
       // Fetch all approved or pending vacation plans
       let query = supabase
         .from('vacation_plans')
@@ -63,7 +92,12 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
         `)
         .in('status', ['facility_pending', 'workspace_pending', 'approved_level2', 'approved_final']);
 
-      // Filter by department if selected
+      // Apply scope filtering
+      if (scopeType !== 'all' && allowedDepartmentIds.length > 0) {
+        query = query.in('department_id', allowedDepartmentIds);
+      }
+
+      // Filter by specific department if selected
       if (selectedDepartment && selectedDepartment !== 'all') {
         query = query.eq('department_id', selectedDepartment);
       }
