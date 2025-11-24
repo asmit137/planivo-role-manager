@@ -148,7 +148,7 @@ const Auth = () => {
       {/* Bottom branding */}
       <div className="absolute bottom-6 left-0 right-0 text-center z-10">
         <p className="text-xs text-muted-foreground/60">
-          Secure Enterprise Solution
+          Powered By <span className="font-semibold text-foreground/80">INMATION.AI</span>
         </p>
       </div>
     </div>
