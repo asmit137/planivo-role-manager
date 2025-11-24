@@ -789,6 +789,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          max_vacation_splits: number
           name: string
           updated_at: string
         }
@@ -796,6 +797,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          max_vacation_splits?: number
           name: string
           updated_at?: string
         }
@@ -803,6 +805,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          max_vacation_splits?: number
           name?: string
           updated_at?: string
         }

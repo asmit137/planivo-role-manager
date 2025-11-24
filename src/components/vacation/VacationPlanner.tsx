@@ -21,7 +21,13 @@ interface VacationSplit {
   days: number;
 }
 
-const VacationPlanner = ({ departmentId }: { departmentId: string }) => {
+interface VacationPlannerProps {
+  departmentId?: string;
+  maxSplits?: number;
+  staffOnly?: boolean;
+}
+
+const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: VacationPlannerProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedStaff, setSelectedStaff] = useState('');
@@ -45,6 +51,7 @@ const VacationPlanner = ({ departmentId }: { departmentId: string }) => {
   const { data: departmentStaff } = useQuery({
     queryKey: ['department-staff', departmentId],
     queryFn: async () => {
+      if (!departmentId) return [];
       const { data, error } = await supabase
         .from('user_roles')
         .select('user_id, profiles(id, full_name, email)')
@@ -53,15 +60,33 @@ const VacationPlanner = ({ departmentId }: { departmentId: string }) => {
       if (error) throw error;
       return data;
     },
+    enabled: !staffOnly && !!departmentId,
   });
 
   const createPlanMutation = useMutation({
     mutationFn: async (planData: any) => {
+      // Get the user's department for staff-only mode
+      let targetDepartmentId = departmentId;
+      
+      if (staffOnly) {
+        const { data: staffRole } = await supabase
+          .from('user_roles')
+          .select('department_id')
+          .eq('user_id', user?.id)
+          .eq('role', 'staff')
+          .maybeSingle();
+        
+        if (!staffRole?.department_id) {
+          throw new Error('No department assigned to staff member');
+        }
+        targetDepartmentId = staffRole.department_id;
+      }
+      
       const { data: plan, error: planError } = await supabase
         .from('vacation_plans')
         .insert({
-          staff_id: planData.staff_id,
-          department_id: departmentId,
+          staff_id: staffOnly ? user?.id : planData.staff_id,
+          department_id: targetDepartmentId,
           vacation_type_id: planData.vacation_type_id,
           total_days: planData.total_days,
           notes: planData.notes,
@@ -96,8 +121,8 @@ const VacationPlanner = ({ departmentId }: { departmentId: string }) => {
   });
 
   const addSplit = () => {
-    if (splits.length >= 6) {
-      toast.error('Maximum 6 splits allowed');
+    if (splits.length >= maxSplits) {
+      toast.error(`Maximum ${maxSplits} splits allowed`);
       return;
     }
     setSplits([
@@ -135,8 +160,13 @@ const VacationPlanner = ({ departmentId }: { departmentId: string }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedStaff || !selectedVacationType) {
-      toast.error('Please select staff and vacation type');
+    if (!staffOnly && !selectedStaff) {
+      toast.error('Please select staff member');
+      return;
+    }
+    
+    if (!selectedVacationType) {
+      toast.error('Please select vacation type');
       return;
     }
 
@@ -162,21 +192,23 @@ const VacationPlanner = ({ departmentId }: { departmentId: string }) => {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label>Staff Member</Label>
-            <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select staff" />
-              </SelectTrigger>
-              <SelectContent>
-                {departmentStaff?.map((staff: any) => (
-                  <SelectItem key={staff.user_id} value={staff.user_id}>
-                    {staff.profiles.full_name} ({staff.profiles.email})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!staffOnly && (
+            <div>
+              <Label>Staff Member</Label>
+              <Select value={selectedStaff} onValueChange={setSelectedStaff}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select staff" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departmentStaff?.map((staff: any) => (
+                    <SelectItem key={staff.user_id} value={staff.user_id}>
+                      {staff.profiles.full_name} ({staff.profiles.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div>
             <Label>Vacation Type</Label>

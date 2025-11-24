@@ -18,12 +18,18 @@ const workspaceSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name too long'),
 });
 
+const workspaceSettingsSchema = z.object({
+  max_vacation_splits: z.number().min(1, 'Minimum 1 split').max(20, 'Maximum 20 splits'),
+});
+
 const WorkspaceManagement = () => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
   const [manageDepartmentsOpen, setManageDepartmentsOpen] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState<any>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [maxVacationSplits, setMaxVacationSplits] = useState(6);
   const queryClient = useQueryClient();
 
   const { data: workspaces, isLoading } = useQuery({
@@ -143,6 +149,27 @@ const WorkspaceManagement = () => {
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to delete workspace');
+    },
+  });
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async ({ workspaceId, maxSplits }: { workspaceId: string; maxSplits: number }) => {
+      const validated = workspaceSettingsSchema.parse({ max_vacation_splits: maxSplits });
+      
+      const { error } = await supabase
+        .from('workspaces')
+        .update({ max_vacation_splits: validated.max_vacation_splits })
+        .eq('id', workspaceId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      toast.success('Workspace settings updated');
+      setSettingsOpen(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to update settings');
     },
   });
 
@@ -364,6 +391,17 @@ const WorkspaceManagement = () => {
                     Departments
                   </Button>
                   <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedWorkspace(workspace);
+                      setMaxVacationSplits(workspace.max_vacation_splits || 6);
+                      setSettingsOpen(true);
+                    }}
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                  <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => deleteMutation.mutate(workspace.id)}
@@ -498,6 +536,54 @@ const WorkspaceManagement = () => {
                 );
               })
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Workspace Settings Dialog */}
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Workspace Settings</DialogTitle>
+            <DialogDescription>
+              Configure settings for {selectedWorkspace?.name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="max-splits">Maximum Vacation Splits</Label>
+              <Input
+                id="max-splits"
+                type="number"
+                min="1"
+                max="20"
+                value={maxVacationSplits}
+                onChange={(e) => setMaxVacationSplits(parseInt(e.target.value) || 6)}
+              />
+              <p className="text-xs text-muted-foreground">
+                How many vacation periods staff can split their vacation into (1-20)
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setSettingsOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedWorkspace) {
+                  updateSettingsMutation.mutate({
+                    workspaceId: selectedWorkspace.id,
+                    maxSplits: maxVacationSplits,
+                  });
+                }
+              }}
+              disabled={updateSettingsMutation.isPending}
+            >
+              Save Settings
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
