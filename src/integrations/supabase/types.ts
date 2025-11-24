@@ -122,8 +122,9 @@ export type Database = {
           category: string | null
           created_at: string
           created_by: string | null
-          facility_id: string
+          facility_id: string | null
           id: string
+          is_template: boolean | null
           min_staffing: number | null
           name: string
           parent_department_id: string | null
@@ -133,8 +134,9 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
-          facility_id: string
+          facility_id?: string | null
           id?: string
+          is_template?: boolean | null
           min_staffing?: number | null
           name: string
           parent_department_id?: string | null
@@ -144,8 +146,9 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
-          facility_id?: string
+          facility_id?: string | null
           id?: string
+          is_template?: boolean | null
           min_staffing?: number | null
           name?: string
           parent_department_id?: string | null
@@ -708,6 +711,78 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      workspace_categories: {
+        Row: {
+          category_id: string
+          created_at: string | null
+          id: string
+          workspace_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string | null
+          id?: string
+          workspace_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string | null
+          id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_categories_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_departments: {
+        Row: {
+          created_at: string | null
+          department_template_id: string
+          id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          department_template_id: string
+          id?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string | null
+          department_template_id?: string
+          id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_departments_department_template_id_fkey"
+            columns: ["department_template_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_departments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       workspaces: {
         Row: {

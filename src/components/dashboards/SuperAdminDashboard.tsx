@@ -187,13 +187,6 @@ const SuperAdminDashboard = () => {
               <Briefcase className="h-4 w-4" />
               <span className="hidden sm:inline">Categories</span>
             </TabsTrigger>
-            <TabsTrigger 
-              value="conflicts" 
-              className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
-            >
-              <AlertCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Conflicts</span>
-            </TabsTrigger>
           </TabsList>
         </Card>
 
@@ -392,6 +385,22 @@ const SuperAdminDashboard = () => {
               </div>
             </CardContent>
           </Card>
+
+          <Separator className="my-8" />
+
+          {/* Vacation Conflicts */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5" />
+                Vacation Conflicts
+              </CardTitle>
+              <CardDescription>Monitor and manage vacation scheduling conflicts</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <VacationConflictDashboard scopeType="all" />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="workspaces">
@@ -416,10 +425,6 @@ const SuperAdminDashboard = () => {
 
         <TabsContent value="categories">
           <CategoryManagement />
-        </TabsContent>
-
-        <TabsContent value="conflicts">
-          <VacationConflictDashboard scopeType="all" />
         </TabsContent>
       </Tabs>
     </DashboardLayout>
