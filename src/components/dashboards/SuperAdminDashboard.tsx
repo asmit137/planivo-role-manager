@@ -5,9 +5,11 @@ import { Users, Building2, Settings, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import WorkspaceManagement from '@/components/admin/WorkspaceManagement';
 import UserManagement from '@/components/admin/UserManagement';
 import AccessManagement from '@/components/admin/AccessManagement';
+import VacationTypeManagement from '@/components/vacation/VacationTypeManagement';
 
 const SuperAdminDashboard = () => {
   const { data: workspaces, isLoading: workspacesLoading } = useQuery({
@@ -74,9 +76,30 @@ const SuperAdminDashboard = () => {
       </div>
 
       <div className="space-y-6">
-        <AccessManagement />
-        <WorkspaceManagement />
-        <UserManagement />
+        <Tabs defaultValue="access" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="access">Access Management</TabsTrigger>
+            <TabsTrigger value="workspaces">Workspaces</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="vacation">Vacation Types</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="access">
+            <AccessManagement />
+          </TabsContent>
+
+          <TabsContent value="workspaces">
+            <WorkspaceManagement />
+          </TabsContent>
+
+          <TabsContent value="users">
+            <UserManagement />
+          </TabsContent>
+
+          <TabsContent value="vacation">
+            <VacationTypeManagement />
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );

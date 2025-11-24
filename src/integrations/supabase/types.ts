@@ -137,6 +137,117 @@ export type Database = {
         }
         Relationships: []
       }
+      task_assignments: {
+        Row: {
+          assigned_to: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          status: string
+          task_id: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          task_id: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          task_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_assignments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          created_at: string
+          created_by: string
+          department_id: string | null
+          description: string | null
+          due_date: string | null
+          facility_id: string | null
+          id: string
+          priority: string | null
+          scope_type: string
+          status: string
+          title: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          department_id?: string | null
+          description?: string | null
+          due_date?: string | null
+          facility_id?: string | null
+          id?: string
+          priority?: string | null
+          scope_type: string
+          status?: string
+          title: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          department_id?: string | null
+          description?: string | null
+          due_date?: string | null
+          facility_id?: string | null
+          id?: string
+          priority?: string | null
+          scope_type?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -191,6 +302,175 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      vacation_approvals: {
+        Row: {
+          approval_level: number
+          approver_id: string
+          comments: string | null
+          created_at: string
+          id: string
+          status: string
+          updated_at: string
+          vacation_plan_id: string
+        }
+        Insert: {
+          approval_level: number
+          approver_id: string
+          comments?: string | null
+          created_at?: string
+          id?: string
+          status: string
+          updated_at?: string
+          vacation_plan_id: string
+        }
+        Update: {
+          approval_level?: number
+          approver_id?: string
+          comments?: string | null
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          vacation_plan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vacation_approvals_vacation_plan_id_fkey"
+            columns: ["vacation_plan_id"]
+            isOneToOne: false
+            referencedRelation: "vacation_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vacation_plans: {
+        Row: {
+          created_at: string
+          created_by: string
+          department_id: string
+          id: string
+          notes: string | null
+          staff_id: string
+          status: string
+          submitted_at: string | null
+          total_days: number
+          updated_at: string
+          vacation_type_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          department_id: string
+          id?: string
+          notes?: string | null
+          staff_id: string
+          status?: string
+          submitted_at?: string | null
+          total_days: number
+          updated_at?: string
+          vacation_type_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          department_id?: string
+          id?: string
+          notes?: string | null
+          staff_id?: string
+          status?: string
+          submitted_at?: string | null
+          total_days?: number
+          updated_at?: string
+          vacation_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vacation_plans_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vacation_plans_vacation_type_id_fkey"
+            columns: ["vacation_type_id"]
+            isOneToOne: false
+            referencedRelation: "vacation_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vacation_splits: {
+        Row: {
+          created_at: string
+          days: number
+          end_date: string
+          id: string
+          start_date: string
+          vacation_plan_id: string
+        }
+        Insert: {
+          created_at?: string
+          days: number
+          end_date: string
+          id?: string
+          start_date: string
+          vacation_plan_id: string
+        }
+        Update: {
+          created_at?: string
+          days?: number
+          end_date?: string
+          id?: string
+          start_date?: string
+          vacation_plan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vacation_splits_vacation_plan_id_fkey"
+            columns: ["vacation_plan_id"]
+            isOneToOne: false
+            referencedRelation: "vacation_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vacation_types: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          max_days: number | null
+          name: string
+          requires_documentation: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_days?: number | null
+          name: string
+          requires_documentation?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_days?: number | null
+          name?: string
+          requires_documentation?: boolean | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       workspaces: {
         Row: {
