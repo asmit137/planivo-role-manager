@@ -5,6 +5,7 @@ import { LogOut } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import NotificationBell from '@/components/notifications/NotificationBell';
 import MessagingPanel from '@/components/messaging/MessagingPanel';
+import UserProfile from '@/components/UserProfile';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -32,6 +33,7 @@ const DashboardLayout = ({ children, title, roleLabel, roleColor = 'bg-primary' 
             <div className="flex items-center gap-2">
               <NotificationBell />
               <MessagingPanel />
+              <UserProfile />
               <Button onClick={signOut} variant="outline" size="sm">
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign Out
