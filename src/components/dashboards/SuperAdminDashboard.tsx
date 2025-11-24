@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import WorkspaceManagement from '@/components/admin/WorkspaceManagement';
 import UserManagement from '@/components/admin/UserManagement';
+import AccessManagement from '@/components/admin/AccessManagement';
 
 const SuperAdminDashboard = () => {
   const { data: workspaces, isLoading: workspacesLoading } = useQuery({
@@ -73,6 +74,7 @@ const SuperAdminDashboard = () => {
       </div>
 
       <div className="space-y-6">
+        <AccessManagement />
         <WorkspaceManagement />
         <UserManagement />
       </div>

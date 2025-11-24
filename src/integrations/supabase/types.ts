@@ -112,6 +112,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           email: string
+          force_password_change: boolean | null
           full_name: string
           id: string
           updated_at: string
@@ -120,6 +121,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           email: string
+          force_password_change?: boolean | null
           full_name: string
           id: string
           updated_at?: string
@@ -128,6 +130,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           email?: string
+          force_password_change?: boolean | null
           full_name?: string
           id?: string
           updated_at?: string

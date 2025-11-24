@@ -1,8 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import PasswordChangeDialog from '@/components/PasswordChangeDialog';
 import SuperAdminDashboard from '@/components/dashboards/SuperAdminDashboard';
 import GeneralAdminDashboard from '@/components/dashboards/GeneralAdminDashboard';
 import WorkplaceSupervisorDashboard from '@/components/dashboards/WorkplaceSupervisorDashboard';
@@ -14,6 +17,23 @@ const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const { data: roles, isLoading: rolesLoading } = useUserRole();
   const navigate = useNavigate();
+
+  // Check if user needs to change password
+  const { data: profile } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('force_password_change')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -27,6 +47,11 @@ const Dashboard = () => {
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  // Show password change dialog if needed
+  if (user && profile?.force_password_change) {
+    return <PasswordChangeDialog open={true} userId={user.id} />;
   }
 
   if (!roles || roles.length === 0) {
