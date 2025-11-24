@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
-import { CheckCircle2, XCircle, Calendar, User, FileText, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, Calendar, User, FileText, Clock, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -19,6 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Label } from '@/components/ui/label';
 
 interface VacationApprovalWorkflowProps {
   approvalLevel: 2 | 3;
@@ -33,6 +35,9 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
   const [comments, setComments] = useState('');
+  const [conflictData, setConflictData] = useState<any[]>([]);
+  const [showConflictDialog, setShowConflictDialog] = useState(false);
+  const [conflictReason, setConflictReason] = useState('');
 
   // Fetch pending vacation plans based on level
   const { data: pendingPlans, isLoading } = useQuery({
@@ -115,7 +120,35 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
   });
 
   const approvalMutation = useMutation({
-    mutationFn: async ({ planId, action, comments }: any) => {
+    mutationFn: async ({ 
+      planId, 
+      action, 
+      comments, 
+      hasConflict = false, 
+      conflictReason = '', 
+      conflictingPlans = [] 
+    }: any) => {
+      // Check for conflicts before approval (only for Department Head level)
+      if (action === 'approve' && approvalLevel === 2 && !hasConflict) {
+        const { data: planData } = await supabase
+          .from('vacation_plans')
+          .select('department_id')
+          .eq('id', planId)
+          .single();
+
+        if (planData) {
+          const { data: conflicts } = await supabase.rpc('check_vacation_conflicts', {
+            _vacation_plan_id: planId,
+            _department_id: planData.department_id
+          });
+
+          if (conflicts && Array.isArray(conflicts) && conflicts.length > 0) {
+            // Return conflicts to trigger dialog
+            throw new Error('CONFLICTS_DETECTED:' + JSON.stringify(conflicts));
+          }
+        }
+      }
+
       // Create or update approval record
       const { data: existingApproval } = await supabase
         .from('vacation_approvals')
@@ -130,6 +163,9 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         approver_id: user?.id,
         status: action === 'approve' ? 'approved' : 'rejected',
         comments: comments || null,
+        has_conflict: hasConflict,
+        conflict_reason: conflictReason || null,
+        conflicting_plans: (Array.isArray(conflictingPlans) && conflictingPlans.length > 0) ? conflictingPlans : null,
       };
 
       if (existingApproval) {
@@ -160,10 +196,23 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       queryClient.invalidateQueries({ queryKey: ['pending-vacation-plans'] });
       toast.success(`Vacation plan ${approvalAction === 'approve' ? 'approved' : 'rejected'}`);
       setShowApprovalDialog(false);
+      setShowConflictDialog(false);
       setSelectedPlan(null);
       setComments('');
+      setConflictReason('');
+      setConflictData([]);
     },
-    onError: () => toast.error('Failed to process approval'),
+    onError: (error: any) => {
+      if (error.message.startsWith('CONFLICTS_DETECTED:')) {
+        const conflictsJson = error.message.replace('CONFLICTS_DETECTED:', '');
+        const conflicts = JSON.parse(conflictsJson);
+        setConflictData(conflicts);
+        setShowApprovalDialog(false);
+        setShowConflictDialog(true);
+      } else {
+        toast.error('Failed to process approval');
+      }
+    },
   });
 
   const handleApprovalAction = (plan: any, action: 'approve' | 'reject') => {
@@ -178,6 +227,21 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       planId: selectedPlan.id,
       action: approvalAction,
       comments,
+    });
+  };
+
+  const confirmConflictApproval = () => {
+    if (!selectedPlan || !conflictReason.trim()) {
+      toast.error('Please provide a reason for approving despite conflicts');
+      return;
+    }
+    approvalMutation.mutate({
+      planId: selectedPlan.id,
+      action: 'approve',
+      comments,
+      hasConflict: true,
+      conflictReason,
+      conflictingPlans: conflictData,
     });
   };
 
@@ -411,6 +475,71 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                   Confirm Rejection
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Conflict Warning Dialog */}
+      <Dialog open={showConflictDialog} onOpenChange={setShowConflictDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              Vacation Conflict Detected
+            </DialogTitle>
+            <DialogDescription>
+              The following staff members from the same specialty have overlapping vacation periods:
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <ScrollArea className="max-h-60 border rounded-md p-4">
+              {conflictData.map((conflict, index) => (
+                <div key={index} className="mb-3 pb-3 border-b last:border-0">
+                  <p className="font-medium">{conflict.staff_name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {format(new Date(conflict.start_date), 'MMM dd, yyyy')} - {format(new Date(conflict.end_date), 'MMM dd, yyyy')}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{conflict.days} days</p>
+                </div>
+              ))}
+            </ScrollArea>
+
+            <div className="space-y-2">
+              <Label htmlFor="conflict-reason" className="text-destructive">
+                Acknowledgment & Reason for Approval *
+              </Label>
+              <Textarea
+                id="conflict-reason"
+                value={conflictReason}
+                onChange={(e) => setConflictReason(e.target.value)}
+                placeholder="I acknowledge the conflict and approve because..."
+                rows={4}
+                required
+              />
+              <p className="text-sm text-muted-foreground">
+                By providing a reason, you acknowledge responsibility for approving overlapping vacations in the same specialty.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowConflictDialog(false);
+                setConflictReason('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmConflictApproval}
+              disabled={approvalMutation.isPending || !conflictReason.trim()}
+            >
+              {approvalMutation.isPending ? 'Processing...' : 'Acknowledge & Approve'}
             </Button>
           </DialogFooter>
         </DialogContent>
