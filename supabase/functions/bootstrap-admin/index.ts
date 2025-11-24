@@ -63,6 +63,26 @@ serve(async (req) => {
       );
     }
 
+    // Check if a user with this email already exists in auth
+    const { data: { users }, error: listError } = await supabaseClient.auth.admin.listUsers();
+    
+    if (listError) {
+      console.error("Error listing users:", listError);
+    } else {
+      const existingAuthUser = users.find(u => u.email === email);
+      if (existingAuthUser) {
+        console.log(`Deleting existing auth user: ${existingAuthUser.id}`);
+        const { error: deleteError } = await supabaseClient.auth.admin.deleteUser(existingAuthUser.id);
+        if (deleteError) {
+          console.error("Error deleting existing user:", deleteError);
+          return new Response(
+            JSON.stringify({ error: "Failed to clean up existing user" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    }
+
     // Create the first super admin user
     const { data: newUser, error: createError } = await supabaseClient.auth.admin.createUser({
       email,
