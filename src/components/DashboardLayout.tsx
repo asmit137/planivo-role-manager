@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth';
-import { LogOut, Calendar } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface DashboardLayoutProps {
@@ -20,7 +20,6 @@ const DashboardLayout = ({ children, title, roleLabel, roleColor = 'bg-primary' 
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Calendar className="h-8 w-8 text-primary" />
               <div>
                 <h1 className="text-2xl font-display font-bold">Planivo</h1>
                 <Badge className={`${roleColor}/10 text-${roleColor} border-${roleColor}/20 text-xs mt-1`} variant="outline">
