@@ -16,6 +16,7 @@ const AccessManagement = () => {
   const [selectedWorkspace, setSelectedWorkspace] = useState('');
   const [selectedFacility, setSelectedFacility] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [emails, setEmails] = useState('');
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -133,9 +134,14 @@ const AccessManagement = () => {
   // Get filtered departments based on facility (including subdepartments)
   const departments = facilities.find(f => f.id === selectedFacility)?.departments || [];
   
+  // Filter by category if selected
+  const filteredDepartments = selectedCategory === 'all' 
+    ? departments 
+    : departments.filter((d: any) => d.category === selectedCategory);
+  
   // Flatten departments to include subdepartments
   const allDepartments: any[] = [];
-  departments.forEach((dept: any) => {
+  filteredDepartments.forEach((dept: any) => {
     allDepartments.push(dept);
     if (dept.subdepartments && dept.subdepartments.length > 0) {
       dept.subdepartments.forEach((subDept: any) => {
@@ -146,6 +152,9 @@ const AccessManagement = () => {
   
   // Get selected department details
   const selectedDept = allDepartments.find(d => d.id === selectedDepartment);
+  
+  // Get unique categories from all departments
+  const categories = Array.from(new Set(departments.map((d: any) => d.category).filter(Boolean)));
 
   const createStaffMutation = useMutation({
     mutationFn: async ({ emails, departmentId }: { emails: string[]; departmentId: string }) => {
@@ -262,30 +271,61 @@ const AccessManagement = () => {
               )}
 
               {selectedFacility && (
-                <div className="space-y-2">
-                  <Label>3. Select Department / Sub-Department</Label>
-                  <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose department..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allDepartments.map((dept: any) => (
-                        <SelectItem key={dept.id} value={dept.id}>
-                          <div className="flex items-center justify-between w-full">
-                            <span className={dept.isSubDepartment ? "ml-4" : ""}>
-                              {dept.isSubDepartment && "↳ "}
-                              {dept.name}
-                              {dept.isSubDepartment && <span className="text-xs text-muted-foreground ml-1">({dept.parentName})</span>}
-                            </span>
-                            <Badge variant="outline" className="ml-2">
-                              {dept.staff_count} staff
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label>3. Filter by Category (Optional)</Label>
+                    <Select value={selectedCategory} onValueChange={(val) => {
+                      setSelectedCategory(val);
+                      setSelectedDepartment('');
+                    }}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All categories..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {categories.map((category: string) => (
+                          <SelectItem key={category} value={category}>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="capitalize">{category}</Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>4. Select Department / Sub-Department</Label>
+                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose department..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allDepartments.map((dept: any) => (
+                          <SelectItem key={dept.id} value={dept.id}>
+                            <div className="flex items-center justify-between w-full">
+                              <span className={dept.isSubDepartment ? "ml-4" : ""}>
+                                {dept.isSubDepartment && "↳ "}
+                                {dept.name}
+                                {dept.isSubDepartment && <span className="text-xs text-muted-foreground ml-1">({dept.parentName})</span>}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                {dept.category && (
+                                  <Badge variant="secondary" className="text-xs capitalize mr-1">
+                                    {dept.category}
+                                  </Badge>
+                                )}
+                                <Badge variant="outline" className="text-xs">
+                                  {dept.staff_count} staff
+                                </Badge>
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
               )}
 
               {selectedDept && (
@@ -404,7 +444,14 @@ const AccessManagement = () => {
                                   <div key={dept.id} className="space-y-2">
                                     <div className="p-2 rounded bg-background text-sm">
                                       <div className="flex items-center justify-between">
-                                        <span className="font-medium">{dept.name}</span>
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-medium">{dept.name}</span>
+                                          {dept.category && (
+                                            <Badge variant="outline" className="text-xs capitalize">
+                                              {dept.category}
+                                            </Badge>
+                                          )}
+                                        </div>
                                         <div className="flex items-center gap-2">
                                           {dept.department_heads?.length > 0 && (
                                             <Badge variant="secondary" className="text-xs">
@@ -425,7 +472,14 @@ const AccessManagement = () => {
                                         {dept.subdepartments.map((subDept: any) => (
                                           <div key={subDept.id} className="p-2 rounded bg-muted/50 text-sm border-l-2 border-primary/30">
                                             <div className="flex items-center justify-between">
-                                              <span className="text-sm">↳ {subDept.name}</span>
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-sm">↳ {subDept.name}</span>
+                                                {subDept.category && (
+                                                  <Badge variant="outline" className="text-xs capitalize">
+                                                    {subDept.category}
+                                                  </Badge>
+                                                )}
+                                              </div>
                                               <div className="flex items-center gap-2">
                                                 {subDept.department_heads?.length > 0 && (
                                                   <Badge variant="outline" className="text-xs">
