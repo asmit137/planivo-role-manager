@@ -73,7 +73,7 @@ serve(async (req) => {
         // Create user with default password
         const { data: newUser, error: createError } = await supabaseClient.auth.admin.createUser({
           email: email.trim(),
-          password: '1234',
+          password: '123456',
           email_confirm: true,
         });
 
