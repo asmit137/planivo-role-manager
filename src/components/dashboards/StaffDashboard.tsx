@@ -1,4 +1,5 @@
-import DashboardLayout from '@/components/DashboardLayout';
+import { PageHeader } from '@/components/layout';
+import { ActionButton } from '@/components/shared';
 import StaffTaskView from '@/components/tasks/StaffTaskView';
 import VacationPlansList from '@/components/vacation/VacationPlansList';
 import VacationPlanner from '@/components/vacation/VacationPlanner';
@@ -8,7 +9,6 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
@@ -37,7 +37,12 @@ const StaffDashboard = () => {
   });
 
   return (
-    <DashboardLayout title="My Dashboard" roleLabel="Staff" roleColor="text-muted-foreground">
+    <>
+      <PageHeader 
+        title="My Dashboard" 
+        description="View and manage your tasks and vacation plans"
+      />
+      
       <Tabs defaultValue={hasAccess('task_management') ? 'tasks' : 'vacation'} className="space-y-4">
         <TabsList>
           {hasAccess('task_management') && (
@@ -68,10 +73,13 @@ const StaffDashboard = () => {
               <div className="flex justify-end">
                 <Dialog open={plannerOpen} onOpenChange={setPlannerOpen}>
                   <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
+                    <ActionButton 
+                      moduleKey="vacation_planning"
+                      permission="edit"
+                      icon={Plus}
+                    >
                       Plan Vacation
-                    </Button>
+                    </ActionButton>
                   </DialogTrigger>
                   <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
@@ -89,7 +97,7 @@ const StaffDashboard = () => {
           </TabsContent>
         )}
       </Tabs>
-    </DashboardLayout>
+    </>
   );
 };
 

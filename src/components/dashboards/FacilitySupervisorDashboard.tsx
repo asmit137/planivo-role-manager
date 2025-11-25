@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
-import DashboardLayout from '@/components/DashboardLayout';
+import { PageHeader, LoadingState } from '@/components/layout';
 import TaskManager from '@/components/tasks/TaskManager';
 import VacationApprovalWorkflow from '@/components/vacation/VacationApprovalWorkflow';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -30,17 +30,16 @@ const FacilitySupervisorDashboard = () => {
   });
 
   if (!userRole?.facility_id) {
-    return (
-      <DashboardLayout title="Facility Overview" roleLabel="Facility Supervisor" roleColor="text-warning">
-        <div className="text-center p-12">
-          <p className="text-muted-foreground">Loading facility information...</p>
-        </div>
-      </DashboardLayout>
-    );
+    return <LoadingState message="Loading facility information..." />;
   }
 
   return (
-    <DashboardLayout title="Facility Overview" roleLabel="Facility Supervisor" roleColor="text-warning">
+    <>
+      <PageHeader 
+        title="Facility Overview" 
+        description="Manage facility tasks and vacation approvals"
+      />
+      
       <Tabs defaultValue={hasAccess('task_management') ? 'tasks' : hasAccess('vacation_planning') ? 'approvals' : undefined} className="space-y-4">
         <TabsList>
           {hasAccess('task_management') && (
@@ -91,7 +90,7 @@ const FacilitySupervisorDashboard = () => {
           </TabsContent>
         )}
       </Tabs>
-    </DashboardLayout>
+    </>
   );
 };
 

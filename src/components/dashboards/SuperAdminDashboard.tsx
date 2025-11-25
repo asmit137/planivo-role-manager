@@ -1,10 +1,9 @@
-import DashboardLayout from '@/components/DashboardLayout';
+import { PageHeader } from '@/components/layout';
+import { StatsCard } from '@/components/shared';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Users, Building2, Plus, Calendar, ClipboardList, CheckCircle, XCircle, Clock, TrendingUp, Building, LayoutDashboard, Folders, UserCircle, UsersRound, FolderTree, AlertCircle, Settings } from 'lucide-react';
+import { Users, Building2, Calendar, ClipboardList, CheckCircle, XCircle, Clock, TrendingUp, Building, LayoutDashboard, Folders, UserCircle, FolderTree, Settings } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
@@ -136,7 +135,12 @@ const SuperAdminDashboard = () => {
   };
 
   return (
-    <DashboardLayout title="System Overview" roleLabel="Super Admin" roleColor="text-primary">
+    <>
+      <PageHeader 
+        title="System Overview" 
+        description="Manage your entire system from one centralized dashboard"
+      />
+      
       <Tabs defaultValue="dashboard" className="space-y-6">
         <Card className="border-2">
           <TabsList className="w-full h-auto p-2 bg-transparent grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-2">
@@ -194,49 +198,27 @@ const SuperAdminDashboard = () => {
         <TabsContent value="dashboard" className="space-y-6">
           {/* Main Stats Grid */}
           <div className="grid gap-6 md:grid-cols-4">
-            <Card className="border-2 hover:border-primary/20 transition-colors">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Workspaces</CardTitle>
-                <Building2 className="h-5 w-5 text-primary" />
-              </CardHeader>
-              <CardContent>
-                {workspacesLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  <div className="text-3xl font-bold">{workspaces?.length || 0}</div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="border-2 hover:border-primary/20 transition-colors">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-                <Users className="h-5 w-5 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{totalUsers || 0}</div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-2 hover:border-primary/20 transition-colors">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Facilities</CardTitle>
-                <Building className="h-5 w-5 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{facilities || 0}</div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-2 hover:border-primary/20 transition-colors">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Departments</CardTitle>
-                <FolderTree className="h-5 w-5 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{departments || 0}</div>
-              </CardContent>
-            </Card>
+            <StatsCard
+              title="Workspaces"
+              value={workspaces?.length || 0}
+              icon={Building2}
+              isLoading={workspacesLoading}
+            />
+            <StatsCard
+              title="Total Users"
+              value={totalUsers || 0}
+              icon={Users}
+            />
+            <StatsCard
+              title="Facilities"
+              value={facilities || 0}
+              icon={Building}
+            />
+            <StatsCard
+              title="Departments"
+              value={departments || 0}
+              icon={FolderTree}
+            />
           </div>
 
           {/* Vacation & Task Stats */}
@@ -405,7 +387,7 @@ const SuperAdminDashboard = () => {
           </TabsContent>
         )}
       </Tabs>
-    </DashboardLayout>
+    </>
   );
 };
 

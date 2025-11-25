@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
-import DashboardLayout from '@/components/DashboardLayout';
+import { PageHeader, LoadingState } from '@/components/layout';
+import { StatsCard } from '@/components/shared';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Building2, Users, FolderTree, LayoutGrid } from 'lucide-react';
 import FacilityUserManagement from '@/components/admin/FacilityUserManagement';
@@ -62,52 +63,37 @@ const GeneralAdminDashboard = () => {
   });
 
   if (!userRole?.workspace_id) {
-    return (
-      <DashboardLayout title="Workspace Management" roleLabel="General System Admin" roleColor="text-accent">
-        <div className="text-center p-12">
-          <p className="text-muted-foreground">Loading workspace information...</p>
-        </div>
-      </DashboardLayout>
-    );
+    return <LoadingState message="Loading workspace information..." />;
   }
 
   return (
-    <DashboardLayout title="Workspace Management" roleLabel="General System Admin" roleColor="text-accent">
+    <>
+      <PageHeader 
+        title={userRole.workspaces?.name || 'Workspace Management'}
+        description="Manage your workspace facilities, departments, and users"
+      />
+      
       <div className="space-y-6">
-        {/* Workspace Header */}
-        <Card className="border-2">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl">
-                  {userRole.workspaces?.name || 'Workspace'}
-                </CardTitle>
-                <CardDescription>Manage your workspace facilities, departments, and users</CardDescription>
-              </div>
-              <Badge variant="outline" className="text-accent border-accent">
-                General Admin
-              </Badge>
-            </div>
-          </CardHeader>
-          {stats && (
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center p-4 rounded-lg bg-primary/5">
-                  <div className="text-3xl font-bold text-primary">{stats.facilities}</div>
-                  <div className="text-sm text-muted-foreground">Facilities</div>
-                </div>
-                <div className="text-center p-4 rounded-lg bg-accent/5">
-                  <div className="text-3xl font-bold text-accent">{stats.departments}</div>
-                  <div className="text-sm text-muted-foreground">Departments</div>
-                </div>
-                <div className="text-center p-4 rounded-lg bg-success/5">
-                  <div className="text-3xl font-bold text-success">{stats.users}</div>
-                  <div className="text-sm text-muted-foreground">Users</div>
-                </div>
-              </div>
-            </CardContent>
-          )}
-        </Card>
+        {/* Stats Grid */}
+        {stats && (
+          <div className="grid gap-6 md:grid-cols-3">
+            <StatsCard
+              title="Facilities"
+              value={stats.facilities}
+              icon={Building2}
+            />
+            <StatsCard
+              title="Departments"
+              value={stats.departments}
+              icon={FolderTree}
+            />
+            <StatsCard
+              title="Users"
+              value={stats.users}
+              icon={Users}
+            />
+          </div>
+        )}
 
         {/* Management Tabs */}
         <Tabs defaultValue={hasAccess('organization') ? 'facilities' : hasAccess('user_management') ? 'users' : 'modules'} className="space-y-4">
@@ -167,7 +153,7 @@ const GeneralAdminDashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </DashboardLayout>
+    </>
   );
 };
 
