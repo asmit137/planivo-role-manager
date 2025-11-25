@@ -30,14 +30,7 @@ const TaskHub = () => {
   const scopeInfo = getScopeInfo();
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Task Management</h2>
-        <p className="text-muted-foreground">
-          Create, assign, and track tasks across your organization
-        </p>
-      </div>
-
+    <div className="space-y-4">
       <Tabs defaultValue={canManageTasks ? "manage" : "my-tasks"} className="space-y-4">
         <TabsList className="grid w-full grid-cols-2">
           {canManageTasks && (

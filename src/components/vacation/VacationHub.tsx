@@ -43,13 +43,6 @@ const VacationHub = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Vacation Management</h2>
-        <p className="text-muted-foreground">
-          Plan, submit, and approve vacation requests
-        </p>
-      </div>
-
       <Tabs defaultValue="planner" className="space-y-4">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="planner">

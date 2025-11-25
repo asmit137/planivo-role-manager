@@ -173,13 +173,6 @@ const StaffManagementHub = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Staff Management</h2>
-        <p className="text-muted-foreground">
-          Manage staff members in your department
-        </p>
-      </div>
-
       <Card className="border-2">
         <CardHeader>
           <div className="flex items-center justify-between">

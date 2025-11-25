@@ -7,13 +7,6 @@ import CategoryDepartmentManagement from './CategoryDepartmentManagement';
 const OrganizationHub = () => {
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Organization Structure</h2>
-        <p className="text-muted-foreground">
-          Manage workspaces, facilities, departments, and categories
-        </p>
-      </div>
-
       <Tabs defaultValue="workspaces" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="workspaces">
