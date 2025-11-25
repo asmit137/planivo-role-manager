@@ -250,7 +250,6 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                   <SelectValue placeholder="Select specialty" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No specialty</SelectItem>
                   {specialties?.map((specialty) => (
                     <SelectItem key={specialty.id} value={specialty.id}>
                       {specialty.name}
