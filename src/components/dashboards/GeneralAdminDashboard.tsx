@@ -3,7 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { PageHeader, LoadingState } from '@/components/layout';
 import { StatsCard } from '@/components/shared';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Building2, Users, FolderTree, LayoutGrid } from 'lucide-react';
 import FacilityUserManagement from '@/components/admin/FacilityUserManagement';
 import WorkspaceManagement from '@/components/admin/WorkspaceManagement';
@@ -13,10 +12,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
+import { useLocation } from 'react-router-dom';
 
 const GeneralAdminDashboard = () => {
   const { user } = useAuth();
   const { hasAccess } = useModuleContext();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const activeTab = searchParams.get('tab') || 'facilities';
 
   const { data: userRole } = useQuery({
     queryKey: ['general-admin-role', user?.id],
@@ -95,63 +98,32 @@ const GeneralAdminDashboard = () => {
           </div>
         )}
 
-        {/* Management Tabs */}
-        <Tabs defaultValue={hasAccess('organization') ? 'facilities' : hasAccess('user_management') ? 'users' : 'modules'} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
-            {hasAccess('organization') && (
-              <TabsTrigger value="facilities">
-                <Building2 className="h-4 w-4 mr-2" />
-                Facilities
-              </TabsTrigger>
-            )}
-            {hasAccess('organization') && (
-              <TabsTrigger value="categories">
-                <FolderTree className="h-4 w-4 mr-2" />
-                Categories & Departments
-              </TabsTrigger>
-            )}
-            {hasAccess('user_management') && (
-              <TabsTrigger value="users">
-                <Users className="h-4 w-4 mr-2" />
-                Users
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="modules">
-              <LayoutGrid className="h-4 w-4 mr-2" />
-              Modules
-            </TabsTrigger>
-          </TabsList>
-
-          {hasAccess('organization') && (
-            <TabsContent value="facilities">
-              <ModuleGuard moduleKey="organization">
-                <WorkspaceManagement />
-              </ModuleGuard>
-            </TabsContent>
+        {/* Management Sections */}
+        <div className="space-y-4">
+          {activeTab === 'facilities' && hasAccess('organization') && (
+            <ModuleGuard moduleKey="organization">
+              <WorkspaceManagement />
+            </ModuleGuard>
           )}
 
-          {hasAccess('organization') && (
-            <TabsContent value="categories">
-              <ModuleGuard moduleKey="organization">
-                <CategoryDepartmentManagement />
-              </ModuleGuard>
-            </TabsContent>
+          {activeTab === 'categories' && hasAccess('organization') && (
+            <ModuleGuard moduleKey="organization">
+              <CategoryDepartmentManagement />
+            </ModuleGuard>
           )}
 
-          {hasAccess('user_management') && (
-            <TabsContent value="users">
-              <ModuleGuard moduleKey="user_management">
-                <FacilityUserManagement />
-              </ModuleGuard>
-            </TabsContent>
+          {activeTab === 'users' && hasAccess('user_management') && (
+            <ModuleGuard moduleKey="user_management">
+              <FacilityUserManagement />
+            </ModuleGuard>
           )}
 
-          <TabsContent value="modules">
+          {activeTab === 'modules' && (
             <ModuleGuard moduleKey="organization">
               <WorkspaceModuleManagement />
             </ModuleGuard>
-          </TabsContent>
-        </Tabs>
+          )}
+        </div>
       </div>
     </>
   );

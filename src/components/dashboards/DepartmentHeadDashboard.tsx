@@ -5,14 +5,17 @@ import { PageHeader, LoadingState, ErrorState, EmptyState } from '@/components/l
 import { StaffManagementHub } from '@/modules/staff-management';
 import { VacationHub } from '@/modules/vacation';
 import { TaskHub } from '@/modules/tasks';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, ClipboardList, UserPlus } from 'lucide-react';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
+import { useLocation } from 'react-router-dom';
 
 const DepartmentHeadDashboard = () => {
   const { user } = useAuth();
   const { hasAccess } = useModuleContext();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const activeTab = searchParams.get('tab') || 'staff';
 
   const { data: userRole, isLoading: roleLoading, error: roleError } = useQuery({
     queryKey: ['department-head-role', user?.id],
@@ -64,52 +67,25 @@ const DepartmentHeadDashboard = () => {
         title="Team Management" 
         description="Manage your department's staff, vacations, and tasks"
       />
-      <Tabs defaultValue={hasAccess('staff_management') ? 'staff' : hasAccess('vacation_planning') ? 'vacation' : 'tasks'} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          {hasAccess('staff_management') && (
-            <TabsTrigger value="staff">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Staff Management
-            </TabsTrigger>
-          )}
-          {hasAccess('vacation_planning') && (
-            <TabsTrigger value="vacation">
-              <Calendar className="h-4 w-4 mr-2" />
-              Vacation Planning
-            </TabsTrigger>
-          )}
-          {hasAccess('task_management') && (
-            <TabsTrigger value="tasks">
-              <ClipboardList className="h-4 w-4 mr-2" />
-              Department Tasks
-            </TabsTrigger>
-          )}
-        </TabsList>
-
-        {hasAccess('staff_management') && (
-          <TabsContent value="staff">
-            <ModuleGuard moduleKey="staff_management">
-              <StaffManagementHub />
-            </ModuleGuard>
-          </TabsContent>
+      <div className="space-y-4">
+        {activeTab === 'staff' && hasAccess('staff_management') && (
+          <ModuleGuard moduleKey="staff_management">
+            <StaffManagementHub />
+          </ModuleGuard>
         )}
 
-        {hasAccess('vacation_planning') && (
-          <TabsContent value="vacation">
-            <ModuleGuard moduleKey="vacation_planning">
-              <VacationHub />
-            </ModuleGuard>
-          </TabsContent>
+        {activeTab === 'vacation' && hasAccess('vacation_planning') && (
+          <ModuleGuard moduleKey="vacation_planning">
+            <VacationHub />
+          </ModuleGuard>
         )}
 
-        {hasAccess('task_management') && (
-          <TabsContent value="tasks">
-            <ModuleGuard moduleKey="task_management">
-              <TaskHub />
-            </ModuleGuard>
-          </TabsContent>
+        {activeTab === 'tasks' && hasAccess('task_management') && (
+          <ModuleGuard moduleKey="task_management">
+            <TaskHub />
+          </ModuleGuard>
         )}
-      </Tabs>
+      </div>
     </>
   );
 };
