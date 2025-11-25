@@ -7,6 +7,7 @@ import { Building2, Users, FolderTree, LayoutGrid } from 'lucide-react';
 import FacilityUserManagement from '@/components/admin/FacilityUserManagement';
 import WorkspaceManagement from '@/components/admin/WorkspaceManagement';
 import CategoryDepartmentManagement from '@/components/admin/CategoryDepartmentManagement';
+import WorkspaceModuleManagement from '@/components/admin/WorkspaceModuleManagement';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ModuleGuard } from '@/components/ModuleGuard';
@@ -109,8 +110,8 @@ const GeneralAdminDashboard = () => {
         </Card>
 
         {/* Management Tabs */}
-        <Tabs defaultValue={hasAccess('organization') ? 'facilities' : hasAccess('user_management') ? 'users' : undefined} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue={hasAccess('organization') ? 'facilities' : hasAccess('user_management') ? 'users' : 'modules'} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4">
             {hasAccess('organization') && (
               <TabsTrigger value="facilities">
                 <Building2 className="h-4 w-4 mr-2" />
@@ -129,6 +130,10 @@ const GeneralAdminDashboard = () => {
                 Users
               </TabsTrigger>
             )}
+            <TabsTrigger value="modules">
+              <LayoutGrid className="h-4 w-4 mr-2" />
+              Modules
+            </TabsTrigger>
           </TabsList>
 
           {hasAccess('organization') && (
@@ -154,6 +159,12 @@ const GeneralAdminDashboard = () => {
               </ModuleGuard>
             </TabsContent>
           )}
+
+          <TabsContent value="modules">
+            <ModuleGuard moduleKey="organization">
+              <WorkspaceModuleManagement />
+            </ModuleGuard>
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
