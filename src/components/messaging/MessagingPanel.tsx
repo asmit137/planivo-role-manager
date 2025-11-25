@@ -101,7 +101,7 @@ const MessagingPanel = () => {
     enabled: !!user && open,
   });
 
-  // Fetch conversations
+  // Fetch conversations with fake data for testing
   const { data: conversations = [] } = useQuery({
     queryKey: ['conversations', user?.id],
     queryFn: async () => {
@@ -149,6 +149,53 @@ const MessagingPanel = () => {
         })
       );
       
+      // Add fake test conversations if no real conversations exist
+      if (convos.length === 0) {
+        return [
+          {
+            id: 'fake-1',
+            title: null,
+            is_group: false,
+            updated_at: new Date().toISOString(),
+            participants: [
+              { id: 'fake-user-1', full_name: 'John Smith', email: 'john@example.com' },
+            ],
+            last_message: {
+              content: 'Hey, how are you doing today?',
+              created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 mins ago
+            },
+          },
+          {
+            id: 'fake-2',
+            title: 'Project Team',
+            is_group: true,
+            updated_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 mins ago
+            participants: [
+              { id: 'fake-user-2', full_name: 'Sarah Johnson', email: 'sarah@example.com' },
+              { id: 'fake-user-3', full_name: 'Mike Wilson', email: 'mike@example.com' },
+              { id: 'fake-user-4', full_name: 'Emily Davis', email: 'emily@example.com' },
+            ],
+            last_message: {
+              content: 'The meeting is scheduled for tomorrow at 10 AM',
+              created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+            },
+          },
+          {
+            id: 'fake-3',
+            title: null,
+            is_group: false,
+            updated_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
+            participants: [
+              { id: 'fake-user-5', full_name: 'Alex Brown', email: 'alex@example.com' },
+            ],
+            last_message: {
+              content: 'Thanks for the help!',
+              created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+            },
+          },
+        ] as Conversation[];
+      }
+      
       return convos.sort((a, b) => 
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       ) as Conversation[];
@@ -156,11 +203,102 @@ const MessagingPanel = () => {
     enabled: !!user && open,
   });
 
-  // Fetch messages for selected conversation
+  // Fetch messages for selected conversation with fake data
   const { data: messages = [] } = useQuery({
     queryKey: ['messages', selectedConversation],
     queryFn: async () => {
       if (!selectedConversation) return [];
+      
+      // Return fake messages for fake conversations
+      if (selectedConversation.startsWith('fake-')) {
+        const fakeMessages: { [key: string]: Message[] } = {
+          'fake-1': [
+            {
+              id: 'msg-1',
+              content: 'Hey, how are you doing today?',
+              sender_id: 'fake-user-1',
+              created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+              sender: { full_name: 'John Smith', email: 'john@example.com' },
+            },
+            {
+              id: 'msg-2',
+              content: 'I\'m doing great! Just finished the project presentation.',
+              sender_id: user?.id || '',
+              created_at: new Date(Date.now() - 1000 * 60 * 3).toISOString(),
+              sender: { full_name: 'You', email: user?.email || '' },
+            },
+            {
+              id: 'msg-3',
+              content: 'That\'s awesome! How did it go?',
+              sender_id: 'fake-user-1',
+              created_at: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
+              sender: { full_name: 'John Smith', email: 'john@example.com' },
+            },
+          ],
+          'fake-2': [
+            {
+              id: 'msg-4',
+              content: 'Good morning team! Quick reminder about tomorrow\'s meeting.',
+              sender_id: 'fake-user-2',
+              created_at: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
+              sender: { full_name: 'Sarah Johnson', email: 'sarah@example.com' },
+            },
+            {
+              id: 'msg-5',
+              content: 'Thanks for the reminder! What time again?',
+              sender_id: 'fake-user-3',
+              created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+              sender: { full_name: 'Mike Wilson', email: 'mike@example.com' },
+            },
+            {
+              id: 'msg-6',
+              content: 'The meeting is scheduled for tomorrow at 10 AM',
+              sender_id: 'fake-user-2',
+              created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+              sender: { full_name: 'Sarah Johnson', email: 'sarah@example.com' },
+            },
+            {
+              id: 'msg-7',
+              content: 'Perfect, I\'ll be there!',
+              sender_id: user?.id || '',
+              created_at: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
+              sender: { full_name: 'You', email: user?.email || '' },
+            },
+          ],
+          'fake-3': [
+            {
+              id: 'msg-8',
+              content: 'Can you help me with the report?',
+              sender_id: user?.id || '',
+              created_at: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+              sender: { full_name: 'You', email: user?.email || '' },
+            },
+            {
+              id: 'msg-9',
+              content: 'Sure! What do you need help with?',
+              sender_id: 'fake-user-5',
+              created_at: new Date(Date.now() - 1000 * 60 * 60 * 2.5).toISOString(),
+              sender: { full_name: 'Alex Brown', email: 'alex@example.com' },
+            },
+            {
+              id: 'msg-10',
+              content: 'I need to format the tables properly',
+              sender_id: user?.id || '',
+              created_at: new Date(Date.now() - 1000 * 60 * 60 * 2.2).toISOString(),
+              sender: { full_name: 'You', email: user?.email || '' },
+            },
+            {
+              id: 'msg-11',
+              content: 'Thanks for the help!',
+              sender_id: user?.id || '',
+              created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+              sender: { full_name: 'You', email: user?.email || '' },
+            },
+          ],
+        };
+        
+        return fakeMessages[selectedConversation] || [];
+      }
       
       const { data, error } = await supabase
         .from('messages')
