@@ -89,7 +89,7 @@ const UserManagement = () => {
           *,
           workspaces(name),
           facilities(name),
-          departments!fk_user_roles_department(name),
+          department:departments!fk_user_roles_department(name),
           specialty:departments!user_roles_specialty_id_fkey(name)
         `);
 
@@ -245,7 +245,7 @@ const UserManagement = () => {
             *,
             workspaces(name),
             facilities(name),
-            departments!fk_user_roles_department(name),
+            department:departments!fk_user_roles_department(name),
             specialty:departments!user_roles_specialty_id_fkey(name)
           `)
           .eq('user_id', editingUser.id);
@@ -298,7 +298,7 @@ const UserManagement = () => {
             *,
             workspaces(name),
             facilities(name),
-            departments!fk_user_roles_department(name),
+            department:departments!fk_user_roles_department(name),
             specialty:departments!user_roles_specialty_id_fkey(name)
           `)
           .eq('user_id', editingUser.id);
@@ -551,20 +551,20 @@ const UserManagement = () => {
                             <div key={roleData.id} className="flex items-center justify-between p-3 border rounded-lg">
                               <div className="space-y-1">
                                 <Badge variant="outline">{roleData.role.replace('_', ' ')}</Badge>
-                                <div className="text-sm text-muted-foreground space-y-0.5">
-                                  {roleData.workspaces && (
-                                    <p>Workspace: {roleData.workspaces.name}</p>
-                                  )}
-                                  {roleData.facilities && (
-                                    <p>Facility: {roleData.facilities.name}</p>
-                                  )}
-                                  {roleData.departments && (
-                                    <p>Department: {roleData.departments.name}</p>
-                                  )}
-                                  {roleData.specialty && (
-                                    <p>Specialty: {roleData.specialty.name}</p>
-                                  )}
-                                </div>
+                                 <div className="text-sm text-muted-foreground space-y-0.5">
+                                   {roleData.workspaces && (
+                                     <p>Workspace: {roleData.workspaces.name}</p>
+                                   )}
+                                   {roleData.facilities && (
+                                     <p>Facility: {roleData.facilities.name}</p>
+                                   )}
+                                   {roleData.department && (
+                                     <p>Department: {roleData.department.name}</p>
+                                   )}
+                                   {roleData.specialty && (
+                                     <p>Specialty: {roleData.specialty.name}</p>
+                                   )}
+                                 </div>
                               </div>
                               <Button
                                 variant="ghost"
