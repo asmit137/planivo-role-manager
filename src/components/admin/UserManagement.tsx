@@ -140,30 +140,30 @@ const UserManagement = () => {
                   Loading users...
                 </div>
               ) : users && users.length > 0 ? (
-                <div className="rounded-md border">
+                <div className="rounded-md border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Roles</TableHead>
-                        <TableHead>Workspaces</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="whitespace-nowrap">Name</TableHead>
+                        <TableHead className="whitespace-nowrap">Email</TableHead>
+                        <TableHead className="whitespace-nowrap">Status</TableHead>
+                        <TableHead className="whitespace-nowrap">Roles</TableHead>
+                        <TableHead className="whitespace-nowrap">Workspaces</TableHead>
+                        <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {users.map((user: any) => (
                         <TableRow key={user.id}>
-                          <TableCell className="font-medium">{user.full_name}</TableCell>
-                          <TableCell>{user.email}</TableCell>
+                          <TableCell className="font-medium whitespace-nowrap">{user.full_name}</TableCell>
+                          <TableCell className="whitespace-nowrap">{user.email}</TableCell>
                           <TableCell>
                             <Badge variant={user.is_active ? "default" : "secondary"}>
                               {user.is_active ? 'Active' : 'Inactive'}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex flex-wrap gap-1 min-w-[150px]">
                               {user.roles.map((roleData: any, idx: number) => (
                                 <Badge key={idx} variant="outline">
                                   {roleData.role.replace(/_/g, ' ')}
@@ -175,7 +175,7 @@ const UserManagement = () => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex flex-wrap gap-1 min-w-[120px]">
                               {user.roles
                                 .filter((roleData: any) => roleData.workspace_id)
                                 .map((roleData: any, idx: number) => {
@@ -193,7 +193,7 @@ const UserManagement = () => {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right">{user.actions}
                             <Button
                               variant="ghost"
                               size="icon"

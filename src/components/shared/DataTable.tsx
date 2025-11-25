@@ -97,13 +97,13 @@ export function DataTable<T>({
         </div>
       )}
 
-      {/* Table */}
-      <div className="rounded-md border">
+      {/* Table with horizontal scroll for mobile */}
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               {columns.map((column) => (
-                <TableHead key={column.key}>{column.header}</TableHead>
+                <TableHead key={column.key} className="whitespace-nowrap">{column.header}</TableHead>
               ))}
             </TableRow>
           </TableHeader>
@@ -111,7 +111,7 @@ export function DataTable<T>({
             {data.map((row, index) => (
               <TableRow key={index}>
                 {columns.map((column) => (
-                  <TableCell key={column.key}>
+                  <TableCell key={column.key} className="whitespace-nowrap">
                     {column.cell(row)}
                   </TableCell>
                 ))}
