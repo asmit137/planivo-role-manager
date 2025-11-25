@@ -22,6 +22,16 @@ interface VacationSplit {
   days: number;
 }
 
+interface DepartmentStaffMember {
+  user_id: string;
+  role: string;
+  profiles: {
+    id: string;
+    full_name: string;
+    email: string;
+  };
+}
+
 interface VacationPlannerProps {
   departmentId?: string;
   maxSplits?: number;
@@ -110,20 +120,43 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     },
   });
 
-  const { data: departmentStaff } = useQuery({
+  const { data: departmentStaff } = useQuery<DepartmentStaffMember[]>({
     queryKey: ['department-staff', effectiveDepartmentId],
     queryFn: async () => {
       if (!effectiveDepartmentId) return [];
-      const { data, error } = await supabase
+      
+      // First get user_roles for the department
+      const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('user_id, role, profiles(id, full_name, email)')
+        .select('user_id, role')
         .eq('department_id', effectiveDepartmentId)
-        .in('role', ['staff', 'department_head'])
-        .order('role', { ascending: false }); // Department heads first
-      if (error) throw error;
-      return data;
+        .in('role', ['staff', 'department_head']);
+      
+      if (rolesError) throw rolesError;
+      if (!roles || roles.length === 0) return [];
+      
+      // Get profile data for these users
+      const userIds = roles.map(r => r.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', userIds);
+      
+      if (profilesError) throw profilesError;
+      
+      // Combine the data
+      return roles.map(role => ({
+        user_id: role.user_id,
+        role: role.role,
+        profiles: profiles?.find(p => p.id === role.user_id) || { id: role.user_id, full_name: 'Unknown', email: '' }
+      })).sort((a, b) => {
+        // Department heads first
+        if (a.role === 'department_head' && b.role !== 'department_head') return -1;
+        if (b.role === 'department_head' && a.role !== 'department_head') return 1;
+        return 0;
+      });
     },
-    enabled: !!effectiveDepartmentId && (isDepartmentHead || !effectiveStaffOnly),
+    enabled: Boolean(effectiveDepartmentId && (isDepartmentHead || isSuperAdmin || !effectiveStaffOnly)),
   });
 
   const createPlanMutation = useMutation({
@@ -285,7 +318,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                   <SelectValue placeholder="Select staff" />
                 </SelectTrigger>
                 <SelectContent>
-                  {departmentStaff?.map((staff: any) => (
+                  {departmentStaff?.map((staff: DepartmentStaffMember) => (
                     <SelectItem key={staff.user_id} value={staff.user_id}>
                       {staff.profiles.full_name} ({staff.profiles.email})
                       {staff.role === 'department_head' && ' (Department Head)'}
