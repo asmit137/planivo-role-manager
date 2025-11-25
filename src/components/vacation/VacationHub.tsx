@@ -7,9 +7,14 @@ import VacationConflictDashboard from './VacationConflictDashboard';
 import VacationTypeManagement from './VacationTypeManagement';
 import { useUserRole } from '@/hooks/useUserRole';
 
-const VacationHub = () => {
+interface VacationHubProps {
+  departmentId?: string;
+}
+
+const VacationHub = ({ departmentId }: VacationHubProps) => {
   const { data: roles } = useUserRole();
   const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
+  const isStaff = roles?.some(r => r.role === 'staff');
   
   // Find approver role and determine level
   const approverRole = roles?.find(r => 
@@ -74,7 +79,7 @@ const VacationHub = () => {
         </TabsList>
 
         <TabsContent value="planner">
-          <VacationPlanner />
+          <VacationPlanner departmentId={departmentId} staffOnly={isStaff} />
         </TabsContent>
 
         <TabsContent value="plans">

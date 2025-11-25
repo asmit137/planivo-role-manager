@@ -111,7 +111,7 @@ const DepartmentHeadDashboard = () => {
 
         {activeTab === 'vacation' && hasAccess('vacation_planning') && (
           <ModuleGuard moduleKey="vacation_planning">
-            <VacationHub />
+            <VacationHub departmentId={userRole.department_id} />
           </ModuleGuard>
         )}
 

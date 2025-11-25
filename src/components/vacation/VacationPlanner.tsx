@@ -36,6 +36,33 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   const [notes, setNotes] = useState('');
   const [splits, setSplits] = useState<VacationSplit[]>([]);
 
+  // Fetch current user's role to auto-detect behavior
+  const { data: currentUserRole } = useQuery({
+    queryKey: ['current-user-role', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('user_id', user.id)
+        .in('role', ['department_head', 'staff'])
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  // Determine effective department ID and mode
+  const effectiveDepartmentId = departmentId || currentUserRole?.department_id;
+  const isStaff = currentUserRole?.role === 'staff';
+  const isDepartmentHead = currentUserRole?.role === 'department_head';
+  const effectiveStaffOnly = staffOnly || isStaff;
+
+  // Auto-select staff member if in staff-only mode
+  if (effectiveStaffOnly && user?.id && !selectedStaff) {
+    setSelectedStaff(user.id);
+  }
+
   // Real-time subscriptions for live updates
   useRealtimeSubscription({
     table: 'vacation_plans',
@@ -66,43 +93,33 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   });
 
   const { data: departmentStaff } = useQuery({
-    queryKey: ['department-staff', departmentId],
+    queryKey: ['department-staff', effectiveDepartmentId],
     queryFn: async () => {
-      if (!departmentId) return [];
+      if (!effectiveDepartmentId) return [];
       const { data, error } = await supabase
         .from('user_roles')
-        .select('user_id, profiles(id, full_name, email)')
-        .eq('department_id', departmentId)
-        .eq('role', 'staff');
+        .select('user_id, role, profiles(id, full_name, email)')
+        .eq('department_id', effectiveDepartmentId)
+        .in('role', ['staff', 'department_head']);
       if (error) throw error;
       return data;
     },
-    enabled: !staffOnly && !!departmentId,
+    enabled: !effectiveStaffOnly && !!effectiveDepartmentId,
   });
 
   const createPlanMutation = useMutation({
     mutationFn: async (planData: any) => {
-      // Get the user's department for staff-only mode
-      let targetDepartmentId = departmentId;
+      // Use the effective department ID
+      const targetDepartmentId = effectiveDepartmentId;
       
-      if (staffOnly) {
-        const { data: staffRole } = await supabase
-          .from('user_roles')
-          .select('department_id')
-          .eq('user_id', user?.id)
-          .eq('role', 'staff')
-          .maybeSingle();
-        
-        if (!staffRole?.department_id) {
-          throw new Error('No department assigned to staff member');
-        }
-        targetDepartmentId = staffRole.department_id;
+      if (!targetDepartmentId) {
+        throw new Error('No department ID available');
       }
       
       const { data: plan, error: planError } = await supabase
         .from('vacation_plans')
         .insert({
-          staff_id: staffOnly ? user?.id : planData.staff_id,
+          staff_id: effectiveStaffOnly ? user?.id : planData.staff_id,
           department_id: targetDepartmentId,
           vacation_type_id: planData.vacation_type_id,
           total_days: planData.total_days,
@@ -180,7 +197,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!staffOnly && !selectedStaff) {
+    if (!effectiveStaffOnly && !selectedStaff) {
       toast.error('Please select staff member');
       return;
     }
@@ -217,7 +234,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {!staffOnly && (
+          {!effectiveStaffOnly && (
             <div>
               <Label>Staff Member</Label>
               <Select value={selectedStaff} onValueChange={setSelectedStaff}>
@@ -228,6 +245,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                   {departmentStaff?.map((staff: any) => (
                     <SelectItem key={staff.user_id} value={staff.user_id}>
                       {staff.profiles.full_name} ({staff.profiles.email})
+                      {staff.role === 'department_head' && ' (Department Head)'}
                     </SelectItem>
                   ))}
                 </SelectContent>
