@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { PageHeader, LoadingState } from '@/components/layout';
 import { StatsCard } from '@/components/shared';
-import { Building2, Users, FolderTree, LayoutGrid } from 'lucide-react';
+import { Building2, Users, FolderTree } from 'lucide-react';
 import FacilityUserManagement from '@/components/admin/FacilityUserManagement';
 import WorkspaceManagement from '@/components/admin/WorkspaceManagement';
 import CategoryDepartmentManagement from '@/components/admin/CategoryDepartmentManagement';

@@ -76,96 +76,82 @@ const NotificationHub = () => {
   const unreadCount = notifications?.filter(n => !n.is_read).length || 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Notifications</h2>
-          <p className="text-muted-foreground">
-            Stay updated with important alerts and messages
-          </p>
-        </div>
-        {unreadCount > 0 && (
-          <Button
-            variant="outline"
-            onClick={() => markAllAsReadMutation.mutate()}
-            disabled={markAllAsReadMutation.isPending}
-          >
-            <Check className="h-4 w-4 mr-2" />
-            Mark All as Read
-          </Button>
-        )}
-      </div>
-
-      <Card className="border-2">
-        <CardHeader>
-          <div className="flex items-center justify-between">
+    <Card className="border-2">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
             <CardTitle>All Notifications</CardTitle>
-            {unreadCount > 0 && (
-              <Badge variant="default">
-                {unreadCount} unread
-              </Badge>
-            )}
+            <CardDescription>View and manage your notifications</CardDescription>
           </div>
-          <CardDescription>View and manage your notifications</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Loading notifications...
-            </div>
-          ) : notifications && notifications.length > 0 ? (
-            <div className="space-y-3">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`p-4 border rounded-lg ${
-                    !notification.is_read ? 'bg-primary/5 border-primary/20' : 'bg-muted/30'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold">{notification.title}</h4>
-                        {!notification.is_read && (
-                          <Badge variant="default" className="text-xs">New</Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground">{notification.message}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(notification.created_at || ''), { addSuffix: true })}
-                      </p>
-                    </div>
+          {unreadCount > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => markAllAsReadMutation.mutate()}
+              disabled={markAllAsReadMutation.isPending}
+            >
+              <Check className="h-4 w-4 mr-2" />
+              Mark All as Read
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-center py-8 text-muted-foreground">
+            Loading notifications...
+          </div>
+        ) : notifications && notifications.length > 0 ? (
+          <div className="space-y-3">
+            {notifications.map((notification) => (
+              <div
+                key={notification.id}
+                className={`p-4 border rounded-lg ${
+                  !notification.is_read ? 'bg-primary/5 border-primary/20' : 'bg-muted/30'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-1">
                     <div className="flex items-center gap-2">
+                      <h4 className="font-semibold">{notification.title}</h4>
                       {!notification.is_read && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => markAsReadMutation.mutate(notification.id)}
-                        >
-                          <Check className="h-4 w-4" />
-                        </Button>
+                        <Badge variant="default" className="text-xs">New</Badge>
                       )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{notification.message}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(notification.created_at || ''), { addSuffix: true })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!notification.is_read && (
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => deleteNotificationMutation.mutate(notification.id)}
+                        onClick={() => markAsReadMutation.mutate(notification.id)}
                       >
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                        <Check className="h-4 w-4" />
                       </Button>
-                    </div>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => deleteNotificationMutation.mutate(notification.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No notifications</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>No notifications</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

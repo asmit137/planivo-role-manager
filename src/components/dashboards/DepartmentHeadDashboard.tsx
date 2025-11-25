@@ -5,7 +5,9 @@ import { PageHeader, LoadingState, ErrorState, EmptyState } from '@/components/l
 import { StaffManagementHub } from '@/modules/staff-management';
 import { VacationHub } from '@/modules/vacation';
 import { TaskHub } from '@/modules/tasks';
-import { Calendar, ClipboardList, UserPlus } from 'lucide-react';
+import { NotificationHub } from '@/modules/notifications';
+import { MessagingHub } from '@/modules/messaging';
+import { Calendar, ClipboardList, UserPlus, Bell, MessageSquare } from 'lucide-react';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
@@ -81,7 +83,19 @@ const DepartmentHeadDashboard = () => {
           description="Assign and track department tasks"
         />
       )}
-      {!['staff', 'vacation', 'tasks'].includes(activeTab) && (
+      {activeTab === 'messaging' && (
+        <PageHeader 
+          title="Messaging" 
+          description="Chat with staff in your department"
+        />
+      )}
+      {activeTab === 'notifications' && (
+        <PageHeader 
+          title="Notifications" 
+          description="View important updates for your department"
+        />
+      )}
+      {!['staff','vacation','tasks','messaging','notifications'].includes(activeTab) && (
         <PageHeader 
           title="Team Management" 
           description="Manage your department"
@@ -107,8 +121,20 @@ const DepartmentHeadDashboard = () => {
           </ModuleGuard>
         )}
 
+        {activeTab === 'messaging' && hasAccess('messaging') && (
+          <ModuleGuard moduleKey="messaging">
+            <MessagingHub />
+          </ModuleGuard>
+        )}
+
+        {activeTab === 'notifications' && hasAccess('notifications') && (
+          <ModuleGuard moduleKey="notifications">
+            <NotificationHub />
+          </ModuleGuard>
+        )}
+
         {/* Show message if no valid tab content */}
-        {!hasAccess('staff_management') && !hasAccess('vacation_planning') && !hasAccess('task_management') && (
+        {!hasAccess('staff_management') && !hasAccess('vacation_planning') && !hasAccess('task_management') && !hasAccess('messaging') && !hasAccess('notifications') && (
           <div className="text-center py-12">
             <p className="text-muted-foreground">No modules available. Contact your administrator.</p>
           </div>
