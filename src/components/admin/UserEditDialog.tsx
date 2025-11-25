@@ -28,6 +28,9 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate }: UserEditDial
   const [newFacilityId, setNewFacilityId] = useState('');
   const [newDepartmentId, setNewDepartmentId] = useState('');
   const [newSpecialtyId, setNewSpecialtyId] = useState('');
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
+  const [editRoleDepartmentId, setEditRoleDepartmentId] = useState('');
+  const [editRoleSpecialtyId, setEditRoleSpecialtyId] = useState('');
   
   const queryClient = useQueryClient();
 
@@ -123,6 +126,21 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate }: UserEditDial
     enabled: !!newDepartmentId,
   });
 
+  const { data: editSpecialties } = useQuery({
+    queryKey: ['edit-specialties', editRoleDepartmentId],
+    queryFn: async () => {
+      if (!editRoleDepartmentId) return [];
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*')
+        .eq('parent_department_id', editRoleDepartmentId)
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!editRoleDepartmentId,
+  });
+
   const updateUserMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
@@ -199,6 +217,41 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate }: UserEditDial
     },
   });
 
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ roleId, departmentId, specialtyId }: { roleId: string; departmentId: string; specialtyId: string }) => {
+      const { error } = await supabase
+        .from('user_roles')
+        .update({
+          department_id: departmentId || null,
+          specialty_id: specialtyId || null,
+        })
+        .eq('id', roleId);
+
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['users'] });
+      await queryClient.invalidateQueries({ queryKey: ['user-module-access', user.id] });
+      
+      const { data: userRoles } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (userRoles) {
+        onUserUpdate({ ...user, roles: userRoles });
+      }
+      
+      setEditingRoleId(null);
+      setEditRoleDepartmentId('');
+      setEditRoleSpecialtyId('');
+      toast.success('Role updated successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to update role');
+    },
+  });
+
   const deleteRoleMutation = useMutation({
     mutationFn: async (roleId: string) => {
       const { error } = await supabase
@@ -243,6 +296,28 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate }: UserEditDial
     }
   };
 
+  const handleEditRole = (roleData: any) => {
+    setEditingRoleId(roleData.id);
+    setEditRoleDepartmentId(roleData.department_id || '');
+    setEditRoleSpecialtyId(roleData.specialty_id || '');
+  };
+
+  const handleSaveRoleEdit = () => {
+    if (editingRoleId) {
+      updateRoleMutation.mutate({
+        roleId: editingRoleId,
+        departmentId: editRoleDepartmentId,
+        specialtyId: editRoleSpecialtyId,
+      });
+    }
+  };
+
+  const handleCancelRoleEdit = () => {
+    setEditingRoleId(null);
+    setEditRoleDepartmentId('');
+    setEditRoleSpecialtyId('');
+  };
+
   const getFilteredFacilities = () => {
     if (!newWorkspaceId || !facilities) return [];
     return facilities.filter(f => f.workspace_id === newWorkspaceId);
@@ -251,6 +326,11 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate }: UserEditDial
   const getFilteredDepartments = () => {
     if (!newFacilityId || !departments) return [];
     return departments.filter(d => d.facility_id === newFacilityId);
+  };
+
+  const getEditFilteredDepartments = (facilityId: string) => {
+    if (!facilityId || !departments) return [];
+    return departments.filter(d => d.facility_id === facilityId);
   };
 
   // Group module access by module
@@ -336,24 +416,110 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate }: UserEditDial
                       const workspace = workspaces?.find(w => w.id === roleData.workspace_id);
                       const facility = facilities?.find(f => f.id === roleData.facility_id);
                       const department = departments?.find(d => d.id === roleData.department_id);
+                      const specialty = editSpecialties?.find(s => s.id === roleData.specialty_id);
+                      const isEditing = editingRoleId === roleData.id;
                       
                       return (
-                        <div key={roleData.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="space-y-1">
+                        <div key={roleData.id} className="p-3 border rounded-lg space-y-3">
+                          <div className="flex items-center justify-between">
                             <Badge variant="outline">{roleData.role.replace(/_/g, ' ')}</Badge>
+                            <div className="flex gap-2">
+                              {!isEditing ? (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditRole(roleData)}
+                                  >
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDeleteRole(roleData.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={handleSaveRoleEdit}
+                                    disabled={updateRoleMutation.isPending}
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleCancelRoleEdit}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {!isEditing ? (
                             <div className="text-sm text-muted-foreground space-y-0.5">
                               {workspace && <p>Workspace: {workspace.name}</p>}
                               {facility && <p>Facility: {facility.name}</p>}
                               {department && <p>Department: {department.name}</p>}
+                              {specialty && <p>Specialty: {specialty.name}</p>}
                             </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteRole(roleData.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          ) : (
+                            <div className="space-y-3">
+                              <div className="text-sm text-muted-foreground space-y-0.5">
+                                {workspace && <p>Workspace: {workspace.name}</p>}
+                                {facility && <p>Facility: {facility.name}</p>}
+                              </div>
+                              
+                              {roleData.facility_id && (
+                                <div className="space-y-2">
+                                  <Label>Department</Label>
+                                  <Select 
+                                    value={editRoleDepartmentId} 
+                                    onValueChange={(val) => {
+                                      setEditRoleDepartmentId(val);
+                                      setEditRoleSpecialtyId('');
+                                    }}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select department" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {getEditFilteredDepartments(roleData.facility_id).map((dept) => (
+                                        <SelectItem key={dept.id} value={dept.id}>
+                                          {dept.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
+
+                              {editRoleDepartmentId && editSpecialties && editSpecialties.length > 0 && (
+                                <div className="space-y-2">
+                                  <Label>Specialty</Label>
+                                  <Select value={editRoleSpecialtyId} onValueChange={setEditRoleSpecialtyId}>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select specialty" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {editSpecialties.map((spec) => (
+                                        <SelectItem key={spec.id} value={spec.id}>
+                                          {spec.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
