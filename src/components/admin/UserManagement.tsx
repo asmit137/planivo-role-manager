@@ -85,13 +85,7 @@ const UserManagement = () => {
       // Fetch all user roles with related data
       const { data: userRoles, error: rolesError } = await supabase
         .from('user_roles')
-        .select(`
-          *,
-          workspaces(name),
-          facilities(name),
-          department:departments!fk_user_roles_department(name),
-          specialty:departments!user_roles_specialty_id_fkey(name)
-        `);
+        .select('*');
 
       if (rolesError) throw rolesError;
 
@@ -241,13 +235,7 @@ const UserManagement = () => {
 
         const { data: userRoles } = await supabase
           .from('user_roles')
-          .select(`
-            *,
-            workspaces(name),
-            facilities(name),
-            department:departments!fk_user_roles_department(name),
-            specialty:departments!user_roles_specialty_id_fkey(name)
-          `)
+          .select('*')
           .eq('user_id', editingUser.id);
 
         if (profiles && userRoles) {
@@ -294,13 +282,7 @@ const UserManagement = () => {
 
         const { data: userRoles } = await supabase
           .from('user_roles')
-          .select(`
-            *,
-            workspaces(name),
-            facilities(name),
-            department:departments!fk_user_roles_department(name),
-            specialty:departments!user_roles_specialty_id_fkey(name)
-          `)
+          .select('*')
           .eq('user_id', editingUser.id);
 
         if (profiles && userRoles) {
@@ -766,13 +748,16 @@ const UserManagement = () => {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {user.roles
-                            .filter((r: any) => r.workspaces)
-                            .map((roleData: any, idx: number) => (
-                              <Badge key={idx} className="bg-primary/10">
-                                {roleData.workspaces.name}
-                              </Badge>
-                            ))}
-                          {user.roles.every((r: any) => !r.workspaces) && (
+                            .map((roleData: any, idx: number) => {
+                              const workspace = workspaces?.find((w: any) => w.id === roleData.workspace_id);
+                              if (!workspace) return null;
+                              return (
+                                <Badge key={idx} className="bg-primary/10">
+                                  {workspace.name}
+                                </Badge>
+                              );
+                            })}
+                          {user.roles.every((r: any) => !r.workspace_id) && (
                             <span className="text-xs text-muted-foreground">System-wide</span>
                           )}
                         </div>
