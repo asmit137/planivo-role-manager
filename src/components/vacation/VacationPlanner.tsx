@@ -134,7 +134,10 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       toast.success('Vacation plan created');
       resetForm();
     },
-    onError: () => toast.error('Failed to create vacation plan'),
+    onError: (error: any) => {
+      console.error('Vacation plan creation error:', error);
+      toast.error(error.message || 'Failed to create vacation plan');
+    },
   });
 
   const addSplit = () => {
@@ -184,6 +187,11 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     
     if (!selectedVacationType) {
       toast.error('Please select vacation type');
+      return;
+    }
+
+    if (splits.length === 0) {
+      toast.error('Please add at least one vacation period');
       return;
     }
 
