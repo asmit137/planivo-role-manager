@@ -21,6 +21,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { 
@@ -32,7 +42,8 @@ import {
   Trash2, 
   Shield,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -78,6 +89,7 @@ const roleColors: Record<string, string> = {
 const ModuleManagement = () => {
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
+  const [dependencyWarning, setDependencyWarning] = useState<{ module: Module; dependentModules: string[] } | null>(null);
   const queryClient = useQueryClient();
 
   const { data: modules, isLoading: modulesLoading } = useQuery({
@@ -151,7 +163,27 @@ const ModuleManagement = () => {
     },
   });
 
+  const checkDependencies = (module: Module): string[] => {
+    if (!modules) return [];
+    
+    return modules
+      .filter((m) => 
+        m.is_active && 
+        m.depends_on && 
+        m.depends_on.includes(module.key)
+      )
+      .map((m) => m.name);
+  };
+
   const handleModuleToggle = (module: Module, checked: boolean) => {
+    if (!checked) {
+      const dependentModules = checkDependencies(module);
+      if (dependentModules.length > 0) {
+        setDependencyWarning({ module, dependentModules });
+        return;
+      }
+    }
+    
     toggleModuleMutation.mutate({ moduleId: module.id, isActive: checked });
   };
 
@@ -362,6 +394,36 @@ const ModuleManagement = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Dependency Warning Dialog */}
+      <AlertDialog open={!!dependencyWarning} onOpenChange={() => setDependencyWarning(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Cannot Disable Module
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                The <strong>{dependencyWarning?.module.name}</strong> module cannot be disabled because the following modules depend on it:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                {dependencyWarning?.dependentModules.map((name) => (
+                  <li key={name} className="font-medium">{name}</li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground">
+                Please disable or reconfigure the dependent modules first before disabling this module.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setDependencyWarning(null)}>
+              Understood
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
