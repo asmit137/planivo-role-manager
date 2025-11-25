@@ -109,14 +109,30 @@ const StaffManagementHub = () => {
     queryFn: async () => {
       if (!userRole?.department_id) return [];
       
-      const { data: staffRoles, error } = await supabase
+      // Fetch user_roles first
+      const { data: staffRoles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('*, profiles(*), departments!user_roles_specialty_id_fkey(name)')
+        .select('*, departments!user_roles_specialty_id_fkey(name)')
         .eq('department_id', userRole.department_id)
         .eq('role', 'staff');
 
-      if (error) throw error;
-      return staffRoles;
+      if (rolesError) throw rolesError;
+      if (!staffRoles || staffRoles.length === 0) return [];
+
+      // Fetch profiles separately
+      const userIds = staffRoles.map(role => role.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Combine the data
+      return staffRoles.map(role => ({
+        ...role,
+        profiles: profiles?.find(p => p.id === role.user_id) || null
+      }));
     },
     enabled: !!userRole?.department_id,
   });
@@ -260,8 +276,8 @@ const StaffManagementHub = () => {
                 <TableBody>
                   {staff.map((member: any) => (
                     <TableRow key={member.id}>
-                      <TableCell className="font-medium">{member.profiles?.full_name}</TableCell>
-                      <TableCell>{member.profiles?.email}</TableCell>
+                      <TableCell className="font-medium">{member.profiles?.full_name || 'Unknown'}</TableCell>
+                      <TableCell>{member.profiles?.email || 'No email'}</TableCell>
                       <TableCell>
                         <Badge variant="outline">
                           {member.departments?.name || 'No specialty'}
