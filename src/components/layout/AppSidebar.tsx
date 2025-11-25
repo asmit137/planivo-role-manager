@@ -90,10 +90,11 @@ export function AppSidebar() {
   return (
     <Sidebar
       collapsible="icon"
+      className="border-r border-sidebar-border bg-sidebar z-40"
     >
-      <SidebarContent>
+      <SidebarContent className="bg-sidebar">
         {/* Branding */}
-        <div className={`px-4 py-6 border-b border-sidebar-border ${collapsed ? 'text-center' : ''}`}>
+        <div className={`px-4 py-6 border-b border-sidebar-border bg-sidebar ${collapsed ? 'text-center' : ''}`}>
           {!collapsed ? (
             <div>
               <h1 className="text-xl font-display font-bold text-sidebar-foreground">Planivo</h1>
@@ -133,8 +134,8 @@ export function AppSidebar() {
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    onClick={() => handleNavigation('/dashboard?tab=module-access')}
-                    isActive={currentTab === 'module-access'}
+                    onClick={() => handleNavigation('/dashboard?tab=modules')}
+                    isActive={currentTab === 'modules'}
                     className="w-full"
                   >
                     <Settings className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
