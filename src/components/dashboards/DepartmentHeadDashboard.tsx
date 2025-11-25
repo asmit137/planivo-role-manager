@@ -29,16 +29,24 @@ const DepartmentHeadDashboard = () => {
   const [staffFullName, setStaffFullName] = useState('');
   const queryClient = useQueryClient();
 
-  const { data: userRole } = useQuery({
+  const { data: userRole, isLoading: roleLoading, error: roleError } = useQuery({
     queryKey: ['department-head-role', user?.id],
     queryFn: async () => {
+      if (!user?.id) throw new Error('User not found');
+      
       const { data, error } = await supabase
         .from('user_roles')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .eq('role', 'department_head')
         .maybeSingle();
-      if (error) throw error;
+      
+      if (error) {
+        console.error('Department head role query error:', error);
+        throw error;
+      }
+      
+      console.log('Department head role data:', data);
       return data;
     },
     enabled: !!user,
@@ -109,11 +117,31 @@ const DepartmentHeadDashboard = () => {
     createStaffMutation.mutate({ email: staffEmail, full_name: staffFullName });
   };
 
-  if (!userRole?.department_id) {
+  if (roleLoading) {
     return (
       <DashboardLayout title="Team Management" roleLabel="Department Head" roleColor="text-primary">
         <div className="text-center p-12">
           <p className="text-muted-foreground">Loading department information...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (roleError) {
+    return (
+      <DashboardLayout title="Team Management" roleLabel="Department Head" roleColor="text-primary">
+        <div className="text-center p-12">
+          <p className="text-destructive">Error loading department information. Please try refreshing the page.</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!userRole?.department_id) {
+    return (
+      <DashboardLayout title="Team Management" roleLabel="Department Head" roleColor="text-primary">
+        <div className="text-center p-12">
+          <p className="text-muted-foreground">No department assigned to your account. Please contact an administrator.</p>
         </div>
       </DashboardLayout>
     );
