@@ -9,13 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import WorkspaceManagement from '@/components/admin/WorkspaceManagement';
-import UserManagement from '@/components/admin/UserManagement';
-import VacationTypeManagement from '@/components/vacation/VacationTypeManagement';
-import FacilityUserManagement from '@/components/admin/FacilityUserManagement';
-import CategoryDepartmentManagement from '@/components/admin/CategoryDepartmentManagement';
-import VacationConflictDashboard from '@/components/vacation/VacationConflictDashboard';
-import ModuleManagement from '@/components/admin/ModuleManagement';
+import { UserManagement } from '@/modules/user-management';
+import { OrganizationHub } from '@/modules/organization';
+import { VacationHub } from '@/modules/vacation';
+import { ModuleAccessHub } from '@/modules/core';
 import ModuleSystemValidator from '@/components/admin/ModuleSystemValidator';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
@@ -29,7 +26,7 @@ const SuperAdminDashboard = () => {
       const { data, error } = await supabase
         .from('workspaces')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false});
       
       if (error) throw error;
       return data;
@@ -166,11 +163,11 @@ const SuperAdminDashboard = () => {
             </TabsTrigger>
             {hasAccess('organization') && (
               <TabsTrigger 
-                value="workspaces" 
+                value="organization" 
                 className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
               >
                 <Folders className="h-4 w-4" />
-                <span className="hidden sm:inline">Workspaces</span>
+                <span className="hidden sm:inline">Organization</span>
               </TabsTrigger>
             )}
             {hasAccess('user_management') && (
@@ -182,31 +179,13 @@ const SuperAdminDashboard = () => {
                 <span className="hidden sm:inline">Users</span>
               </TabsTrigger>
             )}
-            {hasAccess('organization') && (
-              <TabsTrigger 
-                value="facilities" 
-                className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
-              >
-                <UsersRound className="h-4 w-4" />
-                <span className="hidden sm:inline">Facilities & Staff</span>
-              </TabsTrigger>
-            )}
             {hasAccess('vacation_planning') && (
               <TabsTrigger 
                 value="vacation" 
                 className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
               >
                 <Calendar className="h-4 w-4" />
-                <span className="hidden sm:inline">Vacation Types</span>
-              </TabsTrigger>
-            )}
-            {hasAccess('organization') && (
-              <TabsTrigger 
-                value="structure" 
-                className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
-              >
-                <FolderTree className="h-4 w-4" />
-                <span className="hidden sm:inline">Categories & Departments</span>
+                <span className="hidden sm:inline">Vacation</span>
               </TabsTrigger>
             )}
           </TabsList>
@@ -388,59 +367,43 @@ const SuperAdminDashboard = () => {
               </CardContent>
             </Card>
           </div>
-
-          {/* Vacation Conflicts */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5" />
-                Vacation Conflicts
-              </CardTitle>
-              <CardDescription>Monitor and manage vacation scheduling conflicts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <VacationConflictDashboard scopeType="all" />
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="modules">
-          <ModuleManagement />
+          <ModuleGuard moduleKey="core">
+            <ModuleAccessHub />
+          </ModuleGuard>
         </TabsContent>
 
         <TabsContent value="validator">
-          <ModuleSystemValidator />
-        </TabsContent>
-
-        <TabsContent value="workspaces">
-          <ModuleGuard moduleKey="organization">
-            <WorkspaceManagement />
+          <ModuleGuard moduleKey="core">
+            <ModuleSystemValidator />
           </ModuleGuard>
         </TabsContent>
 
-        <TabsContent value="users">
-          <ModuleGuard moduleKey="user_management">
-            <UserManagement />
-          </ModuleGuard>
-        </TabsContent>
+        {hasAccess('organization') && (
+          <TabsContent value="organization">
+            <ModuleGuard moduleKey="organization">
+              <OrganizationHub />
+            </ModuleGuard>
+          </TabsContent>
+        )}
 
-        <TabsContent value="facilities">
-          <ModuleGuard moduleKey="organization">
-            <FacilityUserManagement />
-          </ModuleGuard>
-        </TabsContent>
+        {hasAccess('user_management') && (
+          <TabsContent value="users">
+            <ModuleGuard moduleKey="user_management">
+              <UserManagement />
+            </ModuleGuard>
+          </TabsContent>
+        )}
 
-        <TabsContent value="vacation">
-          <ModuleGuard moduleKey="vacation_planning">
-            <VacationTypeManagement />
-          </ModuleGuard>
-        </TabsContent>
-
-        <TabsContent value="structure">
-          <ModuleGuard moduleKey="organization">
-            <CategoryDepartmentManagement />
-          </ModuleGuard>
-        </TabsContent>
+        {hasAccess('vacation_planning') && (
+          <TabsContent value="vacation">
+            <ModuleGuard moduleKey="vacation_planning">
+              <VacationHub />
+            </ModuleGuard>
+          </TabsContent>
+        )}
       </Tabs>
     </DashboardLayout>
   );
