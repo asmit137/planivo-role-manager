@@ -144,17 +144,26 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       
       if (profilesError) throw profilesError;
       
-      // Combine the data
-      return roles.map(role => ({
-        user_id: role.user_id,
-        role: role.role,
-        profiles: profiles?.find(p => p.id === role.user_id) || { id: role.user_id, full_name: 'Unknown', email: '' }
-      })).sort((a, b) => {
-        // Department heads first
-        if (a.role === 'department_head' && b.role !== 'department_head') return -1;
-        if (b.role === 'department_head' && a.role !== 'department_head') return 1;
-        return 0;
-      });
+      // Ensure profiles is always an array
+      const profilesArray = profiles || [];
+      
+      // Combine the data with safe fallback
+      return roles
+        .map(role => {
+          const profile = profilesArray.find(p => p.id === role.user_id);
+          return {
+            user_id: role.user_id,
+            role: role.role,
+            profiles: profile || { id: role.user_id, full_name: 'Unknown User', email: 'No email' }
+          };
+        })
+        .filter(item => item.profiles !== null) // Extra safety filter
+        .sort((a, b) => {
+          // Department heads first
+          if (a.role === 'department_head' && b.role !== 'department_head') return -1;
+          if (b.role === 'department_head' && a.role !== 'department_head') return 1;
+          return 0;
+        });
     },
     enabled: Boolean(effectiveDepartmentId && (isDepartmentHead || isSuperAdmin || !effectiveStaffOnly)),
   });
@@ -320,7 +329,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                 <SelectContent>
                   {departmentStaff?.map((staff: DepartmentStaffMember) => (
                     <SelectItem key={staff.user_id} value={staff.user_id}>
-                      {staff.profiles.full_name} ({staff.profiles.email})
+                      {staff.profiles?.full_name || 'Unknown User'} ({staff.profiles?.email || 'No email'})
                       {staff.role === 'department_head' && ' (Department Head)'}
                     </SelectItem>
                   ))}
