@@ -1,4 +1,5 @@
 // Vacation Planning module exports
+export { default as VacationHub } from '@/components/vacation/VacationHub';
 export { default as VacationPlanner } from '@/components/vacation/VacationPlanner';
 export { default as VacationPlansList } from '@/components/vacation/VacationPlansList';
 export { default as VacationApprovalWorkflow } from '@/components/vacation/VacationApprovalWorkflow';

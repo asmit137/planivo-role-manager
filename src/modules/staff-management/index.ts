@@ -1,3 +1,2 @@
 // Staff Management module exports
-// Department Head staff management components will be exported here
-export const StaffManagement = () => null; // Placeholder
+export { default as StaffManagementHub } from '@/components/staff/StaffManagementHub';
