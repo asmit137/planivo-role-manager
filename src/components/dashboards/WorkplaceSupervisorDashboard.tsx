@@ -9,6 +9,8 @@ import VacationConflictDashboard from '@/components/vacation/VacationConflictDas
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
+import { NotificationHub } from '@/modules/notifications';
+import { MessagingHub } from '@/modules/messaging';
 
 const WorkplaceSupervisorDashboard = () => {
   const { user } = useAuth();
