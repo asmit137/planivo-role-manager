@@ -254,6 +254,42 @@ export type Database = {
           },
         ]
       }
+      module_definitions: {
+        Row: {
+          created_at: string | null
+          depends_on: string[] | null
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          key: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          depends_on?: string[] | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          key: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          depends_on?: string[] | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          key?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string | null
@@ -322,6 +358,47 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      role_module_access: {
+        Row: {
+          can_admin: boolean | null
+          can_delete: boolean | null
+          can_edit: boolean | null
+          can_view: boolean | null
+          created_at: string | null
+          id: string
+          module_id: string | null
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          can_admin?: boolean | null
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          created_at?: string | null
+          id?: string
+          module_id?: string | null
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          can_admin?: boolean | null
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          created_at?: string | null
+          id?: string
+          module_id?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_module_access_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "module_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       task_assignments: {
         Row: {
@@ -784,6 +861,45 @@ export type Database = {
           },
         ]
       }
+      workspace_module_access: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_enabled: boolean | null
+          module_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          module_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          module_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_module_access_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "module_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_module_access_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
           created_at: string
@@ -824,7 +940,23 @@ export type Database = {
         Args: { _department_id: string; _vacation_plan_id: string }
         Returns: Json
       }
+      get_user_modules: {
+        Args: { _user_id: string }
+        Returns: {
+          can_admin: boolean
+          can_delete: boolean
+          can_edit: boolean
+          can_view: boolean
+          module_id: string
+          module_key: string
+          module_name: string
+        }[]
+      }
       get_user_workspaces: { Args: { _user_id: string }; Returns: string[] }
+      has_module_access: {
+        Args: { _module_key: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
