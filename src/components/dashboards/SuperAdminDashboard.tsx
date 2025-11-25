@@ -16,6 +16,7 @@ import FacilityUserManagement from '@/components/admin/FacilityUserManagement';
 import CategoryDepartmentManagement from '@/components/admin/CategoryDepartmentManagement';
 import VacationConflictDashboard from '@/components/vacation/VacationConflictDashboard';
 import ModuleManagement from '@/components/admin/ModuleManagement';
+import ModuleSystemValidator from '@/components/admin/ModuleSystemValidator';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
 
@@ -141,7 +142,7 @@ const SuperAdminDashboard = () => {
     <DashboardLayout title="System Overview" roleLabel="Super Admin" roleColor="text-primary">
       <Tabs defaultValue="dashboard" className="space-y-6">
         <Card className="border-2">
-          <TabsList className="w-full h-auto p-2 bg-transparent grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
+          <TabsList className="w-full h-auto p-2 bg-transparent grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-2">
             <TabsTrigger 
               value="dashboard" 
               className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
@@ -155,6 +156,13 @@ const SuperAdminDashboard = () => {
             >
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Modules</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="validator" 
+              className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
+            >
+              <CheckCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Validator</span>
             </TabsTrigger>
             {hasAccess('organization') && (
               <TabsTrigger 
@@ -398,6 +406,10 @@ const SuperAdminDashboard = () => {
 
         <TabsContent value="modules">
           <ModuleManagement />
+        </TabsContent>
+
+        <TabsContent value="validator">
+          <ModuleSystemValidator />
         </TabsContent>
 
         <TabsContent value="workspaces">
