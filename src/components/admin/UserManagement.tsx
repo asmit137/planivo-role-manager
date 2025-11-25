@@ -7,12 +7,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, UserPlus, Mail, Filter, Pencil, Trash2 } from 'lucide-react';
+import { Plus, UserPlus, Mail, Filter, Pencil, Trash2, Upload, FileSpreadsheet } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import UnifiedUserCreation from './UnifiedUserCreation';
+import BulkUserUpload from './BulkUserUpload';
 
 const userSchema = z.object({
   email: z.string().trim().min(1, 'Email is required').email('Invalid email address'),
@@ -23,6 +26,7 @@ const userSchema = z.object({
 
 const UserManagement = () => {
   const [open, setOpen] = useState(false);
+  const [unifiedCreateOpen, setUnifiedCreateOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -379,99 +383,54 @@ const UserManagement = () => {
   };
 
   return (
-    <Card className="border-2">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>User Management</CardTitle>
-            <CardDescription>Create and manage user accounts</CardDescription>
+    <>
+      <UnifiedUserCreation open={unifiedCreateOpen} onOpenChange={setUnifiedCreateOpen} />
+      
+      <Card className="border-2">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>User Management</CardTitle>
+              <CardDescription>Create and manage user accounts</CardDescription>
+            </div>
+            <Button onClick={() => setUnifiedCreateOpen(true)} className="bg-gradient-primary">
+              <UserPlus className="mr-2 h-4 w-4" />
+              Create User
+            </Button>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-primary">
-                <UserPlus className="mr-2 h-4 w-4" />
-                Create User
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Create New User</DialogTitle>
-                <DialogDescription>
-                  Add a new user to the system
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="full-name">Full Name</Label>
-                  <Input
-                    id="full-name"
-                    placeholder="John Doe"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="user@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Minimum 6 characters"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="role">Role</Label>
-                  <Select value={role} onValueChange={setRole}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="super_admin">Super Admin</SelectItem>
-                      <SelectItem value="general_admin">General Admin</SelectItem>
-                      <SelectItem value="workplace_supervisor">Workplace Supervisor</SelectItem>
-                      <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
-                      <SelectItem value="department_head">Department Head</SelectItem>
-                      <SelectItem value="staff">Staff</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {role !== 'super_admin' && workspaces && workspaces.length > 0 && (
-                  <div className="space-y-2">
-                    <Label htmlFor="workspace">Workspace (Optional)</Label>
-                    <Select value={workspaceId || undefined} onValueChange={setWorkspaceId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select workspace" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {workspaces.map((workspace) => (
-                          <SelectItem key={workspace.id} value={workspace.id}>
-                            {workspace.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                <Button type="submit" className="w-full" disabled={createUserMutation.isPending}>
-                  {createUserMutation.isPending ? 'Creating...' : 'Create User'}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="list" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="list">
+                <Filter className="h-4 w-4 mr-2" />
+                User List
+              </TabsTrigger>
+              <TabsTrigger value="bulk">
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Bulk Upload
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="list" className="space-y-4">
+              {/* Workspace Filter */}
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-sm">Filter by Workspace:</Label>
+                <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
+                  <SelectTrigger className="w-64">
+                    <SelectValue placeholder="Select workspace" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Workspaces</SelectItem>
+                    {workspaces?.map((workspace) => (
+                      <SelectItem key={workspace.id} value={workspace.id}>
+                        {workspace.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
           {/* Edit User Dialog */}
           <Dialog open={editOpen} onOpenChange={setEditOpen}>
@@ -682,109 +641,93 @@ const UserManagement = () => {
               )}
             </DialogContent>
           </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {/* Workspace Filter */}
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <Label className="text-sm">Filter by Workspace:</Label>
-            <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
-              <SelectTrigger className="w-64">
-                <SelectValue placeholder="Select workspace" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Workspaces</SelectItem>
-                {workspaces?.map((workspace) => (
-                  <SelectItem key={workspace.id} value={workspace.id}>
-                    {workspace.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
 
-          {/* Users Table */}
-          {usersLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Loading users...
-            </div>
-          ) : users && users.length > 0 ? (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Roles</TableHead>
-                    <TableHead>Workspaces</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((user: any) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.full_name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <Badge variant={user.is_active ? "default" : "secondary"}>
-                          {user.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {user.roles.map((roleData: any, idx: number) => (
-                            <Badge key={idx} variant="outline">
-                              {roleData.role.replace('_', ' ')}
+              {/* Users Table */}
+              {usersLoading ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Loading users...
+                </div>
+              ) : users && users.length > 0 ? (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Roles</TableHead>
+                        <TableHead>Workspaces</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((user: any) => (
+                        <TableRow key={user.id}>
+                          <TableCell className="font-medium">{user.full_name}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>
+                            <Badge variant={user.is_active ? "default" : "secondary"}>
+                              {user.is_active ? 'Active' : 'Inactive'}
                             </Badge>
-                          ))}
-                          {user.roles.length === 0 && (
-                            <span className="text-xs text-muted-foreground">No roles</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {user.roles
-                            .map((roleData: any, idx: number) => {
-                              const workspace = workspaces?.find((w: any) => w.id === roleData.workspace_id);
-                              if (!workspace) return null;
-                              return (
-                                <Badge key={idx} className="bg-primary/10">
-                                  {workspace.name}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {user.roles.map((roleData: any, idx: number) => (
+                                <Badge key={idx} variant="outline">
+                                  {roleData.role.replace('_', ' ')}
                                 </Badge>
-                              );
-                            })}
-                          {user.roles.every((r: any) => !r.workspace_id) && (
-                            <span className="text-xs text-muted-foreground">System-wide</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(user)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No users found</p>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+                              ))}
+                              {user.roles.length === 0 && (
+                                <span className="text-xs text-muted-foreground">No roles</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {user.roles
+                                .map((roleData: any, idx: number) => {
+                                  const workspace = workspaces?.find((w: any) => w.id === roleData.workspace_id);
+                                  if (!workspace) return null;
+                                  return (
+                                    <Badge key={idx} className="bg-primary/10">
+                                      {workspace.name}
+                                    </Badge>
+                                  );
+                                })}
+                              {user.roles.every((r: any) => !r.workspace_id) && (
+                                <span className="text-xs text-muted-foreground">System-wide</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(user)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Mail className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No users found</p>
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="bulk">
+              <BulkUserUpload />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </>
   );
 };
 
