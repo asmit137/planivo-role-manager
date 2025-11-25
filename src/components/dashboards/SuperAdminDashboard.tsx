@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Users, Building2, Calendar, ClipboardList, CheckCircle, XCircle, Clock, TrendingUp, Building, LayoutDashboard, Folders, UserCircle, FolderTree, Settings } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -15,9 +14,13 @@ import { ModuleAccessHub } from '@/modules/core';
 import ModuleSystemValidator from '@/components/admin/ModuleSystemValidator';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
+import { useLocation } from 'react-router-dom';
 
 const SuperAdminDashboard = () => {
   const { modules, hasAccess } = useModuleContext();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const activeTab = searchParams.get('tab') || 'dashboard';
   
   const { data: workspaces, isLoading: workspacesLoading } = useQuery({
     queryKey: ['workspaces'],
@@ -141,61 +144,9 @@ const SuperAdminDashboard = () => {
         description="Manage your entire system from one centralized dashboard"
       />
       
-      <Tabs defaultValue="dashboard" className="space-y-6">
-        <Card className="border-2">
-          <TabsList className="w-full h-auto p-2 bg-transparent grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-2">
-            <TabsTrigger 
-              value="dashboard" 
-              className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
-            >
-              <LayoutDashboard className="h-4 w-4" />
-              <span className="hidden sm:inline">Dashboard</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="modules" 
-              className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
-            >
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Modules</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="validator" 
-              className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
-            >
-              <CheckCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Validator</span>
-            </TabsTrigger>
-            {hasAccess('organization') && (
-              <TabsTrigger 
-                value="organization" 
-                className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
-              >
-                <Folders className="h-4 w-4" />
-                <span className="hidden sm:inline">Organization</span>
-              </TabsTrigger>
-            )}
-            {hasAccess('user_management') && (
-              <TabsTrigger 
-                value="users" 
-                className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
-              >
-                <UserCircle className="h-4 w-4" />
-                <span className="hidden sm:inline">Users</span>
-              </TabsTrigger>
-            )}
-            {hasAccess('vacation_planning') && (
-              <TabsTrigger 
-                value="vacation" 
-                className="flex items-center gap-2 px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all"
-              >
-                <Calendar className="h-4 w-4" />
-                <span className="hidden sm:inline">Vacation</span>
-              </TabsTrigger>
-            )}
-          </TabsList>
-        </Card>
-
-        <TabsContent value="dashboard" className="space-y-6">
+      <div className="space-y-6">
+        {activeTab === 'dashboard' && (
+          <div className="space-y-6">
           {/* Main Stats Grid */}
           <div className="grid gap-6 md:grid-cols-4">
             <StatsCard
@@ -349,44 +300,39 @@ const SuperAdminDashboard = () => {
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
+          </div>
+        )}
 
-        <TabsContent value="modules">
+        {activeTab === 'modules' && (
           <ModuleGuard moduleKey="core">
             <ModuleAccessHub />
           </ModuleGuard>
-        </TabsContent>
+        )}
 
-        <TabsContent value="validator">
+        {activeTab === 'validator' && (
           <ModuleGuard moduleKey="core">
             <ModuleSystemValidator />
           </ModuleGuard>
-        </TabsContent>
-
-        {hasAccess('organization') && (
-          <TabsContent value="organization">
-            <ModuleGuard moduleKey="organization">
-              <OrganizationHub />
-            </ModuleGuard>
-          </TabsContent>
         )}
 
-        {hasAccess('user_management') && (
-          <TabsContent value="users">
-            <ModuleGuard moduleKey="user_management">
-              <UserManagement />
-            </ModuleGuard>
-          </TabsContent>
+        {activeTab === 'organization' && hasAccess('organization') && (
+          <ModuleGuard moduleKey="organization">
+            <OrganizationHub />
+          </ModuleGuard>
         )}
 
-        {hasAccess('vacation_planning') && (
-          <TabsContent value="vacation">
-            <ModuleGuard moduleKey="vacation_planning">
-              <VacationHub />
-            </ModuleGuard>
-          </TabsContent>
+        {activeTab === 'users' && hasAccess('user_management') && (
+          <ModuleGuard moduleKey="user_management">
+            <UserManagement />
+          </ModuleGuard>
         )}
-      </Tabs>
+
+        {activeTab === 'vacation' && hasAccess('vacation_planning') && (
+          <ModuleGuard moduleKey="vacation_planning">
+            <VacationHub />
+          </ModuleGuard>
+        )}
+      </div>
     </>
   );
 };
