@@ -90,7 +90,7 @@ const UserManagement = () => {
           workspaces(name),
           facilities(name),
           departments(name),
-          specialties:specialty_id(name)
+          specialty:specialty_id(name)
         `);
 
       if (rolesError) throw rolesError;
@@ -246,7 +246,7 @@ const UserManagement = () => {
             workspaces(name),
             facilities(name),
             departments(name),
-            specialties:specialty_id(name)
+            specialty:specialty_id(name)
           `)
           .eq('user_id', editingUser.id);
 
@@ -299,7 +299,7 @@ const UserManagement = () => {
             workspaces(name),
             facilities(name),
             departments(name),
-            specialties:specialty_id(name)
+            specialty:specialty_id(name)
           `)
           .eq('user_id', editingUser.id);
 
@@ -561,8 +561,8 @@ const UserManagement = () => {
                                   {roleData.departments && (
                                     <p>Department: {roleData.departments.name}</p>
                                   )}
-                                  {roleData.specialties && (
-                                    <p>Specialty: {roleData.specialties.name}</p>
+                                  {roleData.specialty && (
+                                    <p>Specialty: {roleData.specialty.name}</p>
                                   )}
                                 </div>
                               </div>
