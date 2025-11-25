@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -5,12 +6,32 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+
+interface Module {
+  id: string;
+  name: string;
+  key: string;
+  description: string | null;
+  is_active: boolean | null;
+  depends_on: string[] | null;
+}
 
 const WorkspaceModuleManagement = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [dependencyWarning, setDependencyWarning] = useState<{ module: Module; dependentModules: string[] } | null>(null);
 
   const { data: userRole } = useQuery({
     queryKey: ['general-admin-role', user?.id],
@@ -35,7 +56,7 @@ const WorkspaceModuleManagement = () => {
         .select('*')
         .order('name');
       if (error) throw error;
-      return data;
+      return data as Module[];
     },
   });
 
@@ -87,7 +108,18 @@ const WorkspaceModuleManagement = () => {
     },
   });
 
-  const getModuleStatus = (moduleId: string, isActive: boolean) => {
+  const checkDependencies = (module: Module): string[] => {
+    if (!modules) return [];
+    
+    return modules
+      .filter((m) => {
+        const mStatus = getModuleStatusRaw(m.id, m.is_active || false);
+        return mStatus.enabled && m.depends_on && m.depends_on.includes(module.key);
+      })
+      .map((m) => m.name);
+  };
+
+  const getModuleStatusRaw = (moduleId: string, isActive: boolean) => {
     if (!isActive) {
       return { label: 'System Disabled', color: 'destructive', enabled: false, canToggle: false };
     }
@@ -102,6 +134,22 @@ const WorkspaceModuleManagement = () => {
     }
 
     return { label: 'Workspace Disabled', color: 'secondary', enabled: false, canToggle: true };
+  };
+
+  const getModuleStatus = (moduleId: string, isActive: boolean) => {
+    return getModuleStatusRaw(moduleId, isActive);
+  };
+
+  const handleModuleToggle = (module: Module, enabled: boolean) => {
+    if (!enabled) {
+      const dependentModules = checkDependencies(module);
+      if (dependentModules.length > 0) {
+        setDependencyWarning({ module, dependentModules });
+        return;
+      }
+    }
+
+    toggleModuleMutation.mutate({ moduleId: module.id, enabled });
   };
 
   if (isLoading) {
@@ -134,12 +182,7 @@ const WorkspaceModuleManagement = () => {
                     <Switch
                       checked={status.enabled}
                       disabled={!status.canToggle}
-                      onCheckedChange={(checked) => {
-                        toggleModuleMutation.mutate({
-                          moduleId: module.id,
-                          enabled: checked,
-                        });
-                      }}
+                      onCheckedChange={(checked) => handleModuleToggle(module, checked)}
                     />
                   </div>
                 </div>
@@ -158,6 +201,36 @@ const WorkspaceModuleManagement = () => {
           );
         })}
       </div>
+
+      {/* Dependency Warning Dialog */}
+      <AlertDialog open={!!dependencyWarning} onOpenChange={() => setDependencyWarning(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Cannot Disable Module
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                The <strong>{dependencyWarning?.module.name}</strong> module cannot be disabled because the following modules in your workspace depend on it:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                {dependencyWarning?.dependentModules.map((name) => (
+                  <li key={name} className="font-medium">{name}</li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground">
+                Please disable the dependent modules first before disabling this module.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setDependencyWarning(null)}>
+              Understood
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
