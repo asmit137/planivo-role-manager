@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -59,9 +59,11 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   const effectiveStaffOnly = staffOnly || isStaff;
 
   // Auto-select staff member if in staff-only mode
-  if (effectiveStaffOnly && user?.id && !selectedStaff) {
-    setSelectedStaff(user.id);
-  }
+  useEffect(() => {
+    if (effectiveStaffOnly && user?.id && !selectedStaff) {
+      setSelectedStaff(user.id);
+    }
+  }, [effectiveStaffOnly, user?.id, selectedStaff]);
 
   // Real-time subscriptions for live updates
   useRealtimeSubscription({
@@ -100,11 +102,12 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
         .from('user_roles')
         .select('user_id, role, profiles(id, full_name, email)')
         .eq('department_id', effectiveDepartmentId)
-        .in('role', ['staff', 'department_head']);
+        .in('role', ['staff', 'department_head'])
+        .order('role', { ascending: false }); // Department heads first
       if (error) throw error;
       return data;
     },
-    enabled: !effectiveStaffOnly && !!effectiveDepartmentId,
+    enabled: !!effectiveDepartmentId && (isDepartmentHead || !effectiveStaffOnly),
   });
 
   const createPlanMutation = useMutation({
