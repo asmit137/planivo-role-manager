@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import PasswordChangeDialog from '@/components/PasswordChangeDialog';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import SuperAdminDashboard from '@/components/dashboards/SuperAdminDashboard';
 import GeneralAdminDashboard from '@/components/dashboards/GeneralAdminDashboard';
 import WorkplaceSupervisorDashboard from '@/components/dashboards/WorkplaceSupervisorDashboard';
@@ -106,19 +107,47 @@ const Dashboard = () => {
 
   switch (primaryRole) {
     case 'super_admin':
-      return <SuperAdminDashboard />;
+      return (
+        <ErrorBoundary fallbackTitle="Super Admin Dashboard Error">
+          <SuperAdminDashboard />
+        </ErrorBoundary>
+      );
     case 'general_admin':
-      return <GeneralAdminDashboard />;
+      return (
+        <ErrorBoundary fallbackTitle="General Admin Dashboard Error">
+          <GeneralAdminDashboard />
+        </ErrorBoundary>
+      );
     case 'workplace_supervisor':
-      return <WorkplaceSupervisorDashboard />;
+      return (
+        <ErrorBoundary fallbackTitle="Workplace Supervisor Dashboard Error">
+          <WorkplaceSupervisorDashboard />
+        </ErrorBoundary>
+      );
     case 'facility_supervisor':
-      return <FacilitySupervisorDashboard />;
+      return (
+        <ErrorBoundary fallbackTitle="Facility Supervisor Dashboard Error">
+          <FacilitySupervisorDashboard />
+        </ErrorBoundary>
+      );
     case 'department_head':
-      return <DepartmentHeadDashboard />;
+      return (
+        <ErrorBoundary fallbackTitle="Department Head Dashboard Error">
+          <DepartmentHeadDashboard />
+        </ErrorBoundary>
+      );
     case 'staff':
-      return <StaffDashboard />;
+      return (
+        <ErrorBoundary fallbackTitle="Staff Dashboard Error">
+          <StaffDashboard />
+        </ErrorBoundary>
+      );
     default:
-      return <StaffDashboard />;
+      return (
+        <ErrorBoundary fallbackTitle="Dashboard Error">
+          <StaffDashboard />
+        </ErrorBoundary>
+      );
   }
 };
 
