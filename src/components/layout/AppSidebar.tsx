@@ -10,7 +10,8 @@ import {
   Bell,
   Settings,
   LogOut,
-  User
+  User,
+  ShieldCheck
 } from 'lucide-react';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -43,8 +44,8 @@ const moduleConfig = [
   { key: 'user_management', label: 'Users', icon: Users, path: '/dashboard?tab=users' },
   { key: 'organization', label: 'Organization', icon: Building2, path: '/dashboard?tab=organization' },
   { key: 'staff_management', label: 'Staff', icon: UserCog, path: '/dashboard?tab=staff' },
-  { key: 'vacation', label: 'Vacation', icon: Calendar, path: '/dashboard?tab=vacation' },
-  { key: 'tasks', label: 'Tasks', icon: CheckSquare, path: '/dashboard?tab=tasks' },
+  { key: 'vacation_planning', label: 'Vacation', icon: Calendar, path: '/dashboard?tab=vacation' },
+  { key: 'task_management', label: 'Tasks', icon: CheckSquare, path: '/dashboard?tab=tasks' },
   { key: 'messaging', label: 'Messages', icon: MessageSquare, path: '/dashboard?tab=messaging' },
   { key: 'notifications', label: 'Notifications', icon: Bell, path: '/dashboard?tab=notifications' },
 ];
@@ -144,7 +145,7 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Module Access (Admin only) */}
+        {/* System Tools (Admin only) */}
         {primaryRole === 'super_admin' && (
           <SidebarGroup>
             <SidebarGroupLabel>System</SidebarGroupLabel>
@@ -158,6 +159,16 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
                   >
                     <Settings className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
                     {!collapsed && <span>Module Access</span>}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => handleNavigation('/dashboard?tab=validator')}
+                    isActive={currentTab === 'validator'}
+                    className="w-full"
+                  >
+                    <ShieldCheck className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
+                    {!collapsed && <span>System Validator</span>}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
