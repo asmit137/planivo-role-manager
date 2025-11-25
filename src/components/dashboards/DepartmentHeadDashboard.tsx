@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
-import DashboardLayout from '@/components/DashboardLayout';
+import { PageHeader, LoadingState, ErrorState, EmptyState } from '@/components/layout';
 import { StaffManagementHub } from '@/modules/staff-management';
 import { VacationHub } from '@/modules/vacation';
 import { TaskHub } from '@/modules/tasks';
@@ -37,37 +37,33 @@ const DepartmentHeadDashboard = () => {
   });
 
   if (roleLoading) {
-    return (
-      <DashboardLayout title="Team Management" roleLabel="Department Head" roleColor="text-primary">
-        <div className="text-center p-12">
-          <p className="text-muted-foreground">Loading department information...</p>
-        </div>
-      </DashboardLayout>
-    );
+    return <LoadingState message="Loading department information..." />;
   }
 
   if (roleError) {
     return (
-      <DashboardLayout title="Team Management" roleLabel="Department Head" roleColor="text-primary">
-        <div className="text-center p-12">
-          <p className="text-destructive">Error loading department information. Please try refreshing the page.</p>
-        </div>
-      </DashboardLayout>
+      <ErrorState 
+        title="Error Loading Department"
+        message="Error loading department information. Please try refreshing the page." 
+      />
     );
   }
 
   if (!userRole?.department_id) {
     return (
-      <DashboardLayout title="Team Management" roleLabel="Department Head" roleColor="text-primary">
-        <div className="text-center p-12">
-          <p className="text-muted-foreground">No department assigned to your account. Please contact an administrator.</p>
-        </div>
-      </DashboardLayout>
+      <EmptyState 
+        title="No Department Assigned"
+        description="No department assigned to your account. Please contact an administrator."
+      />
     );
   }
 
   return (
-    <DashboardLayout title="Team Management" roleLabel="Department Head" roleColor="text-primary">
+    <>
+      <PageHeader 
+        title="Team Management" 
+        description="Manage your department's staff, vacations, and tasks"
+      />
       <Tabs defaultValue={hasAccess('staff_management') ? 'staff' : hasAccess('vacation_planning') ? 'vacation' : 'tasks'} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           {hasAccess('staff_management') && (
@@ -114,7 +110,7 @@ const DepartmentHeadDashboard = () => {
           </TabsContent>
         )}
       </Tabs>
-    </DashboardLayout>
+    </>
   );
 };
 
