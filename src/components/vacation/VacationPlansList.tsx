@@ -83,7 +83,10 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
       toast.success('Vacation plan submitted for approval');
       setSubmittingPlan(null);
     },
-    onError: () => toast.error('Failed to submit vacation plan'),
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to submit vacation plan');
+      setSubmittingPlan(null);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -104,7 +107,7 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
 
   const getStatusBadge = (status: string) => {
     const configs = {
-      draft: { label: 'Draft', className: 'bg-secondary' },
+      draft: { label: 'Draft', className: 'bg-amber-500 text-white' },
       submitted: { label: 'Pending Level 2', className: 'bg-primary' },
       approved_level2: { label: 'Pending Final Approval', className: 'bg-warning' },
       approved_final: { label: 'Approved', className: 'bg-success' },

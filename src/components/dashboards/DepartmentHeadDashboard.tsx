@@ -63,6 +63,49 @@ const DepartmentHeadDashboard = () => {
     );
   }
 
+  // Count queries for overview
+  const { data: staffCount } = useQuery({
+    queryKey: ['staff-count', userRole?.department_id],
+    queryFn: async () => {
+      if (!userRole?.department_id) return 0;
+      const { count } = await supabase
+        .from('user_roles')
+        .select('*', { count: 'exact', head: true })
+        .eq('department_id', userRole.department_id)
+        .eq('role', 'staff');
+      return count || 0;
+    },
+    enabled: !!userRole?.department_id,
+  });
+
+  const { data: pendingVacations } = useQuery({
+    queryKey: ['pending-vacations', userRole?.department_id],
+    queryFn: async () => {
+      if (!userRole?.department_id) return 0;
+      const { count } = await supabase
+        .from('vacation_plans')
+        .select('*', { count: 'exact', head: true })
+        .eq('department_id', userRole.department_id)
+        .eq('status', 'draft');
+      return count || 0;
+    },
+    enabled: !!userRole?.department_id,
+  });
+
+  const { data: activeTasks } = useQuery({
+    queryKey: ['active-tasks', userRole?.department_id],
+    queryFn: async () => {
+      if (!userRole?.department_id) return 0;
+      const { count } = await supabase
+        .from('tasks')
+        .select('*', { count: 'exact', head: true })
+        .eq('department_id', userRole.department_id)
+        .eq('status', 'active');
+      return count || 0;
+    },
+    enabled: !!userRole?.department_id,
+  });
+
   return (
     <>
       {activeTab === 'staff' && (
@@ -97,12 +140,38 @@ const DepartmentHeadDashboard = () => {
       )}
       {!['staff','vacation','tasks','messaging','notifications'].includes(activeTab) && (
         <PageHeader 
-          title="Team Management" 
+          title="Department Overview" 
           description="Manage your department"
         />
       )}
       
       <div className="space-y-4">
+        {!['staff','vacation','tasks','messaging','notifications'].includes(activeTab) && (
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg border bg-card p-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">Total Staff</p>
+                <UserPlus className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-3xl font-bold mt-2">{staffCount || 0}</p>
+            </div>
+            <div className="rounded-lg border bg-card p-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">Pending Requests</p>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-3xl font-bold mt-2">{pendingVacations || 0}</p>
+            </div>
+            <div className="rounded-lg border bg-card p-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">Active Tasks</p>
+                <ClipboardList className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-3xl font-bold mt-2">{activeTasks || 0}</p>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'staff' && hasAccess('staff_management') && (
           <ModuleGuard moduleKey="staff_management">
             <StaffManagementHub />
