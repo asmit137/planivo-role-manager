@@ -13,6 +13,8 @@ import { VacationHub } from '@/modules/vacation';
 import { ModuleAccessHub } from '@/modules/core';
 import { TaskHub } from '@/modules/tasks';
 import { StaffManagementHub } from '@/modules/staff-management';
+import { NotificationHub } from '@/modules/notifications';
+import { MessagingHub } from '@/modules/messaging';
 import ModuleSystemValidator from '@/components/admin/ModuleSystemValidator';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
@@ -189,7 +191,19 @@ const SuperAdminDashboard = () => {
           description="Manage staff across all departments and facilities"
         />
       )}
-      {!['dashboard', 'modules', 'validator', 'organization', 'users', 'vacation', 'tasks', 'staff'].includes(activeTab) && (
+      {activeTab === 'messaging' && (
+        <PageHeader 
+          title="Messaging" 
+          description="Communicate with colleagues across your workspaces"
+        />
+      )}
+      {activeTab === 'notifications' && (
+        <PageHeader 
+          title="Notifications" 
+          description="View and manage system notifications"
+        />
+      )}
+      {!['dashboard','modules','validator','organization','users','vacation','tasks','staff','messaging','notifications'].includes(activeTab) && (
         <PageHeader 
           title="System Overview" 
           description="Manage your entire system from one centralized dashboard"
@@ -397,11 +411,16 @@ const SuperAdminDashboard = () => {
           </ModuleGuard>
         )}
 
-        {/* Show empty state if no valid tab content */}
-        {!['dashboard', 'modules', 'validator', 'organization', 'users', 'vacation', 'tasks', 'staff'].includes(activeTab) && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">Content not found. Please select a valid module from the sidebar.</p>
-          </div>
+        {activeTab === 'notifications' && hasAccess('notifications') && (
+          <ModuleGuard moduleKey="notifications">
+            <NotificationHub />
+          </ModuleGuard>
+        )}
+
+        {activeTab === 'messaging' && hasAccess('messaging') && (
+          <ModuleGuard moduleKey="messaging">
+            <MessagingHub />
+          </ModuleGuard>
         )}
       </div>
     </>

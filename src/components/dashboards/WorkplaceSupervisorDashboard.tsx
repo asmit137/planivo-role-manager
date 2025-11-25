@@ -56,6 +56,18 @@ const WorkplaceSupervisorDashboard = () => {
           description="View and resolve vacation scheduling conflicts"
         />
       )}
+      {activeTab === 'messaging' && (
+        <PageHeader 
+          title="Messaging" 
+          description="Communicate with staff across this workspace"
+        />
+      )}
+      {activeTab === 'notifications' && (
+        <PageHeader 
+          title="Notifications" 
+          description="View important updates for this workspace"
+        />
+      )}
       
       <div className="space-y-4">
         {activeTab === 'tasks' && hasAccess('task_management') && (
@@ -77,6 +89,18 @@ const WorkplaceSupervisorDashboard = () => {
         {activeTab === 'conflicts' && hasAccess('vacation_planning') && (
           <ModuleGuard moduleKey="vacation_planning">
             <VacationConflictDashboard scopeType="workspace" scopeId={userRole.workspace_id} />
+          </ModuleGuard>
+        )}
+
+        {activeTab === 'messaging' && hasAccess('messaging') && (
+          <ModuleGuard moduleKey="messaging">
+            <MessagingHub />
+          </ModuleGuard>
+        )}
+
+        {activeTab === 'notifications' && hasAccess('notifications') && (
+          <ModuleGuard moduleKey="notifications">
+            <NotificationHub />
           </ModuleGuard>
         )}
       </div>

@@ -3,7 +3,9 @@ import { ActionButton } from '@/components/shared';
 import StaffTaskView from '@/components/tasks/StaffTaskView';
 import VacationPlansList from '@/components/vacation/VacationPlansList';
 import VacationPlanner from '@/components/vacation/VacationPlanner';
-import { ClipboardList, Calendar, Plus } from 'lucide-react';
+import { NotificationHub } from '@/modules/notifications';
+import { MessagingHub } from '@/modules/messaging';
+import { ClipboardList, Calendar, Plus, Bell, MessageSquare } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -53,6 +55,18 @@ const StaffDashboard = () => {
           description="Plan and manage your vacation requests"
         />
       )}
+      {activeTab === 'messaging' && (
+        <PageHeader 
+          title="Messaging" 
+          description="Chat with your colleagues"
+        />
+      )}
+      {activeTab === 'notifications' && (
+        <PageHeader 
+          title="Notifications" 
+          description="View your personal notifications"
+        />
+      )}
       
       <div className="space-y-4">
         {activeTab === 'tasks' && hasAccess('task_management') && (
@@ -86,6 +100,18 @@ const StaffDashboard = () => {
               </Dialog>
             </div>
             <VacationPlansList staffView={true} />
+          </ModuleGuard>
+        )}
+
+        {activeTab === 'messaging' && hasAccess('messaging') && (
+          <ModuleGuard moduleKey="messaging">
+            <MessagingHub />
+          </ModuleGuard>
+        )}
+
+        {activeTab === 'notifications' && hasAccess('notifications') && (
+          <ModuleGuard moduleKey="notifications">
+            <NotificationHub />
           </ModuleGuard>
         )}
       </div>

@@ -56,6 +56,18 @@ const FacilitySupervisorDashboard = () => {
           description="View and resolve vacation scheduling conflicts"
         />
       )}
+      {activeTab === 'messaging' && (
+        <PageHeader 
+          title="Messaging" 
+          description="Communicate with staff in this facility"
+        />
+      )}
+      {activeTab === 'notifications' && (
+        <PageHeader 
+          title="Notifications" 
+          description="View important updates for this facility"
+        />
+      )}
       
       <div className="space-y-4">
         {activeTab === 'tasks' && hasAccess('task_management') && (
@@ -77,6 +89,18 @@ const FacilitySupervisorDashboard = () => {
         {activeTab === 'conflicts' && hasAccess('vacation_planning') && (
           <ModuleGuard moduleKey="vacation_planning">
             <VacationConflictDashboard scopeType="facility" scopeId={userRole.facility_id} />
+          </ModuleGuard>
+        )}
+
+        {activeTab === 'messaging' && hasAccess('messaging') && (
+          <ModuleGuard moduleKey="messaging">
+            <MessagingHub />
+          </ModuleGuard>
+        )}
+
+        {activeTab === 'notifications' && hasAccess('notifications') && (
+          <ModuleGuard moduleKey="notifications">
+            <NotificationHub />
           </ModuleGuard>
         )}
       </div>
