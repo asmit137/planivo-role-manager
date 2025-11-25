@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import PasswordChangeDialog from '@/components/PasswordChangeDialog';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import UnifiedLayout from '@/components/layout/UnifiedLayout';
 import SuperAdminDashboard from '@/components/dashboards/SuperAdminDashboard';
 import GeneralAdminDashboard from '@/components/dashboards/GeneralAdminDashboard';
 import WorkplaceSupervisorDashboard from '@/components/dashboards/WorkplaceSupervisorDashboard';
@@ -108,45 +109,59 @@ const Dashboard = () => {
   switch (primaryRole) {
     case 'super_admin':
       return (
-        <ErrorBoundary fallbackTitle="Super Admin Dashboard Error">
-          <SuperAdminDashboard />
-        </ErrorBoundary>
+        <UnifiedLayout>
+          <ErrorBoundary fallbackTitle="Super Admin Dashboard Error">
+            <SuperAdminDashboard />
+          </ErrorBoundary>
+        </UnifiedLayout>
       );
     case 'general_admin':
       return (
-        <ErrorBoundary fallbackTitle="General Admin Dashboard Error">
-          <GeneralAdminDashboard />
-        </ErrorBoundary>
+        <UnifiedLayout>
+          <ErrorBoundary fallbackTitle="General Admin Dashboard Error">
+            <GeneralAdminDashboard />
+          </ErrorBoundary>
+        </UnifiedLayout>
       );
     case 'workplace_supervisor':
       return (
-        <ErrorBoundary fallbackTitle="Workplace Supervisor Dashboard Error">
-          <WorkplaceSupervisorDashboard />
-        </ErrorBoundary>
+        <UnifiedLayout>
+          <ErrorBoundary fallbackTitle="Workplace Supervisor Dashboard Error">
+            <WorkplaceSupervisorDashboard />
+          </ErrorBoundary>
+        </UnifiedLayout>
       );
     case 'facility_supervisor':
       return (
-        <ErrorBoundary fallbackTitle="Facility Supervisor Dashboard Error">
-          <FacilitySupervisorDashboard />
-        </ErrorBoundary>
+        <UnifiedLayout>
+          <ErrorBoundary fallbackTitle="Facility Supervisor Dashboard Error">
+            <FacilitySupervisorDashboard />
+          </ErrorBoundary>
+        </UnifiedLayout>
       );
     case 'department_head':
       return (
-        <ErrorBoundary fallbackTitle="Department Head Dashboard Error">
-          <DepartmentHeadDashboard />
-        </ErrorBoundary>
+        <UnifiedLayout>
+          <ErrorBoundary fallbackTitle="Department Head Dashboard Error">
+            <DepartmentHeadDashboard />
+          </ErrorBoundary>
+        </UnifiedLayout>
       );
     case 'staff':
       return (
-        <ErrorBoundary fallbackTitle="Staff Dashboard Error">
-          <StaffDashboard />
-        </ErrorBoundary>
+        <UnifiedLayout>
+          <ErrorBoundary fallbackTitle="Staff Dashboard Error">
+            <StaffDashboard />
+          </ErrorBoundary>
+        </UnifiedLayout>
       );
     default:
       return (
-        <ErrorBoundary fallbackTitle="Dashboard Error">
-          <StaffDashboard />
-        </ErrorBoundary>
+        <UnifiedLayout>
+          <ErrorBoundary fallbackTitle="Dashboard Error">
+            <StaffDashboard />
+          </ErrorBoundary>
+        </UnifiedLayout>
       );
   }
 };
