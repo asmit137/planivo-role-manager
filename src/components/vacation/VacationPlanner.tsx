@@ -312,6 +312,8 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                             mode="single"
                             selected={split.start_date}
                             onSelect={(date) => date && updateSplit(index, 'start_date', date)}
+                            initialFocus
+                            className="pointer-events-auto"
                           />
                         </PopoverContent>
                       </Popover>
@@ -336,6 +338,8 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                             mode="single"
                             selected={split.end_date}
                             onSelect={(date) => date && updateSplit(index, 'end_date', date)}
+                            initialFocus
+                            className="pointer-events-auto"
                           />
                         </PopoverContent>
                       </Popover>
