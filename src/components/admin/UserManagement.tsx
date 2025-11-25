@@ -89,8 +89,8 @@ const UserManagement = () => {
           *,
           workspaces(name),
           facilities(name),
-          departments(name),
-          specialty:specialty_id(name)
+          departments!fk_user_roles_department(name),
+          specialty:departments!user_roles_specialty_id_fkey(name)
         `);
 
       if (rolesError) throw rolesError;
@@ -245,8 +245,8 @@ const UserManagement = () => {
             *,
             workspaces(name),
             facilities(name),
-            departments(name),
-            specialty:specialty_id(name)
+            departments!fk_user_roles_department(name),
+            specialty:departments!user_roles_specialty_id_fkey(name)
           `)
           .eq('user_id', editingUser.id);
 
@@ -298,8 +298,8 @@ const UserManagement = () => {
             *,
             workspaces(name),
             facilities(name),
-            departments(name),
-            specialty:specialty_id(name)
+            departments!fk_user_roles_department(name),
+            specialty:departments!user_roles_specialty_id_fkey(name)
           `)
           .eq('user_id', editingUser.id);
 
