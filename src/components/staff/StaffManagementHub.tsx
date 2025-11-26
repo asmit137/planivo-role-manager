@@ -5,14 +5,25 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { UserPlus, Users } from 'lucide-react';
+import { UserPlus, Users, Pencil, Trash2 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import { z } from 'zod';
+import { StaffEditDialog } from './StaffEditDialog';
 
 const staffSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -49,6 +60,10 @@ const StaffManagementHub = () => {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [specialtyId, setSpecialtyId] = useState('');
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [staffToDelete, setStaffToDelete] = useState<{ id: string; name: string } | null>(null);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -176,6 +191,39 @@ const StaffManagementHub = () => {
     createStaffMutation.mutate({ email, full_name: fullName, specialty_id: specialtyId });
   };
 
+  const deleteStaffMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      // Delete user_role record (removes staff from department)
+      const { error } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId)
+        .eq('role', 'staff')
+        .eq('department_id', userRole?.department_id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Staff member removed from department');
+      queryClient.invalidateQueries({ queryKey: ['department-staff'] });
+      setDeleteDialogOpen(false);
+      setStaffToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to remove staff: ${error.message}`);
+    },
+  });
+
+  const handleDeleteClick = (userId: string, name: string) => {
+    setStaffToDelete({ id: userId, name });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleEditClick = (userId: string) => {
+    setSelectedStaffId(userId);
+    setEditDialogOpen(true);
+  };
+
   if (!userRole) {
     return (
       <Card className="border-2">
@@ -267,11 +315,12 @@ const StaffManagementHub = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Specialty</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Specialty</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
                 </TableHeader>
                 <TableBody>
                   {staff.map((member: any) => (
@@ -288,6 +337,25 @@ const StaffManagementHub = () => {
                           {member.profiles?.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditClick(member.user_id)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteClick(member.user_id, member.profiles?.full_name || 'Unknown')}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -301,6 +369,36 @@ const StaffManagementHub = () => {
           )}
         </CardContent>
       </Card>
+
+      {selectedStaffId && userRole?.department_id && (
+        <StaffEditDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          staffUserId={selectedStaffId}
+          departmentId={userRole.department_id}
+        />
+      )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Staff Member</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove {staffToDelete?.name} from this department?
+              This will remove their staff role but keep their account active.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => staffToDelete && deleteStaffMutation.mutate(staffToDelete.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
