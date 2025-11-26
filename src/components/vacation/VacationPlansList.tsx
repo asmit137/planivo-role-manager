@@ -112,10 +112,10 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
 
   const getStatusBadge = (status: string) => {
     const configs = {
-      draft: { label: 'Draft', className: 'bg-amber-500 text-white' },
-      department_pending: { label: 'Pending Dept Head', className: 'bg-blue-500 text-white' },
-      facility_pending: { label: 'Pending Facility', className: 'bg-purple-500 text-white' },
-      workspace_pending: { label: 'Pending Final', className: 'bg-orange-500 text-white' },
+      draft: { label: 'Draft', className: 'bg-warning text-warning-foreground' },
+      department_pending: { label: 'Pending Dept Head', className: 'bg-primary text-primary-foreground' },
+      facility_pending: { label: 'Pending Facility', className: 'bg-accent text-accent-foreground' },
+      workspace_pending: { label: 'Pending Final', className: 'bg-secondary text-secondary-foreground' },
       approved: { label: 'Approved', className: 'bg-success text-success-foreground' },
       rejected: { label: 'Rejected', className: 'bg-destructive text-destructive-foreground' },
     };

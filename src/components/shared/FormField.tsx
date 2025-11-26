@@ -21,6 +21,7 @@ interface TextFieldProps extends BaseFieldProps {
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  autoComplete?: string;
 }
 
 export function TextField({
@@ -34,10 +35,11 @@ export function TextField({
   helperText,
   required,
   disabled,
+  autoComplete,
   className,
 }: TextFieldProps) {
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('space-y-2 w-full', className)}>
       <Label htmlFor={id}>
         {label}
         {required && <span className="text-destructive ml-1">*</span>}
@@ -49,9 +51,12 @@ export function TextField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className={cn(error && 'border-destructive')}
+        autoComplete={autoComplete}
+        className={cn(error && 'border-destructive', 'w-full')}
+        aria-invalid={!!error}
+        aria-describedby={error ? `${id}-error` : undefined}
       />
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p id={`${id}-error`} className="text-sm text-destructive" role="alert">{error}</p>}
       {helperText && !error && <p className="text-sm text-muted-foreground">{helperText}</p>}
     </div>
   );
@@ -79,7 +84,7 @@ export function TextAreaField({
   className,
 }: TextAreaFieldProps) {
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('space-y-2 w-full', className)}>
       <Label htmlFor={id}>
         {label}
         {required && <span className="text-destructive ml-1">*</span>}
@@ -91,9 +96,11 @@ export function TextAreaField({
         placeholder={placeholder}
         disabled={disabled}
         rows={rows}
-        className={cn(error && 'border-destructive')}
+        className={cn(error && 'border-destructive', 'w-full')}
+        aria-invalid={!!error}
+        aria-describedby={error ? `${id}-error` : undefined}
       />
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p id={`${id}-error`} className="text-sm text-destructive" role="alert">{error}</p>}
       {helperText && !error && <p className="text-sm text-muted-foreground">{helperText}</p>}
     </div>
   );
@@ -121,13 +128,18 @@ export function SelectField({
   className,
 }: SelectFieldProps) {
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('space-y-2 w-full', className)}>
       <Label htmlFor={id}>
         {label}
         {required && <span className="text-destructive ml-1">*</span>}
       </Label>
       <Select value={value} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger id={id} className={cn(error && 'border-destructive')}>
+        <SelectTrigger 
+          id={id} 
+          className={cn(error && 'border-destructive', 'w-full')}
+          aria-invalid={!!error}
+          aria-describedby={error ? `${id}-error` : undefined}
+        >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
@@ -138,7 +150,7 @@ export function SelectField({
           ))}
         </SelectContent>
       </Select>
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p id={`${id}-error`} className="text-sm text-destructive" role="alert">{error}</p>}
       {helperText && !error && <p className="text-sm text-muted-foreground">{helperText}</p>}
     </div>
   );
@@ -163,19 +175,21 @@ export function SwitchField({
   className,
 }: SwitchFieldProps) {
   return (
-    <div className={cn('flex items-center justify-between space-x-4', className)}>
-      <div className="space-y-0.5">
+    <div className={cn('flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 w-full', className)}>
+      <div className="space-y-0.5 flex-1">
         <Label htmlFor={id}>{label}</Label>
         {(description || helperText) && (
           <p className="text-sm text-muted-foreground">{description || helperText}</p>
         )}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p id={`${id}-error`} className="text-sm text-destructive" role="alert">{error}</p>}
       </div>
       <Switch
         id={id}
         checked={checked}
         onCheckedChange={onCheckedChange}
         disabled={disabled}
+        aria-invalid={!!error}
+        aria-describedby={error ? `${id}-error` : undefined}
       />
     </div>
   );
