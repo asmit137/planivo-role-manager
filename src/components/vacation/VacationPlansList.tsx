@@ -41,7 +41,7 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
         .select(`
           *,
           vacation_types(name),
-          departments(name, facility_id),
+          departments(name, facility_id, facilities:facility_id(workspace_id)),
           vacation_splits(*),
           vacation_approvals(
             *,
@@ -321,7 +321,7 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
                         approvals={plan.vacation_approvals || []}
                         departmentId={plan.department_id}
                         facilityId={plan.departments?.facility_id}
-                        workspaceId=""
+                        workspaceId={plan.departments?.facilities?.workspace_id}
                       />
                     </div>
                   )}

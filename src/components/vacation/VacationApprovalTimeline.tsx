@@ -3,6 +3,8 @@ import { CheckCircle2, Clock, XCircle, Hourglass, AlertCircle } from 'lucide-rea
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ApprovalStage {
   level: number;
@@ -24,7 +26,67 @@ interface VacationApprovalTimelineProps {
 const VacationApprovalTimeline = ({
   currentStatus,
   approvals,
+  departmentId,
+  facilityId,
+  workspaceId,
 }: VacationApprovalTimelineProps) => {
+  
+  // Fetch designated approvers for each level
+  const { data: designatedApprovers } = useQuery({
+    queryKey: ['designated-approvers', departmentId, facilityId, workspaceId],
+    queryFn: async () => {
+      const results = {
+        level1: 'Not Assigned',
+        level2: 'Not Assigned',
+        level3: 'Not Assigned',
+      };
+
+      // Level 1: Get Department Head
+      if (departmentId) {
+        const { data: deptHead } = await supabase
+          .from('user_roles')
+          .select('user_id, profiles:user_id(full_name)')
+          .eq('role', 'department_head')
+          .eq('department_id', departmentId)
+          .maybeSingle();
+        
+        if (deptHead?.profiles) {
+          results.level1 = (deptHead.profiles as any).full_name || 'Not Assigned';
+        }
+      }
+
+      // Level 2: Get Facility Supervisor
+      if (facilityId) {
+        const { data: facilitySup } = await supabase
+          .from('user_roles')
+          .select('user_id, profiles:user_id(full_name)')
+          .eq('role', 'facility_supervisor')
+          .eq('facility_id', facilityId)
+          .maybeSingle();
+        
+        if (facilitySup?.profiles) {
+          results.level2 = (facilitySup.profiles as any).full_name || 'Not Assigned';
+        }
+      }
+
+      // Level 3: Get Workspace Supervisor
+      if (workspaceId) {
+        const { data: workspaceSup } = await supabase
+          .from('user_roles')
+          .select('user_id, profiles:user_id(full_name)')
+          .eq('role', 'workplace_supervisor')
+          .eq('workspace_id', workspaceId)
+          .maybeSingle();
+        
+        if (workspaceSup?.profiles) {
+          results.level3 = (workspaceSup.profiles as any).full_name || 'Not Assigned';
+        }
+      }
+
+      return results;
+    },
+    enabled: !!(departmentId || facilityId || workspaceId),
+  });
   
   // Build the 3-level approval stages based on current status and approvals
   const stages: ApprovalStage[] = [
@@ -32,19 +94,19 @@ const VacationApprovalTimeline = ({
       level: 1,
       role: 'Department Head',
       status: getStageStatus(1, currentStatus, approvals),
-      ...getApprovalDetails(1, approvals),
+      ...getApprovalDetails(1, approvals, designatedApprovers?.level1),
     },
     {
       level: 2,
       role: 'Facility Supervisor',
       status: getStageStatus(2, currentStatus, approvals),
-      ...getApprovalDetails(2, approvals),
+      ...getApprovalDetails(2, approvals, designatedApprovers?.level2),
     },
     {
       level: 3,
       role: 'Workspace Supervisor',
       status: getStageStatus(3, currentStatus, approvals),
-      ...getApprovalDetails(3, approvals),
+      ...getApprovalDetails(3, approvals, designatedApprovers?.level3),
     },
   ];
 
@@ -289,12 +351,18 @@ function getStageStatus(
 }
 
 // Helper function to get approval details from approval records
-function getApprovalDetails(level: number, approvals: any[]) {
+function getApprovalDetails(level: number, approvals: any[], designatedApprover?: string) {
   const approval = approvals?.find((a) => a.approval_level === level);
-  if (!approval) return {};
+  
+  if (!approval) {
+    // No approval yet, show designated approver
+    return {
+      approverName: designatedApprover || 'Not Assigned',
+    };
+  }
 
   return {
-    approverName: approval.profiles?.full_name || 'Unknown',
+    approverName: approval.profiles?.full_name || designatedApprover || 'Unknown',
     timestamp: approval.updated_at || approval.created_at,
     comments: approval.comments,
   };
