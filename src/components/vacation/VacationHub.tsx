@@ -1,10 +1,11 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, CheckSquare, AlertTriangle, List, Settings } from 'lucide-react';
+import { Calendar, CheckSquare, AlertTriangle, List, Settings, CalendarDays } from 'lucide-react';
 import VacationPlanner from './VacationPlanner';
 import VacationPlansList from './VacationPlansList';
 import VacationApprovalWorkflow from './VacationApprovalWorkflow';
 import VacationConflictDashboard from './VacationConflictDashboard';
 import VacationTypeManagement from './VacationTypeManagement';
+import VacationCalendarView from './VacationCalendarView';
 import { useUserRole } from '@/hooks/useUserRole';
 
 interface VacationHubProps {
@@ -53,8 +54,12 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="planner" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+      <Tabs defaultValue="calendar" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-7">
+          <TabsTrigger value="calendar">
+            <CalendarDays className="h-4 w-4 mr-2" />
+            Calendar
+          </TabsTrigger>
           <TabsTrigger value="planner">
             <Calendar className="h-4 w-4 mr-2" />
             Plan Vacation
@@ -88,6 +93,10 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
             </TabsTrigger>
           )}
         </TabsList>
+
+        <TabsContent value="calendar">
+          <VacationCalendarView departmentId={departmentId} />
+        </TabsContent>
 
         <TabsContent value="planner">
           <VacationPlanner departmentId={departmentId} staffOnly={isStaff} />
