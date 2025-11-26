@@ -41,29 +41,7 @@ const DepartmentHeadDashboard = () => {
     enabled: !!user,
   });
 
-  if (roleLoading) {
-    return <LoadingState message="Loading department information..." />;
-  }
-
-  if (roleError) {
-    return (
-      <ErrorState 
-        title="Error Loading Department"
-        message="Error loading department information. Please try refreshing the page." 
-      />
-    );
-  }
-
-  if (!userRole?.department_id) {
-    return (
-      <EmptyState 
-        title="No Department Assigned"
-        description="No department assigned to your account. Please contact an administrator."
-      />
-    );
-  }
-
-  // Count queries for overview
+  // Count queries for overview - MUST be before early returns
   const { data: staffCount } = useQuery({
     queryKey: ['staff-count', userRole?.department_id],
     queryFn: async () => {
@@ -105,6 +83,28 @@ const DepartmentHeadDashboard = () => {
     },
     enabled: !!userRole?.department_id,
   });
+
+  if (roleLoading) {
+    return <LoadingState message="Loading department information..." />;
+  }
+
+  if (roleError) {
+    return (
+      <ErrorState 
+        title="Error Loading Department"
+        message="Error loading department information. Please try refreshing the page." 
+      />
+    );
+  }
+
+  if (!userRole?.department_id) {
+    return (
+      <EmptyState 
+        title="No Department Assigned"
+        description="No department assigned to your account. Please contact an administrator."
+      />
+    );
+  }
 
   return (
     <>
