@@ -17,7 +17,7 @@ const DepartmentHeadDashboard = () => {
   const { hasAccess } = useModuleContext();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const activeTab = searchParams.get('tab') || (hasAccess('staff_management') ? 'staff' : hasAccess('vacation_planning') ? 'vacation' : 'tasks');
+  const activeTab = searchParams.get('tab');
 
   const { data: userRole, isLoading: roleLoading, error: roleError } = useQuery({
     queryKey: ['department-head-role', user?.id],
