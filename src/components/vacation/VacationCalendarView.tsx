@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { LoadingState } from '@/components/layout/LoadingState';
 import { ErrorState } from '@/components/layout/ErrorState';
 import { format, addDays, isWithinInterval, isSameDay, parseISO } from 'date-fns';
-import { CalendarDays, User } from 'lucide-react';
+import { CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface VacationCalendarViewProps {
@@ -223,49 +223,69 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex justify-center">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              className="rounded-md border"
-              modifiers={{
-                hasVacation: (date) => getVacationsForDate(date).length > 0,
-              }}
-              modifiersClassNames={{
-                hasVacation: 'bg-success/10 font-semibold',
-              }}
-              components={{
-                Day: ({ date }) => {
-                  const vacationsOnDay = getVacationsForDate(date);
-                  const count = vacationsOnDay.length;
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={setSelectedDate}
+            numberOfMonths={2}
+            className="rounded-md border-0 w-full"
+            classNames={{
+              months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0 w-full",
+              month: "space-y-4 w-full",
+              caption: "flex justify-center pt-1 relative items-center mb-4",
+              caption_label: "text-lg font-semibold",
+              nav: "space-x-1 flex items-center",
+              nav_button: "h-9 w-9 bg-transparent p-0 opacity-50 hover:opacity-100 hover:bg-accent rounded-md",
+              nav_button_previous: "absolute left-1",
+              nav_button_next: "absolute right-1",
+              table: "w-full border-collapse space-y-1",
+              head_row: "flex w-full",
+              head_cell: "text-muted-foreground rounded-md w-full font-medium text-sm flex-1 text-center",
+              row: "flex w-full mt-2",
+              cell: "relative p-0 text-center focus-within:relative focus-within:z-20 flex-1",
+              day: "h-12 w-full p-0 font-normal text-base hover:bg-accent hover:text-accent-foreground rounded-md transition-colors",
+              day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+              day_today: "bg-accent text-accent-foreground font-semibold",
+              day_outside: "text-muted-foreground opacity-50",
+              day_disabled: "text-muted-foreground opacity-50",
+              day_hidden: "invisible",
+            }}
+            components={{
+              Day: ({ date, ...props }) => {
+                const vacationsOnDay = getVacationsForDate(date);
+                const hasVacations = vacationsOnDay.length > 0;
 
-                  if (count === 0) {
-                    return <div className="h-9 w-9 p-0 flex items-center justify-center">{format(date, 'd')}</div>;
-                  }
-
-                  return (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button className="h-9 w-9 p-0 flex items-center justify-center relative hover:bg-accent rounded-md">
-                          <span>{format(date, 'd')}</span>
-                          {count > 0 && (
-                            <Badge
-                              variant="default"
-                              className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px] bg-success"
-                            >
-                              {count}
-                            </Badge>
-                          )}
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-80">
+                return (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        {...props}
+                        className={cn(
+                          "h-12 w-full p-0 font-normal hover:bg-accent rounded-md transition-all relative",
+                          hasVacations && "bg-emerald-100 dark:bg-emerald-950 font-semibold border-2 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-200 dark:hover:bg-emerald-900"
+                        )}
+                      >
+                        <time dateTime={format(date, "yyyy-MM-dd")} className="text-base">
+                          {format(date, "d")}
+                        </time>
+                        {hasVacations && (
+                          <div className="absolute bottom-1 right-1 bg-emerald-600 dark:bg-emerald-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                            {vacationsOnDay.length}
+                          </div>
+                        )}
+                      </button>
+                    </PopoverTrigger>
+                    {hasVacations && (
+                      <PopoverContent className="w-96 p-4">
                         <div className="space-y-3">
-                          <h4 className="font-semibold text-sm">
-                            {format(date, 'MMMM d, yyyy')} - {count} staff on vacation
+                          <h4 className="font-semibold text-lg border-b pb-2">
+                            {format(date, "MMMM d, yyyy")}
                           </h4>
-                          <div className="space-y-2">
-                            {vacationsOnDay.map(vacation => {
+                          <p className="text-sm text-muted-foreground">
+                            {vacationsOnDay.length} staff member{vacationsOnDay.length > 1 ? 's' : ''} on vacation
+                          </p>
+                          <div className="space-y-2 max-h-96 overflow-y-auto">
+                            {vacationsOnDay.map((vacation) => {
                               const split = vacation.vacation_splits?.find(s => {
                                 const start = parseISO(s.start_date);
                                 const end = parseISO(s.end_date);
@@ -273,17 +293,29 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                               });
 
                               return (
-                                <div key={vacation.id} className="flex items-start gap-2 text-sm p-2 rounded-md bg-muted/50">
-                                  <User className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                                <div
+                                  key={vacation.id}
+                                  className="flex items-start gap-3 rounded-lg border bg-card p-3 hover:bg-accent/50 transition-colors"
+                                >
+                                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold flex-shrink-0">
+                                    {vacation.profiles?.full_name?.charAt(0) || '?'}
+                                  </div>
                                   <div className="flex-1 min-w-0">
-                                    <div className="font-medium">{vacation.profiles?.full_name}</div>
-                                    <div className="text-xs text-muted-foreground truncate">
-                                      {vacation.vacation_types?.name}
+                                    <p className="font-medium truncate">
+                                      {vacation.profiles?.full_name || 'Unknown'}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      {vacation.departments?.name}
+                                    </p>
+                                    <div className="mt-1 flex items-center gap-1">
+                                      <Badge variant="secondary" className="text-xs">
+                                        {vacation.vacation_types?.name}
+                                      </Badge>
                                     </div>
                                     {split && (
-                                      <div className="text-xs text-muted-foreground mt-1">
-                                        {format(parseISO(split.start_date), 'MMM d')} - {format(parseISO(split.end_date), 'MMM d')} ({split.days} days)
-                                      </div>
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        {format(parseISO(split.start_date), "MMM d")} - {format(parseISO(split.end_date), "MMM d")} ({split.days} days)
+                                      </p>
                                     )}
                                   </div>
                                 </div>
@@ -292,18 +324,22 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                           </div>
                         </div>
                       </PopoverContent>
-                    </Popover>
-                  );
-                },
-              }}
-            />
-          </div>
-
-          {/* Legend */}
-          <div className="flex items-center justify-center gap-4 mt-4 text-sm text-muted-foreground">
+                    )}
+                  </Popover>
+                );
+              },
+            }}
+          />
+          <div className="mt-6 flex items-center gap-4 text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-success" />
-              <span>Staff on vacation</span>
+              <div className="h-6 w-6 rounded border-2 border-emerald-300 bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950" />
+              <span className="text-muted-foreground">Days with approved vacations</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-5 rounded-full bg-emerald-600 dark:bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">
+                #
+              </div>
+              <span className="text-muted-foreground">Number of staff</span>
             </div>
           </div>
         </CardContent>
@@ -312,7 +348,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
       {/* Upcoming Vacations List */}
       <Card>
         <CardHeader>
-          <CardTitle>Upcoming Vacations</CardTitle>
+          <CardTitle className="text-2xl">Upcoming Vacations</CardTitle>
           <CardDescription>
             {timeFilter === 'all' 
               ? 'All upcoming approved vacations' 
@@ -321,38 +357,52 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
         </CardHeader>
         <CardContent>
           {upcomingVacations.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No upcoming approved vacations in this time range
+            <div className="text-center py-12">
+              <p className="text-muted-foreground text-lg">
+                No upcoming approved vacations in this time range
+              </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {upcomingVacations.map((item, index) => (
                 <div
                   key={`${item.id}-${item.split.id}-${index}`}
-                  className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  className="flex flex-col rounded-lg border bg-card shadow-sm hover:shadow-md transition-all p-4 space-y-3"
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span className="font-semibold truncate">{item.profiles?.full_name}</span>
+                  <div className="flex items-start gap-3">
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg flex-shrink-0">
+                      {item.profiles?.full_name?.charAt(0) || '?'}
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      {item.departments?.name}
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {item.vacation_types?.name}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-base truncate">
+                        {item.profiles?.full_name || 'Unknown'}
+                      </p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {item.departments?.name}
+                      </p>
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0 ml-4">
-                    <div className="font-medium text-sm">
-                      {format(item.splitStartDate, 'MMM d, yyyy')}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      to {format(item.splitEndDate, 'MMM d, yyyy')}
-                    </div>
-                    <Badge variant="secondary" className="mt-1">
-                      {item.split.days} days
+                  
+                  <div className="space-y-2">
+                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800">
+                      ✓ Approved
                     </Badge>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Badge variant="secondary">
+                        {item.vacation_types?.name}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 pt-2 border-t">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">
+                        {format(item.splitStartDate, "MMM d")} - {format(item.splitEndDate, "MMM d, yyyy")}
+                      </p>
+                      <Badge variant="outline" className="text-xs">
+                        {item.split.days} day{item.split.days > 1 ? 's' : ''}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               ))}
