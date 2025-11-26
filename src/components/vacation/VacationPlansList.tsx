@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { format } from 'date-fns';
 import { Calendar, Send, Trash2, User, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -192,21 +193,47 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
                   
                 <CardHeader>
                   <div className="flex justify-between items-start">
-                    <div>
-                      {!staffView && (
-                        <div className="flex items-center gap-2 mb-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-semibold">
-                            {plan.staff_profile?.full_name}
-                          </span>
-                          <span className="text-sm text-muted-foreground">
-                            ({plan.staff_profile?.email})
-                          </span>
+                    <div className="flex items-center gap-2">
+                      <div>
+                        {!staffView && (
+                          <div className="flex items-center gap-2 mb-2">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-semibold">
+                              {plan.staff_profile?.full_name}
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              ({plan.staff_profile?.email})
+                            </span>
+                          </div>
+                        )}
+                        <div className="text-sm text-muted-foreground">
+                          {plan.departments?.name}
                         </div>
-                      )}
-                      <div className="text-sm text-muted-foreground">
-                        {plan.departments?.name}
                       </div>
+                      {hasConflicts && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-1 cursor-help text-warning">
+                                <AlertCircle className="h-4 w-4" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <div className="space-y-1">
+                                <p className="font-semibold text-xs">Conflicting Staff:</p>
+                                {plan.vacation_approvals
+                                  ?.filter((a: any) => a.has_conflict)
+                                  .flatMap((a: any) => a.conflicting_plans || [])
+                                  .map((cp: any, idx: number) => (
+                                    <p key={idx} className="text-xs">
+                                      • {cp.staff_name}: {format(new Date(cp.start_date), 'MMM dd')} - {format(new Date(cp.end_date), 'MMM dd')}
+                                    </p>
+                                  ))}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                     </div>
                     {getStatusBadge(plan.status)}
                   </div>

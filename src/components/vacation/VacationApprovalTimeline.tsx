@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
 import { CheckCircle2, Clock, XCircle, Hourglass, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface ApprovalStage {
@@ -138,11 +139,27 @@ const VacationApprovalTimeline = ({
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-semibold text-sm">{stage.level}. {stage.role}</span>
                     {getStatusBadge(stage.status)}
-                    {stageHasConflict && (
-                      <Badge className="bg-warning text-warning-foreground flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        Conflict
-                      </Badge>
+                    {stageHasConflict && stageApproval?.conflicting_plans && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge className="bg-warning text-warning-foreground flex items-center gap-1 cursor-help">
+                              <AlertCircle className="h-3 w-3" />
+                              Conflict
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <div className="space-y-1">
+                              <p className="font-semibold text-xs">Conflicting Staff:</p>
+                              {Array.isArray(stageApproval.conflicting_plans) && stageApproval.conflicting_plans.map((cp: any, idx: number) => (
+                                <p key={idx} className="text-xs">
+                                  • {cp.staff_name}: {format(new Date(cp.start_date), 'MMM dd')} - {format(new Date(cp.end_date), 'MMM dd')} ({cp.days} days)
+                                </p>
+                              ))}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                   </div>
                   {stage.approverName && (
