@@ -15,6 +15,7 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
   const { data: roles } = useUserRole();
   const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
   const isStaff = roles?.some(r => r.role === 'staff');
+  const isDepartmentHead = roles?.some(r => r.role === 'department_head');
   
   // Find approver role and determine level
   const approverRole = roles?.find(r => 
@@ -49,7 +50,7 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="planner" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="planner">
             <Calendar className="h-4 w-4 mr-2" />
             Plan Vacation
@@ -58,6 +59,12 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
             <List className="h-4 w-4 mr-2" />
             My Plans
           </TabsTrigger>
+          {isDepartmentHead && (
+            <TabsTrigger value="department-plans">
+              <List className="h-4 w-4 mr-2" />
+              Department Plans
+            </TabsTrigger>
+          )}
           {isApprover && (
             <TabsTrigger value="approvals">
               <CheckSquare className="h-4 w-4 mr-2" />
@@ -93,6 +100,12 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
               scopeType={approvalInfo.scopeType}
               scopeId={approvalInfo.scopeId}
             />
+          </TabsContent>
+        )}
+
+        {isDepartmentHead && departmentId && (
+          <TabsContent value="department-plans">
+            <VacationPlansList departmentId={departmentId} />
           </TabsContent>
         )}
 
