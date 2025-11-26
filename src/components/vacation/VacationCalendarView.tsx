@@ -25,6 +25,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
   const { data: roles } = useUserRole();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('30');
+  const [statusFilter, setStatusFilter] = useState<'approved' | 'pending' | 'all'>('approved');
 
   // Determine user's role and scope
   const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
@@ -35,9 +36,9 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
   const userFacilityId = roles?.find(r => r.facility_id)?.facility_id;
   const userWorkspaceId = roles?.find(r => r.workspace_id)?.workspace_id;
 
-  // Fetch approved vacations based on role
+  // Fetch vacations based on role and status filter
   const { data: vacations, isLoading, error, refetch } = useQuery({
-    queryKey: ['approved-vacations', user?.id, userDepartmentId, userFacilityId, userWorkspaceId, timeFilter],
+    queryKey: ['vacations', user?.id, userDepartmentId, userFacilityId, userWorkspaceId, timeFilter, statusFilter],
     queryFn: async () => {
       let query = supabase
         .from('vacation_plans')
@@ -51,8 +52,17 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
           departments!vacation_plans_department_id_fkey(id, name, facility_id),
           vacation_types(id, name),
           vacation_splits(id, start_date, end_date, days, status)
-        `)
-        .eq('status', 'approved');
+        `);
+
+      // Apply status filter
+      if (statusFilter === 'approved') {
+        query = query.eq('status', 'approved');
+      } else if (statusFilter === 'pending') {
+        query = query.in('status', ['department_pending', 'facility_pending', 'workspace_pending']);
+      } else {
+        // 'all' - show both approved and pending
+        query = query.in('status', ['approved', 'department_pending', 'facility_pending', 'workspace_pending']);
+      }
 
       // Apply role-based filtering
       if (isSuperAdmin) {
@@ -108,12 +118,28 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
     
     return vacations.filter(vacation => {
       return vacation.vacation_splits?.some(split => {
-        if (split.status !== 'approved') return false;
         const start = parseISO(split.start_date);
         const end = parseISO(split.end_date);
         return isWithinInterval(date, { start, end }) || isSameDay(date, start) || isSameDay(date, end);
       });
     });
+  };
+
+  // Determine color for days with vacations
+  const getVacationStatusColor = (vacationsOnDay: any[]) => {
+    const hasApproved = vacationsOnDay.some(v => v.status === 'approved');
+    const hasPending = vacationsOnDay.some(v => ['department_pending', 'facility_pending', 'workspace_pending'].includes(v.status));
+    
+    if (hasApproved && hasPending) {
+      return 'bg-purple-100 dark:bg-purple-950 border-purple-300 dark:border-purple-800 hover:bg-purple-200 dark:hover:bg-purple-900';
+    }
+    if (hasApproved) {
+      return 'bg-emerald-100 dark:bg-emerald-950 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-200 dark:hover:bg-emerald-900';
+    }
+    if (hasPending) {
+      return 'bg-amber-100 dark:bg-amber-950 border-amber-300 dark:border-amber-800 hover:bg-amber-200 dark:hover:bg-amber-900';
+    }
+    return '';
   };
 
   // Get upcoming vacations filtered by time range
@@ -123,11 +149,10 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
     const dateRange = getDateRange();
     const today = new Date();
     
-    return vacations
+      return vacations
       .flatMap(vacation => {
         return vacation.vacation_splits
-          ?.filter(split => split.status === 'approved')
-          .map(split => ({
+          ?.map(split => ({
             ...vacation,
             split,
             splitStartDate: parseISO(split.start_date),
@@ -187,10 +212,38 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                 Vacation Calendar
               </CardTitle>
               <CardDescription>
-                Showing approved vacations only
+                {statusFilter === 'approved' ? 'Showing approved vacations only' :
+                 statusFilter === 'pending' ? 'Showing pending vacations only' :
+                 'Showing all vacations'}
               </CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              {/* Status Filters */}
+              <div className="flex gap-2 border-r pr-2 mr-2">
+                <Button
+                  variant={statusFilter === 'approved' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setStatusFilter('approved')}
+                >
+                  Approved
+                </Button>
+                <Button
+                  variant={statusFilter === 'pending' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setStatusFilter('pending')}
+                >
+                  Pending
+                </Button>
+                <Button
+                  variant={statusFilter === 'all' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setStatusFilter('all')}
+                >
+                  All
+                </Button>
+              </div>
+              
+              {/* Time Filters */}
               <Button
                 variant={timeFilter === '30' ? 'default' : 'outline'}
                 size="sm"
@@ -262,14 +315,17 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                         {...props}
                         className={cn(
                           "h-12 w-full p-0 font-normal hover:bg-accent rounded-md transition-all relative",
-                          hasVacations && "bg-emerald-100 dark:bg-emerald-950 font-semibold border-2 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-200 dark:hover:bg-emerald-900"
+                          hasVacations && `font-semibold border-2 ${getVacationStatusColor(vacationsOnDay)}`
                         )}
                       >
                         <time dateTime={format(date, "yyyy-MM-dd")} className="text-base">
                           {format(date, "d")}
                         </time>
                         {hasVacations && (
-                          <div className="absolute bottom-1 right-1 bg-emerald-600 dark:bg-emerald-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                          <div className={cn(
+                            "absolute bottom-1 right-1 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center",
+                            vacationsOnDay.some(v => v.status === 'approved') ? "bg-emerald-600 dark:bg-emerald-500" : "bg-amber-600 dark:bg-amber-500"
+                          )}>
                             {vacationsOnDay.length}
                           </div>
                         )}
@@ -330,12 +386,20 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
               },
             }}
           />
-          <div className="mt-6 flex items-center gap-4 text-sm">
+          <div className="mt-6 flex flex-wrap items-center gap-4 text-sm">
             <div className="flex items-center gap-2">
               <div className="h-6 w-6 rounded border-2 border-emerald-300 bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950" />
-              <span className="text-muted-foreground">Days with approved vacations</span>
+              <span className="text-muted-foreground">Approved</span>
             </div>
             <div className="flex items-center gap-2">
+              <div className="h-6 w-6 rounded border-2 border-amber-300 bg-amber-100 dark:border-amber-800 dark:bg-amber-950" />
+              <span className="text-muted-foreground">Pending</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-6 rounded border-2 border-purple-300 bg-purple-100 dark:border-purple-800 dark:bg-purple-950" />
+              <span className="text-muted-foreground">Mixed</span>
+            </div>
+            <div className="flex items-center gap-2 ml-2 pl-2 border-l">
               <div className="h-5 w-5 rounded-full bg-emerald-600 dark:bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center">
                 #
               </div>
@@ -350,25 +414,39 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
         <CardHeader>
           <CardTitle className="text-2xl">Upcoming Vacations</CardTitle>
           <CardDescription>
-            {timeFilter === 'all' 
-              ? 'All upcoming approved vacations' 
-              : `Approved vacations in the next ${timeFilter} days`}
+            {statusFilter === 'approved' 
+              ? (timeFilter === 'all' ? 'All upcoming approved vacations' : `Approved vacations in the next ${timeFilter} days`)
+              : statusFilter === 'pending'
+              ? (timeFilter === 'all' ? 'All upcoming pending vacations' : `Pending vacations in the next ${timeFilter} days`)
+              : (timeFilter === 'all' ? 'All upcoming vacations' : `All vacations in the next ${timeFilter} days`)}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {upcomingVacations.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground text-lg">
-                No upcoming approved vacations in this time range
+                {statusFilter === 'approved' 
+                  ? 'No upcoming approved vacations in this time range'
+                  : statusFilter === 'pending'
+                  ? 'No upcoming pending vacations in this time range'
+                  : 'No upcoming vacations in this time range'}
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {upcomingVacations.map((item, index) => (
-                <div
-                  key={`${item.id}-${item.split.id}-${index}`}
-                  className="flex flex-col rounded-lg border bg-card shadow-sm hover:shadow-md transition-all p-4 space-y-3"
-                >
+              {upcomingVacations.map((item, index) => {
+                const isApproved = item.status === 'approved';
+                const isPending = ['department_pending', 'facility_pending', 'workspace_pending'].includes(item.status);
+                
+                return (
+                  <div
+                    key={`${item.id}-${item.split.id}-${index}`}
+                    className={cn(
+                      "flex flex-col rounded-lg border shadow-sm hover:shadow-md transition-all p-4 space-y-3",
+                      isApproved && "bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800",
+                      isPending && "bg-amber-50/50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
+                    )}
+                  >
                   <div className="flex items-start gap-3">
                     <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg flex-shrink-0">
                       {item.profiles?.full_name?.charAt(0) || '?'}
@@ -382,30 +460,40 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                       </p>
                     </div>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800">
-                      ✓ Approved
-                    </Badge>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Badge variant="secondary">
-                        {item.vacation_types?.name}
+                    
+                    <div className="space-y-2">
+                      <Badge className={cn(
+                        isApproved && "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
+                        item.status === 'department_pending' && "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
+                        item.status === 'facility_pending' && "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
+                        item.status === 'workspace_pending' && "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800"
+                      )}>
+                        {isApproved ? '✓ Approved' :
+                         item.status === 'department_pending' ? '⏳ Dept. Pending' :
+                         item.status === 'facility_pending' ? '⏳ Facility Pending' :
+                         item.status === 'workspace_pending' ? '⏳ Workspace Pending' :
+                         item.status}
                       </Badge>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Badge variant="secondary">
+                          {item.vacation_types?.name}
+                        </Badge>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-1 pt-2 border-t">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium">
-                        {format(item.splitStartDate, "MMM d")} - {format(item.splitEndDate, "MMM d, yyyy")}
-                      </p>
-                      <Badge variant="outline" className="text-xs">
-                        {item.split.days} day{item.split.days > 1 ? 's' : ''}
-                      </Badge>
+                    <div className="space-y-1 pt-2 border-t">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium">
+                          {format(item.splitStartDate, "MMM d")} - {format(item.splitEndDate, "MMM d, yyyy")}
+                        </p>
+                        <Badge variant="outline" className="text-xs">
+                          {item.split.days} day{item.split.days > 1 ? 's' : ''}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
