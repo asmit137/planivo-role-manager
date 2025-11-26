@@ -121,14 +121,26 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     },
     onError: (error: any) => {
       let errorMessage = 'Failed to create user';
-      
-      // Handle different error types
-      if (error.message?.includes('already been registered') || error.message?.includes('duplicate')) {
-        errorMessage = 'A user with this email already exists';
-      } else if (error.message?.includes('specialty')) {
-        errorMessage = error.message;
-      } else if (error.message) {
-        errorMessage = error.message;
+      const rawMessage = error?.message ?? (typeof error === 'string' ? error : '');
+
+      if (rawMessage) {
+        // Try to parse structured validation errors (e.g. Zod arrays)
+        try {
+          const parsed = JSON.parse(rawMessage);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.message) {
+            errorMessage = parsed.map((e: any) => e.message).join(', ');
+          } else {
+            errorMessage = rawMessage;
+          }
+        } catch {
+          if (rawMessage.includes('already been registered') || rawMessage.includes('duplicate')) {
+            errorMessage = 'A user with this email already exists';
+          } else if (rawMessage.includes('specialty')) {
+            errorMessage = rawMessage;
+          } else {
+            errorMessage = rawMessage;
+          }
+        }
       }
       
       toast.error(errorMessage);

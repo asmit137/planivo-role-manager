@@ -72,11 +72,23 @@ const BulkUserUpload = () => {
     },
     onError: (error: any) => {
       let errorMessage = 'Bulk upload failed';
-      
-      if (error.message?.includes('already been registered') || error.message?.includes('duplicate')) {
-        errorMessage = 'One or more users already exist in the system';
-      } else if (error.message) {
-        errorMessage = error.message;
+      const rawMessage = error?.message ?? (typeof error === 'string' ? error : '');
+
+      if (rawMessage) {
+        try {
+          const parsed = JSON.parse(rawMessage);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.message) {
+            errorMessage = parsed.map((e: any) => e.message).join(', ');
+          } else {
+            errorMessage = rawMessage;
+          }
+        } catch {
+          if (rawMessage.includes('already been registered') || rawMessage.includes('duplicate')) {
+            errorMessage = 'One or more users already exist in the system';
+          } else {
+            errorMessage = rawMessage;
+          }
+        }
       }
       
       toast.error(errorMessage);
