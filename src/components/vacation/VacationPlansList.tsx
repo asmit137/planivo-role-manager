@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Calendar, Send, Trash2, User } from 'lucide-react';
 import { toast } from 'sonner';
+import VacationApprovalTimeline from './VacationApprovalTimeline';
 import { cn } from '@/lib/utils';
 import {
   AlertDialog,
@@ -39,9 +40,12 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
         .select(`
           *,
           vacation_types(name),
-          departments(name),
+          departments(name, facility_id),
           vacation_splits(*),
-          vacation_approvals(*)
+          vacation_approvals(
+            *,
+            profiles:approver_id(full_name, email)
+          )
         `);
 
       if (staffView) {
@@ -74,13 +78,13 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
     mutationFn: async (planId: string) => {
       const { error } = await supabase
         .from('vacation_plans')
-        .update({ status: 'submitted', submitted_at: new Date().toISOString() })
+        .update({ status: 'department_pending', submitted_at: new Date().toISOString() })
         .eq('id', planId);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vacation-plans-list'] });
-      toast.success('Vacation plan submitted for approval');
+      toast.success('Vacation plan submitted to Department Head for approval');
       setSubmittingPlan(null);
     },
     onError: (error: any) => {
@@ -108,10 +112,11 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
   const getStatusBadge = (status: string) => {
     const configs = {
       draft: { label: 'Draft', className: 'bg-amber-500 text-white' },
-      submitted: { label: 'Pending Level 2', className: 'bg-primary' },
-      approved_level2: { label: 'Pending Final Approval', className: 'bg-warning' },
-      approved_final: { label: 'Approved', className: 'bg-success' },
-      rejected: { label: 'Rejected', className: 'bg-destructive' },
+      department_pending: { label: 'Pending Dept Head', className: 'bg-blue-500 text-white' },
+      facility_pending: { label: 'Pending Facility', className: 'bg-purple-500 text-white' },
+      workspace_pending: { label: 'Pending Final', className: 'bg-orange-500 text-white' },
+      approved: { label: 'Approved', className: 'bg-success text-success-foreground' },
+      rejected: { label: 'Rejected', className: 'bg-destructive text-destructive-foreground' },
     };
     const config = configs[status as keyof typeof configs] || configs.draft;
     return <Badge className={config.className}>{config.label}</Badge>;
@@ -221,35 +226,15 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
                     </div>
                   )}
 
-                  {plan.vacation_approvals && plan.vacation_approvals.length > 0 && (
+                  {plan.status !== 'draft' && (
                     <div className="border-t pt-4">
-                      <p className="text-sm font-medium mb-2">Approval History</p>
-                      <div className="space-y-2">
-                        {plan.vacation_approvals.map((approval: any) => (
-                          <div
-                            key={approval.id}
-                            className="flex items-center justify-between p-2 bg-accent rounded"
-                          >
-                            <span className="text-sm">
-                              Level {approval.approval_level}
-                            </span>
-                            <Badge
-                              className={cn(
-                                approval.status === 'approved' && 'bg-success',
-                                approval.status === 'rejected' && 'bg-destructive',
-                                approval.status === 'pending' && 'bg-secondary'
-                              )}
-                            >
-                              {approval.status}
-                            </Badge>
-                            {approval.comments && (
-                              <span className="text-xs text-muted-foreground">
-                                {approval.comments}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                      <VacationApprovalTimeline
+                        currentStatus={plan.status}
+                        approvals={plan.vacation_approvals || []}
+                        departmentId={plan.department_id}
+                        facilityId={plan.departments?.facility_id}
+                        workspaceId=""
+                      />
                     </div>
                   )}
 
@@ -297,7 +282,7 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
           <AlertDialogHeader>
             <AlertDialogTitle>Submit Vacation Plan?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will submit the vacation plan for Level 2 approval (Facility Supervisor). 
+              This will submit the vacation plan to the Department Head for Level 1 approval. 
               You won't be able to edit it after submission.
             </AlertDialogDescription>
           </AlertDialogHeader>
