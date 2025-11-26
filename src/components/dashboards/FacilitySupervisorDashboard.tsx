@@ -5,8 +5,10 @@ import { PageHeader, LoadingState } from '@/components/layout';
 import TaskManager from '@/components/tasks/TaskManager';
 import VacationApprovalWorkflow from '@/components/vacation/VacationApprovalWorkflow';
 import VacationCalendarView from '@/components/vacation/VacationCalendarView';
+import { VacationHub } from '@/modules/vacation';
 import { ClipboardList, CheckSquare, AlertCircle } from 'lucide-react';
 import VacationConflictDashboard from '@/components/vacation/VacationConflictDashboard';
+import { UnifiedUserHub } from '@/components/users';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
@@ -65,6 +67,18 @@ const FacilitySupervisorDashboard = () => {
           description="View vacation schedules in calendar format"
         />
       )}
+      {activeTab === 'vacation' && (
+        <PageHeader 
+          title="Vacation Planning" 
+          description="Manage vacation planning for the facility"
+        />
+      )}
+      {activeTab === 'staff' && (
+        <PageHeader 
+          title="Staff Management" 
+          description="Manage staff members in the facility"
+        />
+      )}
       {activeTab === 'messaging' && (
         <PageHeader 
           title="Messaging" 
@@ -104,6 +118,18 @@ const FacilitySupervisorDashboard = () => {
         {activeTab === 'calendar' && hasAccess('vacation_planning') && (
           <ModuleGuard moduleKey="vacation_planning">
             <VacationCalendarView />
+          </ModuleGuard>
+        )}
+
+        {activeTab === 'vacation' && hasAccess('vacation_planning') && (
+          <ModuleGuard moduleKey="vacation_planning">
+            <VacationHub />
+          </ModuleGuard>
+        )}
+
+        {activeTab === 'staff' && hasAccess('staff_management') && (
+          <ModuleGuard moduleKey="staff_management">
+            <UnifiedUserHub scope="facility" scopeId={userRole.facility_id} />
           </ModuleGuard>
         )}
 
