@@ -64,6 +64,19 @@ const UnifiedUserHub = ({ scope, scopeId }: UnifiedUserHubProps) => {
     enabled: detectedScope === 'system',
   });
 
+  // Fetch all departments including specialties for display
+  const { data: allDepartments } = useQuery({
+    queryKey: ['all-departments'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: users, isLoading: usersLoading, error: usersError } = useQuery({
     queryKey: ['unified-users', detectedScope, detectedScopeId, filterWorkspace],
     queryFn: async () => {
@@ -250,10 +263,15 @@ const UnifiedUserHub = ({ scope, scopeId }: UnifiedUserHubProps) => {
       header: 'Specialty',
       cell: (row) => {
         const departmentRole = row.roles.find((r: any) => r.department_id === detectedScopeId);
-        return departmentRole?.specialty_id ? (
-          <Badge variant="outline">Specialty ID: {departmentRole.specialty_id}</Badge>
+        if (!departmentRole?.specialty_id) {
+          return <span className="text-xs text-muted-foreground">Not assigned</span>;
+        }
+        
+        const specialty = allDepartments?.find((d) => d.id === departmentRole.specialty_id);
+        return specialty ? (
+          <Badge variant="outline">{specialty.name}</Badge>
         ) : (
-          <span className="text-xs text-muted-foreground">Not assigned</span>
+          <Badge variant="outline" className="opacity-50">Unknown specialty</Badge>
         );
       },
     });
