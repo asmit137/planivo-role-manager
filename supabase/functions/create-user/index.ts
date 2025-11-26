@@ -59,28 +59,54 @@ serve(async (req) => {
       );
     }
 
-    // Check if requesting user has permission (super admin, general admin, or department head)
+    // Check if requesting user has permission (super admin, general admin, workplace supervisor, facility supervisor, or department head)
     const { data: roles, error: roleError } = await supabaseClient
       .from("user_roles")
-      .select("role, department_id")
+      .select("role, department_id, facility_id, workspace_id")
       .eq("user_id", requestingUser.id)
-      .in("role", ["super_admin", "general_admin", "department_head"]);
+      .in("role", ["super_admin", "general_admin", "workplace_supervisor", "facility_supervisor", "department_head"]);
 
     if (roleError || !roles || roles.length === 0) {
       console.error("Role check failed:", roleError);
       return new Response(
-        JSON.stringify({ error: "Forbidden: Admin or Department Head access required" }),
+        JSON.stringify({ error: "Forbidden: Admin, Supervisor, or Department Head access required" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // If department head, verify they can only create staff in their department
+    // Scope validation based on creator's role
     const isDepartmentHead = roles.some(r => r.role === "department_head");
-    if (isDepartmentHead && role === "staff") {
+    const isFacilitySupervisor = roles.some(r => r.role === "facility_supervisor");
+    const isWorkplaceSupervisor = roles.some(r => r.role === "workplace_supervisor");
+
+    // Department heads can only create staff in their department
+    if (isDepartmentHead) {
       const departmentHeadRole = roles.find(r => r.role === "department_head");
       if (department_id && department_id !== departmentHeadRole?.department_id) {
         return new Response(
-          JSON.stringify({ error: "Forbidden: Can only add staff to your own department" }),
+          JSON.stringify({ error: "Forbidden: Can only add users to your own department" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Facility supervisors can only create within their facility
+    if (isFacilitySupervisor) {
+      const facilitySupervisorRole = roles.find(r => r.role === "facility_supervisor");
+      if (facility_id && facility_id !== facilitySupervisorRole?.facility_id) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden: Can only add users to your own facility" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Workplace supervisors can only create within their workspace
+    if (isWorkplaceSupervisor) {
+      const workplaceSupervisorRole = roles.find(r => r.role === "workplace_supervisor");
+      if (workspace_id && workspace_id !== workplaceSupervisorRole?.workspace_id) {
+        return new Response(
+          JSON.stringify({ error: "Forbidden: Can only add users to your own workspace" }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { Loader2, User, Building2, FolderTree, Stethoscope } from 'lucide-react';
 import { z } from 'zod';
+import { useUserRole, type AppRole } from '@/hooks/useUserRole';
 
 const userSchema = z.object({
   email: z.string().email('Invalid email address').max(255, 'Email too long'),
@@ -33,6 +34,66 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
   const [specialtyId, setSpecialtyId] = useState('');
   const [role, setRole] = useState<'staff' | 'department_head' | 'facility_supervisor'>('staff');
   const queryClient = useQueryClient();
+  
+  // Get current user's roles to determine permissions
+  const { data: currentUserRoles } = useUserRole();
+  
+  // Determine highest role and scope
+  const getHighestRole = (): AppRole | null => {
+    if (!currentUserRoles || currentUserRoles.length === 0) return null;
+    
+    const roleHierarchy: AppRole[] = [
+      'super_admin',
+      'general_admin',
+      'workplace_supervisor',
+      'facility_supervisor',
+      'department_head',
+      'staff'
+    ];
+    
+    for (const hierarchyRole of roleHierarchy) {
+      if (currentUserRoles.some(r => r.role === hierarchyRole)) {
+        return hierarchyRole;
+      }
+    }
+    return null;
+  };
+  
+  const highestRole = getHighestRole();
+  const currentUserRole = currentUserRoles?.[0]; // Get first role for scope info
+  
+  // Determine available roles based on creator's role
+  const getAvailableRoles = (): AppRole[] => {
+    switch (highestRole) {
+      case 'super_admin':
+      case 'general_admin':
+        return ['workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'];
+      case 'workplace_supervisor':
+        return ['facility_supervisor', 'department_head', 'staff'];
+      case 'facility_supervisor':
+        return ['department_head', 'staff'];
+      case 'department_head':
+        return ['staff'];
+      default:
+        return ['staff'];
+    }
+  };
+  
+  const availableRoles = getAvailableRoles();
+  
+  // Auto-scope facility and department based on creator's role
+  useEffect(() => {
+    if (currentUserRole) {
+      if (highestRole === 'department_head') {
+        // Department heads create within their facility and department
+        if (currentUserRole.facility_id) setFacilityId(currentUserRole.facility_id);
+        if (currentUserRole.department_id) setDepartmentId(currentUserRole.department_id);
+      } else if (highestRole === 'facility_supervisor') {
+        // Facility supervisors create within their facility
+        if (currentUserRole.facility_id) setFacilityId(currentUserRole.facility_id);
+      }
+    }
+  }, [currentUserRole, highestRole]);
 
   // Fetch facilities
   const { data: facilities } = useQuery({
@@ -100,12 +161,14 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       const { data, error } = await supabase.functions.invoke('create-user', {
         body: {
           email: userData.email,
+          password: '123456', // Default password - user must change on first login
           full_name: userData.full_name,
           role: userData.role,
           workspace_id: facility.workspace_id,
           facility_id: userData.facility_id,
           department_id: userData.department_id,
           specialty_id: userData.specialty_id,
+          force_password_change: true,
         },
       });
 
@@ -237,7 +300,12 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
 
             <div className="space-y-2">
               <Label htmlFor="facility">Facility *</Label>
-              <Select value={facilityId} onValueChange={handleFacilityChange} required>
+              <Select 
+                value={facilityId} 
+                onValueChange={handleFacilityChange} 
+                required
+                disabled={highestRole === 'department_head' || highestRole === 'facility_supervisor'}
+              >
                 <SelectTrigger id="facility">
                   <SelectValue placeholder="Select facility" />
                 </SelectTrigger>
@@ -249,6 +317,11 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                   ))}
                 </SelectContent>
               </Select>
+              {(highestRole === 'department_head' || highestRole === 'facility_supervisor') && (
+                <p className="text-xs text-muted-foreground">
+                  Auto-assigned to your facility
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -256,7 +329,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
               <Select 
                 value={departmentId} 
                 onValueChange={handleDepartmentChange}
-                disabled={!facilityId}
+                disabled={!facilityId || highestRole === 'department_head'}
                 required
               >
                 <SelectTrigger id="department">
@@ -270,6 +343,11 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                   ))}
                 </SelectContent>
               </Select>
+              {highestRole === 'department_head' && (
+                <p className="text-xs text-muted-foreground">
+                  Auto-assigned to your department
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -312,9 +390,18 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="staff">Staff</SelectItem>
-                  <SelectItem value="department_head">Department Head</SelectItem>
-                  <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
+                  {availableRoles.includes('workplace_supervisor') && (
+                    <SelectItem value="workplace_supervisor">Workplace Supervisor</SelectItem>
+                  )}
+                  {availableRoles.includes('facility_supervisor') && (
+                    <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
+                  )}
+                  {availableRoles.includes('department_head') && (
+                    <SelectItem value="department_head">Department Head</SelectItem>
+                  )}
+                  {availableRoles.includes('staff') && (
+                    <SelectItem value="staff">Staff</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
