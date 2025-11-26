@@ -77,8 +77,8 @@ const SuperAdminDashboard = () => {
     queryKey: ['vacation-stats'],
     queryFn: async () => {
       const [pending, approved, rejected] = await Promise.all([
-        supabase.from('vacation_plans').select('*', { count: 'exact', head: true }).in('status', ['submitted', 'approved_level2']),
-        supabase.from('vacation_plans').select('*', { count: 'exact', head: true }).eq('status', 'approved_final'),
+        supabase.from('vacation_plans').select('*', { count: 'exact', head: true }).in('status', ['department_pending', 'facility_pending', 'workspace_pending']),
+        supabase.from('vacation_plans').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
         supabase.from('vacation_plans').select('*', { count: 'exact', head: true }).eq('status', 'rejected'),
       ]);
       return {
@@ -129,10 +129,11 @@ const SuperAdminDashboard = () => {
 
   const getStatusBadge = (status: string) => {
     const configs: Record<string, { label: string; className: string }> = {
-      draft: { label: 'Draft', className: 'bg-secondary' },
-      submitted: { label: 'Pending', className: 'bg-primary' },
-      approved_level2: { label: 'L2 Approved', className: 'bg-warning' },
-      approved_final: { label: 'Approved', className: 'bg-success' },
+      draft: { label: 'Draft', className: 'bg-amber-500 text-white' },
+      department_pending: { label: 'Dept Pending', className: 'bg-primary' },
+      facility_pending: { label: 'Facility Pending', className: 'bg-primary' },
+      workspace_pending: { label: 'Final Pending', className: 'bg-primary' },
+      approved: { label: 'Approved', className: 'bg-success' },
       rejected: { label: 'Rejected', className: 'bg-destructive' },
       active: { label: 'Active', className: 'bg-primary' },
       completed: { label: 'Completed', className: 'bg-success' },

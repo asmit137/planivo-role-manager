@@ -918,25 +918,34 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          max_concurrent_vacations: number | null
           max_vacation_splits: number
+          min_vacation_notice_days: number | null
           name: string
           updated_at: string
+          vacation_year_start_month: number | null
         }
         Insert: {
           created_at?: string
           created_by?: string | null
           id?: string
+          max_concurrent_vacations?: number | null
           max_vacation_splits?: number
+          min_vacation_notice_days?: number | null
           name: string
           updated_at?: string
+          vacation_year_start_month?: number | null
         }
         Update: {
           created_at?: string
           created_by?: string | null
           id?: string
+          max_concurrent_vacations?: number | null
           max_vacation_splits?: number
+          min_vacation_notice_days?: number | null
           name?: string
           updated_at?: string
+          vacation_year_start_month?: number | null
         }
         Relationships: []
       }

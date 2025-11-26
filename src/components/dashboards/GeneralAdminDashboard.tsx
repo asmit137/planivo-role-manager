@@ -8,6 +8,7 @@ import FacilityUserManagement from '@/components/admin/FacilityUserManagement';
 import WorkspaceManagement from '@/components/admin/WorkspaceManagement';
 import CategoryDepartmentManagement from '@/components/admin/CategoryDepartmentManagement';
 import WorkspaceModuleManagement from '@/components/admin/WorkspaceModuleManagement';
+import { VacationHub } from '@/modules/vacation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ModuleGuard } from '@/components/ModuleGuard';
@@ -95,6 +96,12 @@ const GeneralAdminDashboard = () => {
           description="Configure module access for this workspace"
         />
       )}
+      {activeTab === 'vacation' && (
+        <PageHeader 
+          title="Vacation Management" 
+          description="Manage vacation plans and approvals for this workspace"
+        />
+      )}
       
       <div className="space-y-6">
         {/* Stats Grid */}
@@ -141,6 +148,12 @@ const GeneralAdminDashboard = () => {
           {activeTab === 'modules' && (
             <ModuleGuard moduleKey="organization">
               <WorkspaceModuleManagement />
+            </ModuleGuard>
+          )}
+
+          {activeTab === 'vacation' && hasAccess('vacation_planning') && (
+            <ModuleGuard moduleKey="vacation_planning">
+              <VacationHub />
             </ModuleGuard>
           )}
         </div>

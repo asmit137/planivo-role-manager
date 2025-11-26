@@ -6,6 +6,7 @@ import VacationApprovalWorkflow from './VacationApprovalWorkflow';
 import VacationConflictDashboard from './VacationConflictDashboard';
 import VacationTypeManagement from './VacationTypeManagement';
 import VacationCalendarView from './VacationCalendarView';
+import VacationRulesManagement from './VacationRulesManagement';
 import { useUserRole } from '@/hooks/useUserRole';
 import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorState } from '@/components/layout/ErrorState';
@@ -71,7 +72,7 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
     >
       <div className="space-y-6">
       <Tabs defaultValue="calendar" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="flex flex-wrap gap-1 h-auto">
           <TabsTrigger value="calendar">
             <CalendarDays className="h-4 w-4 mr-2" />
             Calendar
@@ -103,10 +104,16 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
             </TabsTrigger>
           )}
           {isSuperAdmin && (
-            <TabsTrigger value="types">
-              <Settings className="h-4 w-4 mr-2" />
-              Vacation Types
-            </TabsTrigger>
+            <>
+              <TabsTrigger value="types">
+                <Settings className="h-4 w-4 mr-2" />
+                Vacation Types
+              </TabsTrigger>
+              <TabsTrigger value="rules">
+                <Settings className="h-4 w-4 mr-2" />
+                Rules
+              </TabsTrigger>
+            </>
           )}
         </TabsList>
 
@@ -145,9 +152,14 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
         )}
 
         {isSuperAdmin && (
-          <TabsContent value="types">
-            <VacationTypeManagement />
-          </TabsContent>
+          <>
+            <TabsContent value="types">
+              <VacationTypeManagement />
+            </TabsContent>
+            <TabsContent value="rules">
+              <VacationRulesManagement />
+            </TabsContent>
+          </>
         )}
       </Tabs>
     </div>

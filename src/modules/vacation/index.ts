@@ -7,3 +7,5 @@ export { default as VacationApprovalTimeline } from '@/components/vacation/Vacat
 export { default as VacationConflictDashboard } from '@/components/vacation/VacationConflictDashboard';
 export { default as VacationTypeManagement } from '@/components/vacation/VacationTypeManagement';
 export { default as VacationCalendarView } from '@/components/vacation/VacationCalendarView';
+export { default as VacationRulesManagement } from '@/components/vacation/VacationRulesManagement';
+export { sendVacationStatusNotification } from '@/lib/vacationNotifications';
