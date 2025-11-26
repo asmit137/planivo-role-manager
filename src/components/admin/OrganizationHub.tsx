@@ -3,10 +3,21 @@ import { Building2, FolderTree, Building } from 'lucide-react';
 import WorkspaceManagement from './WorkspaceManagement';
 import FacilityUserManagement from './FacilityUserManagement';
 import CategoryDepartmentManagement from './CategoryDepartmentManagement';
+import { ErrorBoundary } from 'react-error-boundary';
+import { ErrorState } from '@/components/layout/ErrorState';
 
 const OrganizationHub = () => {
   return (
-    <div className="space-y-6">
+    <ErrorBoundary
+      fallback={
+        <ErrorState
+          title="Organization Hub Error"
+          message="Failed to load organization management"
+          onRetry={() => window.location.reload()}
+        />
+      }
+    >
+      <div className="space-y-6">
       <Tabs defaultValue="workspaces" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="workspaces">
@@ -36,6 +47,7 @@ const OrganizationHub = () => {
         </TabsContent>
       </Tabs>
     </div>
+    </ErrorBoundary>
   );
 };
 

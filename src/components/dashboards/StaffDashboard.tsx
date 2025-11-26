@@ -7,6 +7,8 @@ import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
 import { ClipboardList, Calendar, MessageSquare, Bell } from 'lucide-react';
+import { ErrorBoundary } from 'react-error-boundary';
+import { ErrorState } from '@/components/layout/ErrorState';
 
 const StaffDashboard = () => {
   const { hasAccess } = useModuleContext();
@@ -15,7 +17,16 @@ const StaffDashboard = () => {
   const activeTab = searchParams.get('tab');
 
   return (
-    <>
+    <ErrorBoundary
+      fallback={
+        <ErrorState
+          title="Dashboard Error"
+          message="Failed to load staff dashboard"
+          onRetry={() => window.location.reload()}
+        />
+      }
+    >
+      <>
       {!activeTab && (
         <PageHeader 
           title="My Dashboard" 
@@ -94,6 +105,7 @@ const StaffDashboard = () => {
         )}
       </div>
     </>
+    </ErrorBoundary>
   );
 };
 

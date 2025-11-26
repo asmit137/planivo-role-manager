@@ -19,6 +19,8 @@ import UnifiedUserCreation from '@/components/admin/UnifiedUserCreation';
 import BulkUserUpload from '@/components/admin/BulkUserUpload';
 import UserEditDialog from '@/components/admin/UserEditDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ErrorBoundary } from 'react-error-boundary';
+import { ErrorState } from '@/components/layout/ErrorState';
 
 interface UnifiedUserHubProps {
   scope?: 'system' | 'workspace' | 'facility' | 'department';
@@ -338,7 +340,16 @@ const UnifiedUserHub = ({ scope, scopeId }: UnifiedUserHubProps) => {
     : 'Create and manage user accounts';
 
   return (
-    <>
+    <ErrorBoundary
+      fallback={
+        <ErrorState
+          title="User Management Error"
+          message="Failed to load user management"
+          onRetry={() => window.location.reload()}
+        />
+      }
+    >
+      <>
       <UnifiedUserCreation open={unifiedCreateOpen} onOpenChange={setUnifiedCreateOpen} />
       <UserEditDialog 
         open={editOpen} 
@@ -482,6 +493,7 @@ const UnifiedUserHub = ({ scope, scopeId }: UnifiedUserHubProps) => {
         </CardContent>
       </Card>
     </>
+    </ErrorBoundary>
   );
 };
 
