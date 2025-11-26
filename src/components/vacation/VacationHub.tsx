@@ -116,9 +116,9 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
           </TabsContent>
         )}
 
-        {isDepartmentHead && departmentId && (
+        {isDepartmentHead && (
           <TabsContent value="department-plans">
-            <VacationPlansList departmentId={departmentId} />
+            <VacationPlansList departmentId={departmentId || approvalInfo?.scopeId} />
           </TabsContent>
         )}
 

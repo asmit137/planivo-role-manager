@@ -254,6 +254,13 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     if (field === 'start_date' || field === 'end_date') {
       const start = new Date(newSplits[index].start_date);
       const end = new Date(newSplits[index].end_date);
+      
+      // Validate end date is not before start date
+      if (end < start) {
+        toast.error('End date cannot be before start date');
+        return;
+      }
+      
       const diffTime = Math.abs(end.getTime() - start.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
       newSplits[index].days = diffDays;

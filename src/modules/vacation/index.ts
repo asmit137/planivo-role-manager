@@ -6,3 +6,4 @@ export { default as VacationApprovalWorkflow } from '@/components/vacation/Vacat
 export { default as VacationApprovalTimeline } from '@/components/vacation/VacationApprovalTimeline';
 export { default as VacationConflictDashboard } from '@/components/vacation/VacationConflictDashboard';
 export { default as VacationTypeManagement } from '@/components/vacation/VacationTypeManagement';
+export { default as VacationCalendarView } from '@/components/vacation/VacationCalendarView';

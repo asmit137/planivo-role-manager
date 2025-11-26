@@ -90,7 +90,7 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
           vacation_splits(*),
           vacation_approvals(has_conflict, conflict_reason, conflicting_plans)
         `)
-        .in('status', ['facility_pending', 'workspace_pending', 'approved_level2', 'approved_final']);
+        .in('status', ['department_pending', 'facility_pending', 'workspace_pending', 'approved']);
 
       // Apply scope filtering
       if (scopeType !== 'all' && allowedDepartmentIds.length > 0) {

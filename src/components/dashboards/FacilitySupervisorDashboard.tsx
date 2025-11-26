@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth';
 import { PageHeader, LoadingState } from '@/components/layout';
 import TaskManager from '@/components/tasks/TaskManager';
 import VacationApprovalWorkflow from '@/components/vacation/VacationApprovalWorkflow';
+import VacationCalendarView from '@/components/vacation/VacationCalendarView';
 import { ClipboardList, CheckSquare, AlertCircle } from 'lucide-react';
 import VacationConflictDashboard from '@/components/vacation/VacationConflictDashboard';
 import { ModuleGuard } from '@/components/ModuleGuard';
@@ -58,6 +59,12 @@ const FacilitySupervisorDashboard = () => {
           description="View and resolve vacation scheduling conflicts"
         />
       )}
+      {activeTab === 'calendar' && (
+        <PageHeader 
+          title="Vacation Calendar" 
+          description="View vacation schedules in calendar format"
+        />
+      )}
       {activeTab === 'messaging' && (
         <PageHeader 
           title="Messaging" 
@@ -91,6 +98,12 @@ const FacilitySupervisorDashboard = () => {
         {activeTab === 'conflicts' && hasAccess('vacation_planning') && (
           <ModuleGuard moduleKey="vacation_planning">
             <VacationConflictDashboard scopeType="facility" scopeId={userRole.facility_id} />
+          </ModuleGuard>
+        )}
+
+        {activeTab === 'calendar' && hasAccess('vacation_planning') && (
+          <ModuleGuard moduleKey="vacation_planning">
+            <VacationCalendarView />
           </ModuleGuard>
         )}
 
