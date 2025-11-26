@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { PageHeader, LoadingState } from '@/components/layout';
+import { ErrorBoundary } from 'react-error-boundary';
+import { ErrorState } from '@/components/layout/ErrorState';
 import TaskManager from '@/components/tasks/TaskManager';
 import VacationApprovalWorkflow from '@/components/vacation/VacationApprovalWorkflow';
 import VacationCalendarView from '@/components/vacation/VacationCalendarView';
@@ -42,7 +44,16 @@ const WorkplaceSupervisorDashboard = () => {
   }
 
   return (
-    <>
+    <ErrorBoundary
+      fallback={
+        <ErrorState
+          title="Dashboard Error"
+          message="Failed to load workplace supervisor dashboard"
+          onRetry={() => window.location.reload()}
+        />
+      }
+    >
+      <>
       {!activeTab && (
         <PageHeader 
           title="Workspace Overview" 
@@ -181,6 +192,7 @@ const WorkplaceSupervisorDashboard = () => {
         )}
       </div>
     </>
+    </ErrorBoundary>
   );
 };
 

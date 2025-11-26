@@ -11,6 +11,7 @@ import { Calendar, ClipboardList, UserPlus, Bell, MessageSquare } from 'lucide-r
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
+import { ErrorBoundary } from 'react-error-boundary';
 
 const DepartmentHeadDashboard = () => {
   const { user } = useAuth();
@@ -107,7 +108,16 @@ const DepartmentHeadDashboard = () => {
   }
 
   return (
-    <>
+    <ErrorBoundary
+      fallback={
+        <ErrorState
+          title="Dashboard Error"
+          message="Failed to load department head dashboard"
+          onRetry={() => window.location.reload()}
+        />
+      }
+    >
+      <>
       {activeTab === 'staff' && (
         <PageHeader 
           title="Staff Management" 
@@ -210,6 +220,7 @@ const DepartmentHeadDashboard = () => {
         )}
       </div>
     </>
+    </ErrorBoundary>
   );
 };
 

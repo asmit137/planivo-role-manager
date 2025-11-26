@@ -998,6 +998,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      user_has_conversation_access: {
+        Args: { conversation_uuid: string; user_uuid: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role:

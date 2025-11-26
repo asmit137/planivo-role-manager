@@ -4,6 +4,8 @@ import { useAuth } from '@/lib/auth';
 import { PageHeader, LoadingState } from '@/components/layout';
 import { StatsCard } from '@/components/shared';
 import { Building2, Users, FolderTree } from 'lucide-react';
+import { ErrorBoundary } from 'react-error-boundary';
+import { ErrorState } from '@/components/layout/ErrorState';
 import FacilityUserManagement from '@/components/admin/FacilityUserManagement';
 import WorkspaceManagement from '@/components/admin/WorkspaceManagement';
 import CategoryDepartmentManagement from '@/components/admin/CategoryDepartmentManagement';
@@ -20,7 +22,7 @@ const GeneralAdminDashboard = () => {
   const { hasAccess } = useModuleContext();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const activeTab = searchParams.get('tab') || (hasAccess('organization') ? 'facilities' : hasAccess('user_management') ? 'users' : 'modules');
+  const activeTab = searchParams.get('tab');
 
   const { data: userRole } = useQuery({
     queryKey: ['general-admin-role', user?.id],
@@ -71,11 +73,26 @@ const GeneralAdminDashboard = () => {
   }
 
   return (
-    <>
-      {(activeTab === 'facilities' || !activeTab) && (
+    <ErrorBoundary
+      fallback={
+        <ErrorState
+          title="Dashboard Error"
+          message="Failed to load general admin dashboard"
+          onRetry={() => window.location.reload()}
+        />
+      }
+    >
+      <>
+      {activeTab === 'facilities' && (
         <PageHeader 
           title={userRole.workspaces?.name || 'Workspace Management'}
           description="Manage workspace facilities and organizational structure"
+        />
+      )}
+      {!activeTab && (
+        <PageHeader 
+          title={userRole.workspaces?.name || 'Workspace Management'}
+          description="Overview of workspace statistics and management"
         />
       )}
       {activeTab === 'categories' && (
@@ -104,8 +121,8 @@ const GeneralAdminDashboard = () => {
       )}
       
       <div className="space-y-6">
-        {/* Stats Grid */}
-        {stats && (
+        {/* Stats Grid - Show in overview or on tabs */}
+        {stats && !activeTab && (
           <div className="grid gap-6 md:grid-cols-3">
             <StatsCard
               title="Facilities"
@@ -159,6 +176,7 @@ const GeneralAdminDashboard = () => {
         </div>
       </div>
     </>
+    </ErrorBoundary>
   );
 };
 
