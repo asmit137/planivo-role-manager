@@ -33,14 +33,27 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
   const [editRoleDepartmentId, setEditRoleDepartmentId] = useState('');
   const [editRoleSpecialtyId, setEditRoleSpecialtyId] = useState('');
   
+  // For scoped mode (Department Head editing staff)
+  const [scopedDepartmentId, setScopedDepartmentId] = useState('');
+  const [scopedSpecialtyId, setScopedSpecialtyId] = useState('');
+  
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (user) {
       setFullName(user.full_name || '');
       setIsActive(user.is_active ?? true);
+      
+      // Initialize scoped mode fields
+      if (mode === 'scoped' && user.roles?.length > 0) {
+        const staffRole = user.roles.find((r: any) => r.role === 'staff' || r.role === 'department_head');
+        if (staffRole) {
+          setScopedDepartmentId(staffRole.department_id || '');
+          setScopedSpecialtyId(staffRole.specialty_id || '');
+        }
+      }
     }
-  }, [user]);
+  }, [user, mode]);
 
   // Fetch modules
   const { data: modules } = useQuery({
@@ -142,9 +155,25 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
     enabled: !!editRoleDepartmentId,
   });
 
+  const { data: scopedSpecialties } = useQuery({
+    queryKey: ['scoped-specialties', scopedDepartmentId],
+    queryFn: async () => {
+      if (!scopedDepartmentId) return [];
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*')
+        .eq('parent_department_id', scopedDepartmentId)
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!scopedDepartmentId && mode === 'scoped',
+  });
+
   const updateUserMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase
+      // Update profile
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({
           full_name: fullName,
@@ -152,10 +181,27 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
         })
         .eq('id', user.id);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
+
+      // Update specialty if in scoped mode
+      if (mode === 'scoped' && user.roles?.length > 0) {
+        const staffRole = user.roles.find((r: any) => r.role === 'staff' || r.role === 'department_head');
+        if (staffRole) {
+          const { error: roleError } = await supabase
+            .from('user_roles')
+            .update({
+              department_id: scopedDepartmentId || null,
+              specialty_id: scopedSpecialtyId || null,
+            })
+            .eq('id', staffRole.id);
+
+          if (roleError) throw roleError;
+        }
+      }
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['users'] });
+      await queryClient.invalidateQueries({ queryKey: ['unified-users'] });
       const { data: updatedProfile } = await supabase
         .from('profiles')
         .select('*')
@@ -400,6 +446,49 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                   onCheckedChange={setIsActive}
                 />
               </div>
+
+              {/* Department and Specialty fields for scoped mode (Department Head editing staff) */}
+              {mode === 'scoped' && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="department">Department</Label>
+                    <Select value={scopedDepartmentId} onValueChange={(val) => {
+                      setScopedDepartmentId(val);
+                      setScopedSpecialtyId('');
+                    }}>
+                      <SelectTrigger id="department">
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments?.map((dept) => (
+                          <SelectItem key={dept.id} value={dept.id}>
+                            {dept.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {scopedDepartmentId && scopedSpecialties && scopedSpecialties.length > 0 && (
+                    <div className="space-y-2">
+                      <Label htmlFor="specialty">Specialty</Label>
+                      <Select value={scopedSpecialtyId} onValueChange={setScopedSpecialtyId}>
+                        <SelectTrigger id="specialty">
+                          <SelectValue placeholder="Select specialty" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {scopedSpecialties.map((specialty) => (
+                            <SelectItem key={specialty.id} value={specialty.id}>
+                              {specialty.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </>
+              )}
+
               <Button type="submit" className="w-full" disabled={updateUserMutation.isPending}>
                 {updateUserMutation.isPending ? 'Updating...' : 'Update User'}
               </Button>
