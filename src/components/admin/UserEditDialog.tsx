@@ -413,7 +413,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
         {user && (
           <div className="space-y-6">
             {/* Basic Info Section */}
-            <form onSubmit={handleUpdateSubmit} className="space-y-4">
+            <form onSubmit={handleUpdateSubmit} className="space-y-4" autoComplete="off" data-form-type="other">
               <div className="space-y-2">
                 <Label htmlFor="full-name">Full Name</Label>
                 <Input
@@ -421,6 +421,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   required
+                  autoComplete="off"
                 />
               </div>
               <div className="space-y-2">
@@ -431,6 +432,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                   value={user.email}
                   disabled
                   className="bg-muted"
+                  autoComplete="off"
                 />
               </div>
               <div className="flex items-center justify-between">

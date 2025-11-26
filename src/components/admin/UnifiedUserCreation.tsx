@@ -191,7 +191,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off" data-form-type="other">
           {/* Basic Information */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm font-semibold">
@@ -209,6 +209,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 maxLength={255}
+                autoComplete="off"
               />
             </div>
 
@@ -222,6 +223,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                 onChange={(e) => setFullName(e.target.value)}
                 required
                 maxLength={100}
+                autoComplete="off"
               />
             </div>
           </div>
