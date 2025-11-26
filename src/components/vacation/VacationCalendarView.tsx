@@ -419,21 +419,21 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
           {/* Legend */}
           <div className="mt-8 pt-6 border-t">
             <h4 className="text-sm font-semibold mb-4">Legend</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-md border-2 border-emerald-400 bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950 flex-shrink-0" />
+                <div className="h-8 w-8 rounded-md border-2 border-success bg-success/10 flex-shrink-0" />
                 <span className="text-sm font-medium">Approved Vacation</span>
               </div>
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-md border-2 border-amber-400 bg-amber-100 dark:border-amber-700 dark:bg-amber-950 flex-shrink-0" />
+                <div className="h-8 w-8 rounded-md border-2 border-warning bg-warning/10 flex-shrink-0" />
                 <span className="text-sm font-medium">Pending Vacation</span>
               </div>
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-md border-2 border-purple-400 bg-purple-100 dark:border-purple-700 dark:bg-purple-950 flex-shrink-0" />
+                <div className="h-8 w-8 rounded-md border-2 border-accent bg-accent/10 flex-shrink-0" />
                 <span className="text-sm font-medium">Mixed Status</span>
               </div>
               <div className="flex items-center gap-3">
-                <div className="h-6 w-6 rounded-full bg-emerald-600 dark:bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center shadow-md flex-shrink-0">
+                <div className="h-6 w-6 rounded-full bg-success text-success-foreground text-[11px] font-bold flex items-center justify-center shadow-md flex-shrink-0">
                   3
                 </div>
                 <span className="text-sm font-medium">Staff Count</span>

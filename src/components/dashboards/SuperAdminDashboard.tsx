@@ -129,11 +129,11 @@ const SuperAdminDashboard = () => {
 
   const getStatusBadge = (status: string) => {
     const configs: Record<string, { label: string; className: string }> = {
-      draft: { label: 'Draft', className: 'bg-amber-500 text-white' },
-      department_pending: { label: 'Dept Pending', className: 'bg-primary' },
-      facility_pending: { label: 'Facility Pending', className: 'bg-primary' },
-      workspace_pending: { label: 'Final Pending', className: 'bg-primary' },
-      approved: { label: 'Approved', className: 'bg-success' },
+      draft: { label: 'Draft', className: 'bg-warning text-warning-foreground' },
+      department_pending: { label: 'Dept Pending', className: 'bg-primary text-primary-foreground' },
+      facility_pending: { label: 'Facility Pending', className: 'bg-primary text-primary-foreground' },
+      workspace_pending: { label: 'Final Pending', className: 'bg-primary text-primary-foreground' },
+      approved: { label: 'Approved', className: 'bg-success text-success-foreground' },
       rejected: { label: 'Rejected', className: 'bg-destructive' },
       active: { label: 'Active', className: 'bg-primary' },
       completed: { label: 'Completed', className: 'bg-success' },

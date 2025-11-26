@@ -56,8 +56,8 @@ export function ActionButton({
   }
 
   const button = (
-    <Button {...props}>
-      {Icon && <Icon className="h-4 w-4 mr-2" />}
+    <Button {...props} aria-label={props['aria-label'] || (typeof children === 'string' ? children : undefined)}>
+      {Icon && <Icon className="h-4 w-4 mr-2" aria-hidden="true" />}
       {children}
     </Button>
   );

@@ -262,32 +262,34 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
               Basic Information
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="user@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                maxLength={255}
-                autoComplete="off"
-              />
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="user@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  maxLength={255}
+                  autoComplete="off"
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="full_name">Full Name *</Label>
-              <Input
-                id="full_name"
-                type="text"
-                placeholder="John Doe"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-                maxLength={100}
-                autoComplete="off"
-              />
+              <div className="space-y-2">
+                <Label htmlFor="full_name">Full Name *</Label>
+                <Input
+                  id="full_name"
+                  type="text"
+                  placeholder="John Doe"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  maxLength={100}
+                  autoComplete="off"
+                />
+              </div>
             </div>
           </div>
 
@@ -298,56 +300,58 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
               Organization Assignment
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="facility">Facility *</Label>
-              <Select 
-                value={facilityId} 
-                onValueChange={handleFacilityChange} 
-                required
-                disabled={highestRole === 'department_head' || highestRole === 'facility_supervisor'}
-              >
-                <SelectTrigger id="facility">
-                  <SelectValue placeholder="Select facility" />
-                </SelectTrigger>
-                <SelectContent>
-                  {facilities?.map((facility) => (
-                    <SelectItem key={facility.id} value={facility.id}>
-                      {facility.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {(highestRole === 'department_head' || highestRole === 'facility_supervisor') && (
-                <p className="text-xs text-muted-foreground">
-                  Auto-assigned to your facility
-                </p>
-              )}
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="facility">Facility *</Label>
+                <Select 
+                  value={facilityId} 
+                  onValueChange={handleFacilityChange} 
+                  required
+                  disabled={highestRole === 'department_head' || highestRole === 'facility_supervisor'}
+                >
+                  <SelectTrigger id="facility">
+                    <SelectValue placeholder="Select facility" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {facilities?.map((facility) => (
+                      <SelectItem key={facility.id} value={facility.id}>
+                        {facility.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {(highestRole === 'department_head' || highestRole === 'facility_supervisor') && (
+                  <p className="text-xs text-muted-foreground">
+                    Auto-assigned to your facility
+                  </p>
+                )}
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="department">Department *</Label>
-              <Select 
-                value={departmentId} 
-                onValueChange={handleDepartmentChange}
-                disabled={!facilityId || highestRole === 'department_head'}
-                required
-              >
-                <SelectTrigger id="department">
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments?.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {highestRole === 'department_head' && (
-                <p className="text-xs text-muted-foreground">
-                  Auto-assigned to your department
-                </p>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="department">Department *</Label>
+                <Select 
+                  value={departmentId} 
+                  onValueChange={handleDepartmentChange}
+                  disabled={!facilityId || highestRole === 'department_head'}
+                  required
+                >
+                  <SelectTrigger id="department">
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments?.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {highestRole === 'department_head' && (
+                  <p className="text-xs text-muted-foreground">
+                    Auto-assigned to your department
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
