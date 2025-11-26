@@ -137,56 +137,53 @@ const VacationApprovalTimeline = ({
       )}
 
       {/* Visual Progress Line */}
-      <div className="mb-8">
+      <div className="mb-8 px-8">
         {/* Circles and connecting lines */}
-        <div className="flex items-center justify-between px-4 mb-3">
+        <div className="flex items-center justify-center mb-4">
           {stages.map((stage, index) => (
-            <div key={stage.level} className="flex items-center flex-1">
-              <div className="flex items-center justify-center flex-1">
-                <div
-                  className={cn(
-                    'w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all',
-                    stage.status === 'approved' &&
-                      'bg-success border-success text-success-foreground',
-                    stage.status === 'rejected' &&
-                      'bg-destructive border-destructive text-destructive-foreground',
-                    stage.status === 'pending' &&
-                      'bg-warning border-warning text-warning-foreground animate-pulse',
-                    stage.status === 'waiting' &&
-                      'bg-muted border-border text-muted-foreground'
-                  )}
-                >
-                  {stage.status === 'approved' && <CheckCircle2 className="h-6 w-6" />}
-                  {stage.status === 'rejected' && <XCircle className="h-6 w-6" />}
-                  {stage.status === 'pending' && <Clock className="h-6 w-6" />}
-                  {stage.status === 'waiting' && <Hourglass className="h-6 w-6" />}
-                </div>
+            <div key={stage.level} className="flex items-center">
+              {/* Circle */}
+              <div
+                className={cn(
+                  'w-14 h-14 rounded-full flex items-center justify-center border-2 transition-all',
+                  stage.status === 'approved' &&
+                    'bg-success border-success text-success-foreground',
+                  stage.status === 'rejected' &&
+                    'bg-destructive border-destructive text-destructive-foreground',
+                  stage.status === 'pending' &&
+                    'bg-warning border-warning text-warning-foreground animate-pulse',
+                  stage.status === 'waiting' &&
+                    'bg-muted border-border text-muted-foreground'
+                )}
+              >
+                {stage.status === 'approved' && <CheckCircle2 className="h-6 w-6" />}
+                {stage.status === 'rejected' && <XCircle className="h-6 w-6" />}
+                {stage.status === 'pending' && <Clock className="h-6 w-6" />}
+                {stage.status === 'waiting' && <Hourglass className="h-6 w-6" />}
               </div>
               
               {/* Connecting Line */}
               {index < stages.length - 1 && (
-                <div className="flex-1 px-4">
-                  <div
-                    className={cn(
-                      'h-0.5 w-full transition-all',
-                      stage.status === 'approved' ? 'bg-success' : 'bg-border'
-                    )}
-                  />
-                </div>
+                <div
+                  className={cn(
+                    'h-0.5 w-32 mx-4 transition-all',
+                    stage.status === 'approved' ? 'bg-success' : 'bg-border'
+                  )}
+                />
               )}
             </div>
           ))}
         </div>
         
         {/* Labels below circles */}
-        <div className="flex items-start justify-between px-4">
+        <div className="flex items-start justify-center gap-40">
           {stages.map((stage) => (
-            <div key={`label-${stage.level}`} className="flex-1 text-center">
+            <div key={`label-${stage.level}`} className="text-center w-32">
               <span className="text-sm font-medium block mb-1">
                 Level {stage.level}
               </span>
               {stage.approverName && (
-                <span className="text-sm text-muted-foreground block">
+                <span className="text-sm text-muted-foreground block truncate">
                   {stage.approverName}
                 </span>
               )}
