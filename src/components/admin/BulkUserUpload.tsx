@@ -70,8 +70,16 @@ const BulkUserUpload = () => {
       setFile(null);
       setParsedData([]);
     },
-    onError: (error) => {
-      toast.error('Bulk upload failed: ' + error.message);
+    onError: (error: any) => {
+      let errorMessage = 'Bulk upload failed';
+      
+      if (error.message?.includes('already been registered') || error.message?.includes('duplicate')) {
+        errorMessage = 'One or more users already exist in the system';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
       console.error(error);
     },
   });

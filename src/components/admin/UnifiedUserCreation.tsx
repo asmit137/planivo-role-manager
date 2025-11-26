@@ -83,7 +83,15 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
   const createUserMutation = useMutation({
     mutationFn: async (userData: z.infer<typeof userSchema>) => {
       // Validate
-      userSchema.parse(userData);
+      try {
+        userSchema.parse(userData);
+      } catch (validationError) {
+        if (validationError instanceof z.ZodError) {
+          const firstError = validationError.errors[0];
+          throw new Error(firstError.message);
+        }
+        throw validationError;
+      }
 
       const facility = facilities?.find(f => f.id === userData.facility_id);
       if (!facility) throw new Error('Facility not found');
@@ -111,8 +119,19 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       handleReset();
       onOpenChange(false);
     },
-    onError: (error) => {
-      toast.error('Failed to create user: ' + error.message);
+    onError: (error: any) => {
+      let errorMessage = 'Failed to create user';
+      
+      // Handle different error types
+      if (error.message?.includes('already been registered') || error.message?.includes('duplicate')) {
+        errorMessage = 'A user with this email already exists';
+      } else if (error.message?.includes('specialty')) {
+        errorMessage = error.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
       console.error(error);
     },
   });
