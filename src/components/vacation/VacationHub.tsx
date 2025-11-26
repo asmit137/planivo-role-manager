@@ -83,7 +83,7 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
         </TabsContent>
 
         <TabsContent value="plans">
-          <VacationPlansList />
+          <VacationPlansList staffView={true} />
         </TabsContent>
 
         {isApprover && approvalInfo && (

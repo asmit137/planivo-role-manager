@@ -253,7 +253,8 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
                     </div>
                   )}
 
-                  {!staffView && plan.status === 'draft' && (
+                  {plan.status === 'draft' && 
+                   (plan.created_by === user?.id || plan.staff_id === user?.id) && (
                     <div className="flex gap-2 pt-2">
                       <Button
                         onClick={() => setSubmittingPlan(plan.id)}
