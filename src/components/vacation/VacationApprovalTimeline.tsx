@@ -75,7 +75,7 @@ const VacationApprovalTimeline = ({
       )}
 
       {/* Visual Progress Line */}
-      <div className="relative flex items-center justify-between px-4 py-2">
+      <div className="relative flex items-center justify-between px-4 py-2 mb-8">
         {stages.map((stage, index) => (
           <div key={stage.level} className="flex-1 flex items-center">
             {/* Stage Circle */}
@@ -98,9 +98,16 @@ const VacationApprovalTimeline = ({
                 {stage.status === 'pending' && <Clock className="h-5 w-5" />}
                 {stage.status === 'waiting' && <Hourglass className="h-5 w-5" />}
               </div>
-              <span className="absolute -bottom-6 text-xs font-medium whitespace-nowrap">
-                Level {stage.level}
-              </span>
+              <div className="absolute -bottom-12 text-center">
+                <span className="text-xs font-medium whitespace-nowrap block">
+                  Level {stage.level}
+                </span>
+                {stage.approverName && (
+                  <span className="text-xs text-muted-foreground whitespace-nowrap block">
+                    {stage.approverName}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Connecting Line */}
