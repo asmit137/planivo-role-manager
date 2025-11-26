@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { Calendar, Send, Trash2, User } from 'lucide-react';
+import { Calendar, Send, Trash2, User, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import VacationApprovalTimeline from './VacationApprovalTimeline';
 import { cn } from '@/lib/utils';
@@ -142,8 +142,54 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {plans?.map((plan) => (
-              <Card key={plan.id} className="border-2">
+            {plans?.map((plan) => {
+              const hasConflicts = plan.vacation_approvals?.some((a: any) => a.has_conflict);
+              
+              return (
+                <Card key={plan.id} className="border-2">
+                  {/* Conflict Alert Banner at Top */}
+                  {hasConflicts && (
+                    <div className="bg-warning/10 border-b-2 border-warning p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 space-y-2">
+                          <p className="font-semibold text-warning">CONFLICT ALERT</p>
+                          <p className="text-sm text-muted-foreground">
+                            This vacation was approved despite overlapping with other staff members.
+                          </p>
+                          {plan.vacation_approvals
+                            ?.filter((a: any) => a.has_conflict)
+                            .map((approval: any, idx: number) => (
+                              <div key={idx} className="mt-2 p-2 bg-background rounded-md text-sm">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Badge className="bg-warning text-warning-foreground text-xs">
+                                    Level {approval.approval_level}
+                                  </Badge>
+                                  <span className="font-medium">
+                                    {approval.profiles?.full_name}
+                                  </span>
+                                </div>
+                                {approval.conflicting_plans && Array.isArray(approval.conflicting_plans) && (
+                                  <div className="mt-1 pl-4 space-y-1">
+                                    {approval.conflicting_plans.map((cp: any, cpIdx: number) => (
+                                      <p key={cpIdx} className="text-xs text-muted-foreground">
+                                        • {cp.staff_name}: {format(new Date(cp.start_date), 'MMM dd')} - {format(new Date(cp.end_date), 'MMM dd')}
+                                      </p>
+                                    ))}
+                                  </div>
+                                )}
+                                {approval.conflict_reason && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Reason: {approval.conflict_reason}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div>
@@ -260,7 +306,8 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
                   )}
                 </CardContent>
               </Card>
-            ))}
+            );
+            })}
 
             {plans?.length === 0 && (
               <div className="text-center p-12 border-2 border-dashed rounded-lg">

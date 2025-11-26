@@ -943,6 +943,10 @@ export type Database = {
         Args: { _task_id: string; _user_id: string }
         Returns: boolean
       }
+      check_user_vacation_overlap: {
+        Args: { _splits: Json; _staff_id: string }
+        Returns: Json
+      }
       check_vacation_conflicts: {
         Args: { _department_id: string; _vacation_plan_id: string }
         Returns: Json

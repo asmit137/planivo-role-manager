@@ -176,11 +176,25 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       if (!targetDepartmentId) {
         throw new Error('No department ID available');
       }
+
+      // Check for same-user overlapping vacation plans
+      const targetStaffId = effectiveStaffOnly ? user?.id : planData.staff_id;
+      const { data: userOverlaps } = await supabase.rpc('check_user_vacation_overlap', {
+        _staff_id: targetStaffId,
+        _splits: planData.splits
+      });
+
+      if (userOverlaps && Array.isArray(userOverlaps) && userOverlaps.length > 0) {
+        const overlap = userOverlaps[0] as any;
+        throw new Error(
+          `You already have a vacation request from ${format(new Date(overlap.start_date), 'PPP')} to ${format(new Date(overlap.end_date), 'PPP')} (${overlap.vacation_type}) that overlaps with this date range. Please modify your existing request or choose different dates.`
+        );
+      }
       
       const { data: plan, error: planError } = await supabase
         .from('vacation_plans')
         .insert({
-          staff_id: effectiveStaffOnly ? user?.id : planData.staff_id,
+          staff_id: targetStaffId,
           department_id: targetDepartmentId,
           vacation_type_id: planData.vacation_type_id,
           total_days: planData.total_days,

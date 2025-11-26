@@ -38,6 +38,8 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
   const [conflictData, setConflictData] = useState<any[]>([]);
   const [showConflictDialog, setShowConflictDialog] = useState(false);
   const [conflictReason, setConflictReason] = useState('');
+  const [previousLevelConflicts, setPreviousLevelConflicts] = useState<any[]>([]);
+  const [showPreviousConflictDialog, setShowPreviousConflictDialog] = useState(false);
 
   // Fetch pending vacation plans based on level
   const { data: pendingPlans, isLoading } = useQuery({
@@ -174,6 +176,20 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         }
       }
 
+      // For Level 2 & 3: Check if previous levels had conflicts that need acknowledgment
+      if (action === 'approve' && (approvalLevel === 2 || approvalLevel === 3) && !hasConflict) {
+        const { data: previousApprovals } = await supabase
+          .from('vacation_approvals')
+          .select('*, profiles:approver_id(full_name)')
+          .eq('vacation_plan_id', planId)
+          .eq('has_conflict', true)
+          .in('approval_level', approvalLevel === 2 ? [1] : [1, 2]);
+
+        if (previousApprovals && previousApprovals.length > 0) {
+          throw new Error('PREVIOUS_CONFLICTS:' + JSON.stringify(previousApprovals));
+        }
+      }
+
       // Create or update approval record
       const { data: existingApproval } = await supabase
         .from('vacation_approvals')
@@ -238,6 +254,12 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         setConflictData(conflicts);
         setShowApprovalDialog(false);
         setShowConflictDialog(true);
+      } else if (error.message.startsWith('PREVIOUS_CONFLICTS:')) {
+        const conflictsJson = error.message.replace('PREVIOUS_CONFLICTS:', '');
+        const conflicts = JSON.parse(conflictsJson);
+        setPreviousLevelConflicts(conflicts);
+        setShowApprovalDialog(false);
+        setShowPreviousConflictDialog(true);
       } else {
         toast.error('Failed to process approval');
       }
@@ -572,6 +594,110 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
             <Button
               variant="destructive"
               onClick={confirmConflictApproval}
+              disabled={approvalMutation.isPending || !conflictReason.trim()}
+            >
+              {approvalMutation.isPending ? 'Processing...' : 'Acknowledge & Approve'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Level 2 & 3 Previous Conflict Acknowledgment Dialog */}
+      <Dialog open={showPreviousConflictDialog} onOpenChange={setShowPreviousConflictDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-warning" />
+              Previous Level Conflicts Detected
+            </DialogTitle>
+            <DialogDescription>
+              This vacation plan was previously approved with conflicts by{' '}
+              {approvalLevel === 2 ? 'Level 1 (Department Head)' : 'previous approval levels'}.
+              You must acknowledge these conflicts before proceeding with your approval.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <ScrollArea className="max-h-80 border rounded-md p-4">
+              {previousLevelConflicts.map((conflict, index) => (
+                <div key={index} className="mb-4 pb-4 border-b last:border-0 bg-warning/5 p-3 rounded">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge className="bg-warning text-warning-foreground">
+                      Level {conflict.approval_level}
+                    </Badge>
+                    <span className="font-medium">
+                      {conflict.profiles?.full_name}
+                    </span>
+                  </div>
+                  
+                  {conflict.conflicting_plans && Array.isArray(conflict.conflicting_plans) && (
+                    <div className="mt-2 space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Conflicting Staff:</p>
+                      {conflict.conflicting_plans.map((cp: any, idx: number) => (
+                        <div key={idx} className="text-sm pl-4 border-l-2 border-warning">
+                          <p className="font-medium">{cp.staff_name}</p>
+                          <p className="text-muted-foreground">
+                            {format(new Date(cp.start_date), 'MMM dd')} - {format(new Date(cp.end_date), 'MMM dd, yyyy')} ({cp.days} days)
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {conflict.conflict_reason && (
+                    <div className="mt-2 p-2 bg-background rounded text-sm">
+                      <span className="font-medium">Reason for approval: </span>
+                      <span className="text-muted-foreground">{conflict.conflict_reason}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </ScrollArea>
+
+            <div className="space-y-2">
+              <Label htmlFor="level-conflict-reason" className="text-destructive">
+                Your Acknowledgment & Approval Reason *
+              </Label>
+              <Textarea
+                id="level-conflict-reason"
+                value={conflictReason}
+                onChange={(e) => setConflictReason(e.target.value)}
+                placeholder="I acknowledge the previous conflict approvals and approve because..."
+                rows={4}
+                required
+              />
+              <p className="text-sm text-muted-foreground">
+                By approving, you acknowledge and accept responsibility for the staffing conflicts identified at previous approval levels.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPreviousConflictDialog(false);
+                setConflictReason('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!conflictReason.trim()) {
+                  toast.error('Please provide a reason for your approval');
+                  return;
+                }
+                approvalMutation.mutate({
+                  planId: selectedPlan.id,
+                  action: 'approve',
+                  comments,
+                  hasConflict: true,
+                  conflictReason,
+                  conflictingPlans: [],
+                });
+              }}
               disabled={approvalMutation.isPending || !conflictReason.trim()}
             >
               {approvalMutation.isPending ? 'Processing...' : 'Acknowledge & Approve'}
