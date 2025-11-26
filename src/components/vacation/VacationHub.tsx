@@ -17,19 +17,23 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
   const isStaff = roles?.some(r => r.role === 'staff');
   const isDepartmentHead = roles?.some(r => r.role === 'department_head');
   
-  // Find approver role and determine level
+  // Find approver role and determine level (supports 3-level approval workflow)
   const approverRole = roles?.find(r => 
-    ['facility_supervisor', 'workplace_supervisor'].includes(r.role)
-  );
-  
-  const isApprover = roles?.some(r => 
     ['department_head', 'facility_supervisor', 'workplace_supervisor'].includes(r.role)
   );
+  
+  const isApprover = !!approverRole;
 
   const getApprovalInfo = () => {
     if (!approverRole) return null;
     
-    if (approverRole.role === 'facility_supervisor') {
+    if (approverRole.role === 'department_head') {
+      return { 
+        approvalLevel: 1 as const, 
+        scopeType: 'department' as const, 
+        scopeId: approverRole.department_id! 
+      };
+    } else if (approverRole.role === 'facility_supervisor') {
       return { 
         approvalLevel: 2 as const, 
         scopeType: 'facility' as const, 

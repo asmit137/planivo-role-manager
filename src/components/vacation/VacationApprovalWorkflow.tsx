@@ -23,8 +23,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 
 interface VacationApprovalWorkflowProps {
-  approvalLevel: 2 | 3;
-  scopeType: 'facility' | 'workspace';
+  approvalLevel: 1 | 2 | 3;
+  scopeType: 'department' | 'facility' | 'workspace';
   scopeId: string;
 }
 
@@ -50,12 +50,37 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
           vacation_types(name, description),
           departments(name, facility_id),
           vacation_splits(*),
-          vacation_approvals(*)
+          vacation_approvals(
+            *,
+            profiles:approver_id(full_name, email)
+          )
         `);
 
-      if (approvalLevel === 2) {
-        // Facility Supervisor: Plans submitted for level 2 approval
-        query = query.eq('status', 'submitted');
+      if (approvalLevel === 1) {
+        // Department Head: Plans pending department approval
+        query = query.eq('status', 'department_pending').eq('department_id', scopeId);
+        const { data: plans, error } = await query;
+        if (error) throw error;
+
+        // Fetch staff and creator info
+        const enrichedPlans = await Promise.all(
+          (plans || []).map(async (plan) => {
+            const [staffProfile, creatorProfile] = await Promise.all([
+              supabase.from('profiles').select('full_name, email').eq('id', plan.staff_id).single(),
+              supabase.from('profiles').select('full_name').eq('id', plan.created_by).single(),
+            ]);
+            return {
+              ...plan,
+              staff_profile: staffProfile.data,
+              creator_profile: creatorProfile.data,
+            };
+          })
+        );
+
+        return enrichedPlans;
+      } else if (approvalLevel === 2) {
+        // Facility Supervisor: Plans approved by Dept Head, pending facility approval
+        query = query.eq('status', 'facility_pending');
         const { data: plans, error } = await query;
         if (error) throw error;
 
@@ -81,8 +106,8 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
 
         return enrichedPlans;
       } else {
-        // Workplace Supervisor: Plans approved at level 2, pending level 3
-        query = query.eq('status', 'approved_level2');
+        // Workplace Supervisor: Plans approved at level 2, pending workspace approval
+        query = query.eq('status', 'workspace_pending');
         const { data: plans, error } = await query;
         if (error) throw error;
 
@@ -129,7 +154,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       conflictingPlans = [] 
     }: any) => {
       // Check for conflicts before approval (only for Department Head level)
-      if (action === 'approve' && approvalLevel === 2 && !hasConflict) {
+      if (action === 'approve' && approvalLevel === 1 && !hasConflict) {
         const { data: planData } = await supabase
           .from('vacation_plans')
           .select('department_id')
@@ -182,7 +207,11 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       if (action === 'reject') {
         newStatus = 'rejected';
       } else {
-        newStatus = approvalLevel === 2 ? 'approved_level2' : 'approved_final';
+        // Progress to next approval level
+        newStatus = 
+          approvalLevel === 1 ? 'facility_pending' :
+          approvalLevel === 2 ? 'workspace_pending' : 
+          'approved';
       }
 
       const { error: updateError } = await supabase
@@ -247,11 +276,12 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
 
   const getStatusBadge = (status: string) => {
     const configs = {
-      draft: { label: 'Draft', className: 'bg-secondary' },
-      submitted: { label: 'Submitted', className: 'bg-primary' },
-      approved_level2: { label: 'Level 2 Approved', className: 'bg-warning' },
-      approved_final: { label: 'Approved', className: 'bg-success' },
-      rejected: { label: 'Rejected', className: 'bg-destructive' },
+      draft: { label: 'Draft', className: 'bg-amber-500 text-white' },
+      department_pending: { label: 'Pending Dept Head', className: 'bg-blue-500 text-white' },
+      facility_pending: { label: 'Pending Facility', className: 'bg-purple-500 text-white' },
+      workspace_pending: { label: 'Pending Final', className: 'bg-orange-500 text-white' },
+      approved: { label: 'Approved', className: 'bg-success text-success-foreground' },
+      rejected: { label: 'Rejected', className: 'bg-destructive text-destructive-foreground' },
     };
     const config = configs[status as keyof typeof configs] || configs.draft;
     return <Badge className={config.className}>{config.label}</Badge>;
@@ -272,7 +302,10 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       <Card>
         <CardHeader>
           <CardTitle>
-            {approvalLevel === 2 ? 'Level 2 Approvals' : 'Final Approvals'} - Pending Review
+            {approvalLevel === 1 && 'Level 1 (Department Head) Approvals'}
+            {approvalLevel === 2 && 'Level 2 (Facility Supervisor) Approvals'}
+            {approvalLevel === 3 && 'Level 3 (Workspace Supervisor) Approvals'}
+            {' - Pending Review'}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -407,8 +440,10 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
             <DialogDescription>
               {approvalAction === 'approve'
                 ? `You are about to approve this vacation plan for ${selectedPlan?.staff_profile?.full_name}. ${
-                    approvalLevel === 2
-                      ? 'This will move it to Level 3 (Workplace Supervisor) for final approval.'
+                    approvalLevel === 1
+                      ? 'This will move it to Level 2 (Facility Supervisor) for approval.'
+                      : approvalLevel === 2
+                      ? 'This will move it to Level 3 (Workspace Supervisor) for final approval.'
                       : 'This will be the final approval and the vacation will be confirmed.'
                   }`
                 : `You are about to reject this vacation plan for ${selectedPlan?.staff_profile?.full_name}. Please provide a reason for rejection.`}
