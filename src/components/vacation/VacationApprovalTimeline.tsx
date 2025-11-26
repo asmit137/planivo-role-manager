@@ -137,7 +137,7 @@ const VacationApprovalTimeline = ({
       )}
 
       {/* Visual Progress Line */}
-      <div className="relative flex items-center justify-between px-4 py-2 mb-8">
+      <div className="relative flex items-center justify-between px-4 py-2 mb-20">
         {stages.map((stage, index) => (
           <div key={stage.level} className="flex-1 flex items-center">
             {/* Stage Circle */}
@@ -160,12 +160,12 @@ const VacationApprovalTimeline = ({
                 {stage.status === 'pending' && <Clock className="h-5 w-5" />}
                 {stage.status === 'waiting' && <Hourglass className="h-5 w-5" />}
               </div>
-              <div className="absolute -bottom-12 text-center">
-                <span className="text-xs font-medium whitespace-nowrap block">
+              <div className="absolute -bottom-16 text-center w-32">
+                <span className="text-xs font-medium whitespace-nowrap block mb-1">
                   Level {stage.level}
                 </span>
                 {stage.approverName && (
-                  <span className="text-xs text-muted-foreground whitespace-nowrap block">
+                  <span className="text-xs text-muted-foreground block truncate">
                     {stage.approverName}
                   </span>
                 )}
@@ -186,7 +186,7 @@ const VacationApprovalTimeline = ({
       </div>
 
       {/* Detailed Stage Cards */}
-      <div className="space-y-3 mt-8">
+      <div className="space-y-3">
         {stages.map((stage) => {
           const stageApproval = approvals?.find(a => a.approval_level === stage.level);
           const stageHasConflict = stageApproval?.has_conflict;
