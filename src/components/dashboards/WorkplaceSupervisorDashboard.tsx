@@ -39,6 +39,53 @@ const WorkplaceSupervisorDashboard = () => {
     enabled: !!user,
   });
 
+  // Fetch workspace tasks count
+  const { data: tasksCount } = useQuery({
+    queryKey: ['workspace-tasks-count', userRole?.workspace_id],
+    queryFn: async () => {
+      if (!userRole?.workspace_id) return 0;
+      const { count, error } = await supabase
+        .from('tasks')
+        .select('*', { count: 'exact', head: true })
+        .eq('workspace_id', userRole.workspace_id)
+        .in('status', ['pending', 'in_progress']);
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: !!userRole?.workspace_id,
+  });
+
+  // Fetch pending approvals count (workspace_pending)
+  const { data: approvalsCount } = useQuery({
+    queryKey: ['workspace-approvals-count', userRole?.workspace_id],
+    queryFn: async () => {
+      if (!userRole?.workspace_id) return 0;
+      const { count, error } = await supabase
+        .from('vacation_plans')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'workspace_pending');
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: !!userRole?.workspace_id,
+  });
+
+  // Fetch conflicts count
+  const { data: conflictsCount } = useQuery({
+    queryKey: ['workspace-conflicts-count', userRole?.workspace_id],
+    queryFn: async () => {
+      if (!userRole?.workspace_id) return 0;
+      const { count, error } = await supabase
+        .from('vacation_approvals')
+        .select('*', { count: 'exact', head: true })
+        .eq('has_conflict', true)
+        .in('status', ['pending', 'approved']);
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: !!userRole?.workspace_id,
+  });
+
   if (!userRole?.workspace_id) {
     return <LoadingState message="Loading workspace information..." />;
   }
@@ -117,24 +164,24 @@ const WorkplaceSupervisorDashboard = () => {
                 <p className="text-sm font-medium text-muted-foreground">Active Tasks</p>
                 <ClipboardList className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">-</p>
-              <p className="text-xs text-muted-foreground mt-2">View from Tasks tab</p>
+              <p className="text-3xl font-bold mt-2">{tasksCount ?? '-'}</p>
+              <p className="text-xs text-muted-foreground mt-2">Tasks in progress</p>
             </div>
             <div className="rounded-lg border bg-card p-6">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Pending Approvals</p>
                 <CheckSquare className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">-</p>
-              <p className="text-xs text-muted-foreground mt-2">View from Approvals tab</p>
+              <p className="text-3xl font-bold mt-2">{approvalsCount ?? '-'}</p>
+              <p className="text-xs text-muted-foreground mt-2">Awaiting final approval</p>
             </div>
             <div className="rounded-lg border bg-card p-6">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Conflicts</p>
                 <AlertCircle className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">-</p>
-              <p className="text-xs text-muted-foreground mt-2">View from Conflicts tab</p>
+              <p className="text-3xl font-bold mt-2">{conflictsCount ?? '-'}</p>
+              <p className="text-xs text-muted-foreground mt-2">Vacation conflicts</p>
             </div>
           </div>
         )}
