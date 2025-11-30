@@ -255,15 +255,18 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       const start = new Date(newSplits[index].start_date);
       const end = new Date(newSplits[index].end_date);
       
-      // Validate end date is not before start date
-      if (end < start) {
-        toast.error('End date cannot be before start date');
-        return;
+      // Only validate if both dates are set and valid
+      if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        // Validate end date is not before start date
+        if (end < start) {
+          toast.error('End date cannot be before start date');
+          return;
+        }
+        
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        newSplits[index].days = diffDays;
       }
-      
-      const diffTime = Math.abs(end.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-      newSplits[index].days = diffDays;
     }
     
     setSplits(newSplits);
@@ -403,6 +406,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
+                            type="button"
                             variant="outline"
                             className={cn(
                               'w-full justify-start text-left font-normal',
@@ -413,7 +417,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                             {split.start_date ? format(split.start_date, 'PPP') : 'Pick date'}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
+                        <PopoverContent className="w-auto p-0 z-50 pointer-events-auto" align="start">
                           <Calendar
                             mode="single"
                             selected={split.start_date}
@@ -429,6 +433,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
+                            type="button"
                             variant="outline"
                             className={cn(
                               'w-full justify-start text-left font-normal',
@@ -439,7 +444,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                             {split.end_date ? format(split.end_date, 'PPP') : 'Pick date'}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
+                        <PopoverContent className="w-auto p-0 z-50 pointer-events-auto" align="start">
                           <Calendar
                             mode="single"
                             selected={split.end_date}
