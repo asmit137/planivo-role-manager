@@ -415,14 +415,25 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                   required={isDepartmentRequired}
                 >
                   <SelectTrigger id="department">
-                    <SelectValue placeholder={isDepartmentRequired ? "Select department" : "Not required"} />
+                    <SelectValue placeholder={
+                      !facilityId ? "Select facility first" :
+                      !isDepartmentRequired ? "Not required" :
+                      departments?.length === 0 ? "No departments available" :
+                      "Select department"
+                    } />
                   </SelectTrigger>
                   <SelectContent>
-                    {departments?.map((dept) => (
-                      <SelectItem key={dept.id} value={dept.id}>
-                        {dept.name}
-                      </SelectItem>
-                    ))}
+                    {departments && departments.length > 0 ? (
+                      departments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="py-2 px-2 text-sm text-muted-foreground">
+                        No departments found for this facility
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
                 {highestRole === 'department_head' && (
@@ -433,6 +444,11 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                 {!isDepartmentRequired && (
                   <p className="text-xs text-muted-foreground">
                     Not required for {role === 'workplace_supervisor' ? 'Workplace' : 'Facility'} Supervisor
+                  </p>
+                )}
+                {facilityId && departments?.length === 0 && isDepartmentRequired && (
+                  <p className="text-xs text-destructive">
+                    No departments exist for this facility. Please create departments first in Organization management.
                   </p>
                 )}
               </div>
