@@ -8,7 +8,7 @@ import TaskManager from '@/components/tasks/TaskManager';
 import VacationApprovalWorkflow from '@/components/vacation/VacationApprovalWorkflow';
 import VacationCalendarView from '@/components/vacation/VacationCalendarView';
 import { VacationHub } from '@/modules/vacation';
-import { ClipboardList, CheckSquare, AlertCircle } from 'lucide-react';
+import { ClipboardList, CheckSquare, AlertCircle, CalendarClock } from 'lucide-react';
 import VacationConflictDashboard from '@/components/vacation/VacationConflictDashboard';
 import { UnifiedUserHub } from '@/components/users';
 import { ModuleGuard } from '@/components/ModuleGuard';
@@ -16,6 +16,7 @@ import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
 import { NotificationHub } from '@/modules/notifications';
 import { MessagingHub } from '@/modules/messaging';
+import { FacilitySchedulingHub } from '@/components/scheduling/FacilitySchedulingHub';
 
 const FacilitySupervisorDashboard = () => {
   const { user } = useAuth();
@@ -108,6 +109,12 @@ const FacilitySupervisorDashboard = () => {
           description="View important updates for this facility"
         />
       )}
+      {activeTab === 'scheduling' && (
+        <PageHeader 
+          title="Scheduling" 
+          description="Create and manage staff schedules for your facility"
+        />
+      )}
       
       <div className="space-y-4">
         {!activeTab && (
@@ -188,6 +195,12 @@ const FacilitySupervisorDashboard = () => {
         {activeTab === 'notifications' && hasAccess('notifications') && (
           <ModuleGuard moduleKey="notifications">
             <NotificationHub />
+          </ModuleGuard>
+        )}
+
+        {activeTab === 'scheduling' && hasAccess('scheduling') && (
+          <ModuleGuard moduleKey="scheduling">
+            <FacilitySchedulingHub facilityId={userRole.facility_id} />
           </ModuleGuard>
         )}
       </div>
