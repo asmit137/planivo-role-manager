@@ -12,13 +12,14 @@ import { Loader2, User, Building2, FolderTree, Stethoscope } from 'lucide-react'
 import { z } from 'zod';
 import { useUserRole, type AppRole } from '@/hooks/useUserRole';
 
+// Base schema - role-specific validation happens in the mutation
 const userSchema = z.object({
   email: z.string().email('Invalid email address').max(255, 'Email too long'),
   full_name: z.string().min(2, 'Name too short').max(100, 'Name too long'),
-  facility_id: z.string().uuid('Invalid facility'),
-  department_id: z.string().uuid('Invalid department'),
-  specialty_id: z.string().uuid().nullable(),
-  role: z.enum(['staff', 'department_head', 'facility_supervisor']),
+  facility_id: z.string().uuid('Invalid facility').optional().nullable(),
+  department_id: z.string().uuid('Invalid department').optional().nullable(),
+  specialty_id: z.string().uuid().optional().nullable(),
+  role: z.enum(['staff', 'department_head', 'facility_supervisor', 'workplace_supervisor']),
 });
 
 interface UnifiedUserCreationProps {
@@ -32,7 +33,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
   const [facilityId, setFacilityId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [specialtyId, setSpecialtyId] = useState('');
-  const [role, setRole] = useState<'staff' | 'department_head' | 'facility_supervisor'>('staff');
+  const [role, setRole] = useState<'staff' | 'department_head' | 'facility_supervisor' | 'workplace_supervisor'>('staff');
   const queryClient = useQueryClient();
   
   // Get current user's roles to determine permissions
@@ -80,6 +81,10 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
   };
   
   const availableRoles = getAvailableRoles();
+  
+  // Check if department is required based on role
+  const isDepartmentRequired = role === 'staff' || role === 'department_head';
+  const isFacilityRequired = role !== 'workplace_supervisor';
   
   // Auto-scope facility and department based on creator's role
   useEffect(() => {
@@ -143,7 +148,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
 
   const createUserMutation = useMutation({
     mutationFn: async (userData: z.infer<typeof userSchema>) => {
-      // Validate
+      // Validate base schema
       try {
         userSchema.parse(userData);
       } catch (validationError) {
@@ -154,8 +159,29 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
         throw validationError;
       }
 
-      const facility = facilities?.find(f => f.id === userData.facility_id);
-      if (!facility) throw new Error('Facility not found');
+      // Role-specific validation
+      if (userData.role === 'staff' || userData.role === 'department_head') {
+        if (!userData.facility_id) throw new Error('Facility is required for this role');
+        if (!userData.department_id) throw new Error('Department is required for this role');
+      } else if (userData.role === 'facility_supervisor') {
+        if (!userData.facility_id) throw new Error('Facility is required for this role');
+      }
+
+      // Get workspace_id from facility if facility is selected
+      let workspaceId: string | null = null;
+      if (userData.facility_id) {
+        const facility = facilities?.find(f => f.id === userData.facility_id);
+        if (!facility) throw new Error('Facility not found');
+        workspaceId = facility.workspace_id;
+      } else {
+        // For workplace_supervisor without facility, get workspace from first facility or current user's scope
+        const firstFacility = facilities?.[0];
+        if (firstFacility) {
+          workspaceId = firstFacility.workspace_id;
+        }
+      }
+
+      if (!workspaceId) throw new Error('Could not determine workspace');
 
       // Call edge function to create user
       const { data, error } = await supabase.functions.invoke('create-user', {
@@ -164,10 +190,10 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
           password: '123456', // Default password - user must change on first login
           full_name: userData.full_name,
           role: userData.role,
-          workspace_id: facility.workspace_id,
-          facility_id: userData.facility_id,
-          department_id: userData.department_id,
-          specialty_id: userData.specialty_id,
+          workspace_id: workspaceId,
+          facility_id: userData.facility_id || null,
+          department_id: userData.department_id || null,
+          specialty_id: userData.specialty_id || null,
           force_password_change: true,
         },
       });
@@ -182,24 +208,22 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       handleReset();
       onOpenChange(false);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       let errorMessage = 'Failed to create user';
-      const rawMessage = error?.message ?? (typeof error === 'string' ? error : '');
+      const rawMessage = error instanceof Error ? error.message : String(error);
 
       if (rawMessage) {
         // Try to parse structured validation errors (e.g. Zod arrays)
         try {
           const parsed = JSON.parse(rawMessage);
           if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.message) {
-            errorMessage = parsed.map((e: any) => e.message).join(', ');
+            errorMessage = parsed.map((e: { message: string }) => e.message).join(', ');
           } else {
             errorMessage = rawMessage;
           }
         } catch {
           if (rawMessage.includes('already been registered') || rawMessage.includes('duplicate')) {
             errorMessage = 'A user with this email already exists';
-          } else if (rawMessage.includes('specialty')) {
-            errorMessage = rawMessage;
           } else {
             errorMessage = rawMessage;
           }
@@ -217,8 +241,8 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     createUserMutation.mutate({
       email: email.trim(),
       full_name: fullName.trim(),
-      facility_id: facilityId,
-      department_id: departmentId,
+      facility_id: facilityId || null,
+      department_id: departmentId || null,
       specialty_id: specialtyId || null,
       role,
     });
@@ -242,6 +266,19 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
   const handleDepartmentChange = (value: string) => {
     setDepartmentId(value);
     setSpecialtyId('');
+  };
+
+  const handleRoleChange = (value: 'staff' | 'department_head' | 'facility_supervisor' | 'workplace_supervisor') => {
+    setRole(value);
+    // Clear department if switching to a role that doesn't need it
+    if (value === 'workplace_supervisor' || value === 'facility_supervisor') {
+      setDepartmentId('');
+      setSpecialtyId('');
+    }
+    // Clear facility if switching to workplace_supervisor
+    if (value === 'workplace_supervisor') {
+      setFacilityId('');
+    }
   };
 
   return (
@@ -293,7 +330,44 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
             </div>
           </div>
 
-          {/* Organization Assignment */}
+          {/* Role Assignment - Moved BEFORE Organization Assignment */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <FolderTree className="h-4 w-4" />
+              Role Assignment
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="role">Role *</Label>
+              <Select value={role} onValueChange={handleRoleChange} required>
+                <SelectTrigger id="role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableRoles.includes('workplace_supervisor') && (
+                    <SelectItem value="workplace_supervisor">Workplace Supervisor</SelectItem>
+                  )}
+                  {availableRoles.includes('facility_supervisor') && (
+                    <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
+                  )}
+                  {availableRoles.includes('department_head') && (
+                    <SelectItem value="department_head">Department Head</SelectItem>
+                  )}
+                  {availableRoles.includes('staff') && (
+                    <SelectItem value="staff">Staff</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {role === 'workplace_supervisor' && 'Workspace-level access - no facility/department required'}
+                {role === 'facility_supervisor' && 'Facility-level access - department not required'}
+                {role === 'department_head' && 'Department-level access - requires facility and department'}
+                {role === 'staff' && 'Staff member - requires facility and department'}
+              </p>
+            </div>
+          </div>
+
+          {/* Organization Assignment - Shows conditionally based on role */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <Building2 className="h-4 w-4" />
@@ -302,11 +376,13 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="facility">Facility *</Label>
+                <Label htmlFor="facility">
+                  Facility {role !== 'workplace_supervisor' ? '*' : '(Optional)'}
+                </Label>
                 <Select 
                   value={facilityId} 
                   onValueChange={handleFacilityChange} 
-                  required
+                  required={role !== 'workplace_supervisor'}
                   disabled={highestRole === 'department_head' || highestRole === 'facility_supervisor'}
                 >
                   <SelectTrigger id="facility">
@@ -328,15 +404,17 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="department">Department *</Label>
+                <Label htmlFor="department">
+                  Department {isDepartmentRequired ? '*' : '(Optional)'}
+                </Label>
                 <Select 
                   value={departmentId} 
                   onValueChange={handleDepartmentChange}
-                  disabled={!facilityId || highestRole === 'department_head'}
-                  required
+                  disabled={!facilityId || highestRole === 'department_head' || !isDepartmentRequired}
+                  required={isDepartmentRequired}
                 >
                   <SelectTrigger id="department">
-                    <SelectValue placeholder="Select department" />
+                    <SelectValue placeholder={isDepartmentRequired ? "Select department" : "Not required"} />
                   </SelectTrigger>
                   <SelectContent>
                     {departments?.map((dept) => (
@@ -351,64 +429,40 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                     Auto-assigned to your department
                   </p>
                 )}
+                {!isDepartmentRequired && (
+                  <p className="text-xs text-muted-foreground">
+                    Not required for {role === 'workplace_supervisor' ? 'Workplace' : 'Facility'} Supervisor
+                  </p>
+                )}
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="specialty">Specialty (Optional)</Label>
-              <Select 
-                value={specialtyId} 
-                onValueChange={setSpecialtyId}
-                disabled={!departmentId}
-              >
-                <SelectTrigger id="specialty">
-                  <SelectValue placeholder="Select specialty" />
-                </SelectTrigger>
-                <SelectContent>
-                  {specialties?.map((specialty) => (
-                    <SelectItem key={specialty.id} value={specialty.id}>
-                      {specialty.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {specialties && specialties.length === 0 && departmentId && (
-                <p className="text-xs text-muted-foreground">
-                  No specialties available for this department
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Role Assignment */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <FolderTree className="h-4 w-4" />
-              Role Assignment
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="role">Role *</Label>
-              <Select value={role} onValueChange={(value: any) => setRole(value)} required>
-                <SelectTrigger id="role">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableRoles.includes('workplace_supervisor') && (
-                    <SelectItem value="workplace_supervisor">Workplace Supervisor</SelectItem>
-                  )}
-                  {availableRoles.includes('facility_supervisor') && (
-                    <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
-                  )}
-                  {availableRoles.includes('department_head') && (
-                    <SelectItem value="department_head">Department Head</SelectItem>
-                  )}
-                  {availableRoles.includes('staff') && (
-                    <SelectItem value="staff">Staff</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
+            {isDepartmentRequired && (
+              <div className="space-y-2">
+                <Label htmlFor="specialty">Specialty (Optional)</Label>
+                <Select 
+                  value={specialtyId} 
+                  onValueChange={setSpecialtyId}
+                  disabled={!departmentId}
+                >
+                  <SelectTrigger id="specialty">
+                    <SelectValue placeholder="Select specialty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {specialties?.map((specialty) => (
+                      <SelectItem key={specialty.id} value={specialty.id}>
+                        {specialty.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {specialties && specialties.length === 0 && departmentId && (
+                  <p className="text-xs text-muted-foreground">
+                    No specialties available for this department
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <Alert>
