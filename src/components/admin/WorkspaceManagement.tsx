@@ -456,7 +456,7 @@ const WorkspaceManagement = () => {
           <div className="space-y-3">
             {categories && categories.length > 0 ? (
               <div className="grid gap-2">
-                {categories.map((category: any) => {
+              {categories.map((category: any) => {
                   const isAssigned = isCategoryAssigned(category.id);
                   
                   return (
@@ -468,11 +468,12 @@ const WorkspaceManagement = () => {
                       <Checkbox
                         id={category.id}
                         checked={isAssigned}
-                        onCheckedChange={() => handleToggleCategory(category.id)}
+                        onClick={(e) => e.stopPropagation()}
                       />
                       <Label
                         htmlFor={category.id}
                         className="text-sm cursor-pointer flex-1"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         <div className="font-medium">{category.name}</div>
                         {category.description && (
@@ -528,7 +529,7 @@ const WorkspaceManagement = () => {
                     </div>
                     
                     <div className="grid grid-cols-2 gap-2 ml-6">
-                      {categoryDepts.map((dept: any) => {
+                    {categoryDepts.map((dept: any) => {
                         const isAssigned = isDepartmentAssigned(dept.id);
                         
                         return (
@@ -540,11 +541,12 @@ const WorkspaceManagement = () => {
                             <Checkbox
                               id={dept.id}
                               checked={isAssigned}
-                              onCheckedChange={() => handleToggleDepartment(dept.id)}
+                              onClick={(e) => e.stopPropagation()}
                             />
                             <Label
                               htmlFor={dept.id}
                               className="text-sm cursor-pointer flex-1"
+                              onClick={(e) => e.stopPropagation()}
                             >
                               {dept.name}
                             </Label>
