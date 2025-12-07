@@ -1,7 +1,7 @@
 import { PageHeader } from '@/components/layout';
 import { StatsCard } from '@/components/shared';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Building2, Calendar, ClipboardList, CheckCircle, XCircle, Clock, TrendingUp, Building, LayoutDashboard, Folders, UserCircle, FolderTree, Settings, Code } from 'lucide-react';
+import { Users, Building2, Calendar, ClipboardList, CheckCircle, XCircle, Clock, TrendingUp, Building, LayoutDashboard, Folders, UserCircle, FolderTree, Settings, Code, CalendarClock } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Separator } from '@/components/ui/separator';
@@ -20,6 +20,7 @@ import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { SourceCodeHub } from '@/components/admin/SourceCodeHub';
+import { FacilitySchedulingHub } from '@/components/scheduling';
 
 const SuperAdminDashboard = () => {
   const { modules, hasAccess } = useModuleContext();
@@ -211,7 +212,13 @@ const SuperAdminDashboard = () => {
           description="View project structure and access source code"
         />
       )}
-      {!['dashboard','modules','validator','organization','users','vacation','tasks','staff','messaging','notifications','source-code'].includes(activeTab) && (
+      {activeTab === 'scheduling' && (
+        <PageHeader 
+          title="Scheduling" 
+          description="Manage schedules and shift assignments across facilities"
+        />
+      )}
+      {!['dashboard','modules','validator','organization','users','vacation','tasks','staff','messaging','notifications','source-code','scheduling'].includes(activeTab) && (
         <PageHeader 
           title="System Overview" 
           description="Manage your entire system from one centralized dashboard"
@@ -451,9 +458,14 @@ const SuperAdminDashboard = () => {
             <MessagingHub />
           </ModuleGuard>
         )}
-
         {activeTab === 'source-code' && (
           <SourceCodeHub />
+        )}
+
+        {activeTab === 'scheduling' && (
+          <ModuleGuard moduleKey="scheduling">
+            <FacilitySchedulingHub />
+          </ModuleGuard>
         )}
       </div>
     </>

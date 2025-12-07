@@ -21,7 +21,7 @@ import { ShiftCalendarView } from './ShiftCalendarView';
 import { SchedulingDashboard } from './SchedulingDashboard';
 
 interface FacilitySchedulingHubProps {
-  facilityId: string;
+  facilityId?: string;
 }
 
 interface ShiftConfig {
@@ -35,13 +35,31 @@ interface ShiftConfig {
 const DEFAULT_SHIFT_COLORS = ['#3b82f6', '#10b981', '#f59e0b'];
 const DEFAULT_SHIFT_NAMES = ['Morning Shift', 'Afternoon Shift', 'Night Shift'];
 
-export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ facilityId }) => {
+export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ facilityId: propFacilityId }) => {
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string>(propFacilityId || '');
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('schedules');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [filterDepartmentId, setFilterDepartmentId] = useState<string>('all');
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+
+  // Use the effective facility ID (prop or selected)
+  const facilityId = propFacilityId || selectedFacilityId;
+
+  // Fetch all facilities for Super Admin facility selector
+  const { data: allFacilities } = useQuery({
+    queryKey: ['all-facilities'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('facilities')
+        .select('id, name, workspaces(name)')
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !propFacilityId, // Only fetch if no facility prop provided
+  });
 
   // Form state
   const [name, setName] = useState('');
@@ -56,6 +74,7 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ fa
   const { data: departments } = useQuery({
     queryKey: ['facility-departments', facilityId],
     queryFn: async () => {
+      if (!facilityId) return [];
       // First get the workspace_id from the facility
       const { data: facility } = await supabase
         .from('facilities')
@@ -94,12 +113,14 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ fa
       if (error) throw error;
       return data || [];
     },
+    enabled: !!facilityId,
   });
 
   // Fetch all schedules for facility
   const { data: schedules, isLoading } = useQuery({
     queryKey: ['facility-schedules', facilityId],
     queryFn: async () => {
+      if (!facilityId) return [];
       const { data, error } = await supabase
         .from('schedules')
         .select(`
@@ -113,6 +134,7 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ fa
       if (error) throw error;
       return data;
     },
+    enabled: !!facilityId,
   });
 
   // Filter schedules by department
@@ -267,11 +289,58 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ fa
     }
   };
 
-  if (isLoading) return <LoadingState message="Loading schedules..." />;
+  if (isLoading && facilityId) return <LoadingState message="Loading schedules..." />;
+
+  // If no facility selected and no prop, show facility selector
+  if (!facilityId && !propFacilityId) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Select Facility</CardTitle>
+          <CardDescription>Choose a facility to manage schedules</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Select value={selectedFacilityId} onValueChange={setSelectedFacilityId}>
+            <SelectTrigger className="w-full max-w-md">
+              <SelectValue placeholder="Select a facility..." />
+            </SelectTrigger>
+            <SelectContent>
+              {allFacilities?.map((facility: any) => (
+                <SelectItem key={facility.id} value={facility.id}>
+                  {facility.name} {facility.workspaces?.name ? `(${facility.workspaces.name})` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {allFacilities?.length === 0 && (
+            <p className="text-muted-foreground mt-4">No facilities found. Please create a facility first.</p>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <ErrorBoundary>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        {/* Facility Selector for Super Admin */}
+        {!propFacilityId && allFacilities && allFacilities.length > 0 && (
+          <div className="mb-4">
+            <Select value={selectedFacilityId} onValueChange={setSelectedFacilityId}>
+              <SelectTrigger className="w-full max-w-xs">
+                <SelectValue placeholder="Select facility..." />
+              </SelectTrigger>
+              <SelectContent>
+                {allFacilities.map((facility: any) => (
+                  <SelectItem key={facility.id} value={facility.id}>
+                    {facility.name} {facility.workspaces?.name ? `(${facility.workspaces.name})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <TabsList className="grid w-full grid-cols-3 mb-6">
           <TabsTrigger value="schedules" className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4" />
