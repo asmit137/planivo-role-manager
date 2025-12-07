@@ -12,7 +12,8 @@ import {
   LogOut,
   User,
   ShieldCheck,
-  CalendarClock
+  CalendarClock,
+  Code
 } from 'lucide-react';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -171,6 +172,16 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
                   >
                     <ShieldCheck className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
                     {!collapsed && <span>System Validator</span>}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => handleNavigation('/dashboard?tab=source-code')}
+                    isActive={currentTab === 'source-code'}
+                    className="w-full"
+                  >
+                    <Code className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
+                    {!collapsed && <span>Source Code</span>}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>

@@ -1,7 +1,7 @@
 import { PageHeader } from '@/components/layout';
 import { StatsCard } from '@/components/shared';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Building2, Calendar, ClipboardList, CheckCircle, XCircle, Clock, TrendingUp, Building, LayoutDashboard, Folders, UserCircle, FolderTree, Settings } from 'lucide-react';
+import { Users, Building2, Calendar, ClipboardList, CheckCircle, XCircle, Clock, TrendingUp, Building, LayoutDashboard, Folders, UserCircle, FolderTree, Settings, Code } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Separator } from '@/components/ui/separator';
@@ -19,6 +19,7 @@ import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { SourceCodeHub } from '@/components/admin/SourceCodeHub';
 
 const SuperAdminDashboard = () => {
   const { modules, hasAccess } = useModuleContext();
@@ -204,7 +205,13 @@ const SuperAdminDashboard = () => {
           description="View and manage system notifications"
         />
       )}
-      {!['dashboard','modules','validator','organization','users','vacation','tasks','staff','messaging','notifications'].includes(activeTab) && (
+      {activeTab === 'source-code' && (
+        <PageHeader 
+          title="Source Code" 
+          description="View project structure and access source code"
+        />
+      )}
+      {!['dashboard','modules','validator','organization','users','vacation','tasks','staff','messaging','notifications','source-code'].includes(activeTab) && (
         <PageHeader 
           title="System Overview" 
           description="Manage your entire system from one centralized dashboard"
@@ -443,6 +450,10 @@ const SuperAdminDashboard = () => {
           <ModuleGuard moduleKey="messaging">
             <MessagingHub />
           </ModuleGuard>
+        )}
+
+        {activeTab === 'source-code' && (
+          <SourceCodeHub />
         )}
       </div>
     </>
