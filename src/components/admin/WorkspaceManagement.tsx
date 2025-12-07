@@ -207,12 +207,15 @@ const WorkspaceManagement = () => {
         
         if (error) throw error;
       } else {
-        // Add assignment
+        // Add assignment - use upsert to prevent duplicate key errors
         const { error } = await supabase
           .from('workspace_categories')
-          .insert({
+          .upsert({
             workspace_id: workspaceId,
             category_id: categoryId,
+          }, {
+            onConflict: 'workspace_id,category_id',
+            ignoreDuplicates: true,
           });
         
         if (error) throw error;
@@ -239,12 +242,15 @@ const WorkspaceManagement = () => {
         
         if (error) throw error;
       } else {
-        // Add assignment
+        // Add assignment - use upsert to prevent duplicate key errors
         const { error } = await supabase
           .from('workspace_departments')
-          .insert({
+          .upsert({
             workspace_id: workspaceId,
             department_template_id: departmentId,
+          }, {
+            onConflict: 'workspace_id,department_template_id',
+            ignoreDuplicates: true,
           });
         
         if (error) throw error;
@@ -283,7 +289,7 @@ const WorkspaceManagement = () => {
   };
 
   const handleToggleCategory = (categoryId: string) => {
-    if (!selectedWorkspace) return;
+    if (!selectedWorkspace || toggleCategoryMutation.isPending) return;
     
     const isAssigned = isCategoryAssigned(categoryId);
     toggleCategoryMutation.mutate({
@@ -298,7 +304,7 @@ const WorkspaceManagement = () => {
   };
 
   const handleToggleDepartment = (departmentId: string) => {
-    if (!selectedWorkspace) return;
+    if (!selectedWorkspace || toggleDepartmentMutation.isPending) return;
     
     const isAssigned = isDepartmentAssigned(departmentId);
     toggleDepartmentMutation.mutate({
@@ -458,22 +464,22 @@ const WorkspaceManagement = () => {
               <div className="grid gap-2">
               {categories.map((category: any) => {
                   const isAssigned = isCategoryAssigned(category.id);
+                  const isPending = toggleCategoryMutation.isPending;
                   
                   return (
                     <div
                       key={category.id}
-                      className="flex items-center space-x-2 p-3 rounded-md border hover:bg-accent cursor-pointer transition-colors"
+                      className={`flex items-center space-x-2 p-3 rounded-md border hover:bg-accent cursor-pointer transition-colors ${isPending ? 'opacity-50 pointer-events-none' : ''}`}
                       onClick={() => handleToggleCategory(category.id)}
                     >
                       <Checkbox
                         id={category.id}
                         checked={isAssigned}
-                        onClick={(e) => e.stopPropagation()}
+                        disabled={isPending}
                       />
                       <Label
                         htmlFor={category.id}
                         className="text-sm cursor-pointer flex-1"
-                        onClick={(e) => e.stopPropagation()}
                       >
                         <div className="font-medium">{category.name}</div>
                         {category.description && (
