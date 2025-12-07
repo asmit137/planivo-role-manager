@@ -13,12 +13,12 @@ import {
   Globe,
   ChevronRight,
   ChevronDown,
-  ExternalLink,
-  Copy,
-  Check
+  FileJson,
+  FileText,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
-
+import { supabase } from '@/integrations/supabase/client';
 interface FolderStructure {
   name: string;
   type: 'folder' | 'file';
@@ -153,6 +153,109 @@ const projectStructure: FolderStructure[] = [
   { name: 'package.json', type: 'file', description: 'Project dependencies' },
 ];
 
+const getTableDescription = (table: string): string => {
+  const descriptions: Record<string, string> = {
+    profiles: 'User profile information',
+    user_roles: 'User role assignments with scope',
+    workspaces: 'Organization workspaces',
+    facilities: 'Facilities within workspaces',
+    departments: 'Departments and specialties',
+    categories: 'Department categories',
+    workspace_categories: 'Category assignments to workspaces',
+    workspace_departments: 'Department templates assigned to workspaces',
+    vacation_plans: 'Staff vacation requests',
+    vacation_splits: 'Individual vacation date ranges',
+    vacation_approvals: 'Multi-level approval records',
+    vacation_types: 'Types of vacation leave',
+    tasks: 'Task definitions',
+    task_assignments: 'Task assignments to staff',
+    schedules: 'Work schedules',
+    shifts: 'Shift definitions within schedules',
+    shift_assignments: 'Staff shift assignments',
+    notifications: 'User notifications',
+    conversations: 'Messaging conversations',
+    conversation_participants: 'Conversation membership',
+    messages: 'Chat messages',
+    module_definitions: 'System module registry',
+    role_module_access: 'Role-based module permissions',
+    workspace_module_access: 'Workspace module overrides'
+  };
+  return descriptions[table] || table;
+};
+
+const generateStructureText = (items: FolderStructure[], level: number): string => {
+  let result = '';
+  const indent = '  '.repeat(level);
+  for (const item of items) {
+    const icon = item.type === 'folder' ? '📁' : '📄';
+    result += `${indent}${icon} ${item.name}${item.description ? ` - ${item.description}` : ''}\n`;
+    if (item.children) {
+      result += generateStructureText(item.children, level + 1);
+    }
+  }
+  return result;
+};
+
+const generateProjectDocumentation = (): string => {
+  return `# Planivo - Staff Management System
+
+## Overview
+Planivo is a comprehensive staff management system built with React, TypeScript, and Supabase.
+
+## Technology Stack
+
+### Frontend
+- React 18 with TypeScript
+- Vite for build tooling
+- Tailwind CSS for styling
+- Shadcn/ui component library
+- React Query for data fetching
+- React Router for navigation
+
+### Backend
+- Supabase (PostgreSQL database)
+- Edge Functions (Deno runtime)
+- Row Level Security (RLS)
+- Realtime subscriptions
+
+## User Roles
+1. **Super Admin** - System-wide access
+2. **General Admin** - Workspace-level management
+3. **Workplace Supervisor** - Workspace operations
+4. **Facility Supervisor** - Facility operations
+5. **Department Head** - Department management
+6. **Staff** - Basic user access
+
+## Modules
+- Core (authentication, navigation)
+- User Management
+- Organization Structure
+- Staff Management
+- Vacation Planning
+- Task Management
+- Scheduling
+- Messaging
+- Notifications
+
+## Database Tables
+- profiles, user_roles
+- workspaces, facilities, departments
+- vacation_plans, vacation_splits, vacation_approvals
+- tasks, task_assignments
+- schedules, shifts, shift_assignments
+- notifications, conversations, messages
+- module_definitions, role_module_access
+
+## Getting Started
+1. Clone the repository
+2. Install dependencies: npm install
+3. Set up environment variables
+4. Run development server: npm run dev
+
+Generated: ${new Date().toISOString()}
+`;
+};
+
 const FolderItem = ({ item, level = 0 }: { item: FolderStructure; level?: number }) => {
   const [isOpen, setIsOpen] = useState(level < 2);
 
@@ -200,14 +303,75 @@ const FolderItem = ({ item, level = 0 }: { item: FolderStructure; level?: number
 };
 
 export const SourceCodeHub = () => {
-  const [copied, setCopied] = useState(false);
+  const [downloadingSchema, setDownloadingSchema] = useState(false);
+  const [downloadingDocs, setDownloadingDocs] = useState(false);
 
-  const handleCopyGitClone = () => {
-    // This would be the actual git URL if connected
-    navigator.clipboard.writeText('git clone <your-github-repo-url>');
-    setCopied(true);
-    toast.success('Git clone command copied to clipboard');
-    setTimeout(() => setCopied(false), 2000);
+  const downloadFile = (content: string, filename: string, type: string) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadSchema = async () => {
+    setDownloadingSchema(true);
+    try {
+      // Fetch all table information
+      const tables = [
+        'profiles', 'user_roles', 'workspaces', 'facilities', 'departments',
+        'categories', 'workspace_categories', 'workspace_departments',
+        'vacation_plans', 'vacation_splits', 'vacation_approvals', 'vacation_types',
+        'tasks', 'task_assignments', 'schedules', 'shifts', 'shift_assignments',
+        'notifications', 'conversations', 'conversation_participants', 'messages',
+        'module_definitions', 'role_module_access', 'workspace_module_access'
+      ];
+
+      const schemaDoc = {
+        exportDate: new Date().toISOString(),
+        projectName: 'Planivo',
+        tables: tables.map(table => ({
+          name: table,
+          description: getTableDescription(table)
+        })),
+        roles: ['super_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'],
+        modules: ['core', 'user_management', 'organization', 'staff_management', 'vacation', 'tasks', 'messaging', 'notifications']
+      };
+
+      downloadFile(
+        JSON.stringify(schemaDoc, null, 2),
+        'planivo-database-schema.json',
+        'application/json'
+      );
+      toast.success('Database schema downloaded');
+    } catch (error) {
+      toast.error('Failed to download schema');
+    } finally {
+      setDownloadingSchema(false);
+    }
+  };
+
+  const handleDownloadDocs = () => {
+    setDownloadingDocs(true);
+    try {
+      const docs = generateProjectDocumentation();
+      downloadFile(docs, 'planivo-documentation.md', 'text/markdown');
+      toast.success('Documentation downloaded');
+    } catch (error) {
+      toast.error('Failed to download documentation');
+    } finally {
+      setDownloadingDocs(false);
+    }
+  };
+
+  const handleDownloadStructure = () => {
+    const structure = generateStructureText(projectStructure, 0);
+    downloadFile(structure, 'planivo-project-structure.txt', 'text/plain');
+    toast.success('Project structure downloaded');
   };
 
   return (
@@ -267,46 +431,62 @@ export const SourceCodeHub = () => {
         </Card>
       </div>
 
-      {/* Download Options */}
+      {/* Direct Download Options */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Download className="h-5 w-5" />
-            Access Source Code
+            Direct Downloads
           </CardTitle>
           <CardDescription>
-            Download or access the complete project source code
+            Download project documentation, schema, and structure files
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Button 
               variant="default"
-              onClick={() => window.open('https://github.com', '_blank')}
-              className="gap-2"
+              onClick={handleDownloadSchema}
+              disabled={downloadingSchema}
+              className="gap-2 w-full"
             >
-              <ExternalLink className="h-4 w-4" />
-              View on GitHub
+              {downloadingSchema ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileJson className="h-4 w-4" />
+              )}
+              Download Schema (JSON)
             </Button>
             
             <Button 
-              variant="outline"
-              onClick={handleCopyGitClone}
-              className="gap-2"
+              variant="default"
+              onClick={handleDownloadDocs}
+              disabled={downloadingDocs}
+              className="gap-2 w-full"
             >
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              Copy Git Clone Command
+              {downloadingDocs ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+              Download Docs (MD)
+            </Button>
+
+            <Button 
+              variant="default"
+              onClick={handleDownloadStructure}
+              className="gap-2 w-full"
+            >
+              <FolderOpen className="h-4 w-4" />
+              Download Structure (TXT)
             </Button>
           </div>
 
           <div className="bg-muted/50 p-4 rounded-lg">
-            <h4 className="font-medium mb-2">How to Download:</h4>
-            <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-              <li>Connect your project to GitHub via Project Settings → Integrations</li>
-              <li>Once connected, all code syncs automatically to your repository</li>
-              <li>Clone the repository locally using <code className="bg-background px-1 py-0.5 rounded">git clone</code></li>
-              <li>Or download as ZIP directly from GitHub</li>
-            </ol>
+            <h4 className="font-medium mb-2">For Full Source Code:</h4>
+            <p className="text-sm text-muted-foreground">
+              Connect to GitHub via Project Settings → Integrations → GitHub to sync and download the complete codebase.
+            </p>
           </div>
         </CardContent>
       </Card>
