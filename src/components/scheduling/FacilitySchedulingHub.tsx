@@ -52,10 +52,39 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ fa
     { name: 'Morning Shift', startTime: '06:00', endTime: '14:00', requiredStaff: 1, color: '#3b82f6' }
   ]);
 
-  // Fetch departments in facility
+  // Fetch departments in facility (including workspace-assigned templates)
   const { data: departments } = useQuery({
     queryKey: ['facility-departments', facilityId],
     queryFn: async () => {
+      // First get the workspace_id from the facility
+      const { data: facility } = await supabase
+        .from('facilities')
+        .select('workspace_id')
+        .eq('id', facilityId)
+        .single();
+
+      // Try workspace-assigned template departments first
+      if (facility?.workspace_id) {
+        const { data: workspaceDepts } = await supabase
+          .from('workspace_departments')
+          .select(`
+            department_template_id,
+            departments!inner(id, name)
+          `)
+          .eq('workspace_id', facility.workspace_id);
+
+        if (workspaceDepts && workspaceDepts.length > 0) {
+          return workspaceDepts
+            .filter(wd => wd.departments)
+            .map(wd => ({
+              id: (wd.departments as any).id,
+              name: (wd.departments as any).name
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+        }
+      }
+
+      // Fall back to facility-specific departments
       const { data, error } = await supabase
         .from('departments')
         .select('id, name')
@@ -63,7 +92,7 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ fa
         .order('name');
 
       if (error) throw error;
-      return data;
+      return data || [];
     },
   });
 
