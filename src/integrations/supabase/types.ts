@@ -400,6 +400,168 @@ export type Database = {
           },
         ]
       }
+      schedules: {
+        Row: {
+          created_at: string
+          created_by: string
+          department_id: string
+          end_date: string
+          facility_id: string | null
+          id: string
+          name: string
+          shift_count: number
+          start_date: string
+          status: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          department_id: string
+          end_date: string
+          facility_id?: string | null
+          id?: string
+          name: string
+          shift_count?: number
+          start_date: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          department_id?: string
+          end_date?: string
+          facility_id?: string | null
+          id?: string
+          name?: string
+          shift_count?: number
+          start_date?: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedules_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedules_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedules_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shift_assignments: {
+        Row: {
+          assigned_by: string
+          assignment_date: string
+          created_at: string
+          id: string
+          notes: string | null
+          shift_id: string
+          staff_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_by: string
+          assignment_date: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          shift_id: string
+          staff_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_by?: string
+          assignment_date?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          shift_id?: string
+          staff_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_assignments_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_assignments_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shifts: {
+        Row: {
+          color: string | null
+          created_at: string
+          end_time: string
+          id: string
+          name: string
+          required_staff: number
+          schedule_id: string
+          shift_order: number
+          start_time: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          end_time: string
+          id?: string
+          name: string
+          required_staff?: number
+          schedule_id: string
+          shift_order: number
+          start_time: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          end_time?: string
+          id?: string
+          name?: string
+          required_staff?: number
+          schedule_id?: string
+          shift_order?: number
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shifts_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_assignments: {
         Row: {
           assigned_to: string
