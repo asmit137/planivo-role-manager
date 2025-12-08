@@ -321,32 +321,41 @@ export const SourceCodeHub = () => {
   const handleDownloadSchema = async () => {
     setDownloadingSchema(true);
     try {
-      // Fetch all table information
-      const tables = [
-        'profiles', 'user_roles', 'workspaces', 'facilities', 'departments',
-        'categories', 'workspace_categories', 'workspace_departments',
-        'vacation_plans', 'vacation_splits', 'vacation_approvals', 'vacation_types',
-        'tasks', 'task_assignments', 'schedules', 'shifts', 'shift_assignments',
-        'notifications', 'conversations', 'conversation_participants', 'messages',
-        'module_definitions', 'role_module_access', 'workspace_module_access'
-      ];
+      // Fetch the comprehensive schema from the docs folder
+      const response = await fetch('/src/docs/PLANIVO_DATABASE_SCHEMA.json');
+      if (response.ok) {
+        const schema = await response.text();
+        downloadFile(schema, 'PLANIVO_DATABASE_SCHEMA.json', 'application/json');
+      } else {
+        // Fallback to basic schema
+        const tables = [
+          'profiles', 'user_roles', 'workspaces', 'facilities', 'departments',
+          'categories', 'workspace_categories', 'workspace_departments',
+          'vacation_plans', 'vacation_splits', 'vacation_approvals', 'vacation_types',
+          'tasks', 'task_assignments', 'schedules', 'shifts', 'shift_assignments',
+          'notifications', 'conversations', 'conversation_participants', 'messages',
+          'module_definitions', 'role_module_access', 'workspace_module_access',
+          'training_events', 'training_registrations', 'training_attendance', 'training_meeting_chat',
+          'jitsi_server_config', 'organizations'
+        ];
 
-      const schemaDoc = {
-        exportDate: new Date().toISOString(),
-        projectName: 'Planivo',
-        tables: tables.map(table => ({
-          name: table,
-          description: getTableDescription(table)
-        })),
-        roles: ['super_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'],
-        modules: ['core', 'user_management', 'organization', 'staff_management', 'vacation', 'tasks', 'messaging', 'notifications']
-      };
+        const schemaDoc = {
+          exportDate: new Date().toISOString(),
+          projectName: 'Planivo',
+          tables: tables.map(table => ({
+            name: table,
+            description: getTableDescription(table)
+          })),
+          roles: ['super_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'],
+          modules: ['core', 'user_management', 'organization', 'staff_management', 'vacation', 'tasks', 'scheduling', 'training', 'messaging', 'notifications']
+        };
 
-      downloadFile(
-        JSON.stringify(schemaDoc, null, 2),
-        'planivo-database-schema.json',
-        'application/json'
-      );
+        downloadFile(
+          JSON.stringify(schemaDoc, null, 2),
+          'planivo-database-schema.json',
+          'application/json'
+        );
+      }
       toast.success('Database schema downloaded');
     } catch (error) {
       toast.error('Failed to download schema');
@@ -355,14 +364,25 @@ export const SourceCodeHub = () => {
     }
   };
 
-  const handleDownloadDocs = () => {
+  const handleDownloadDocs = async () => {
     setDownloadingDocs(true);
     try {
+      // Fetch the comprehensive documentation from the docs folder
+      const response = await fetch('/src/docs/PLANIVO_SYSTEM_DOCUMENTATION.md');
+      if (response.ok) {
+        const docs = await response.text();
+        downloadFile(docs, 'PLANIVO_SYSTEM_DOCUMENTATION.md', 'text/markdown');
+      } else {
+        // Fallback to generated docs
+        const docs = generateProjectDocumentation();
+        downloadFile(docs, 'planivo-documentation.md', 'text/markdown');
+      }
+      toast.success('Documentation downloaded');
+    } catch (error) {
+      // Fallback to generated docs
       const docs = generateProjectDocumentation();
       downloadFile(docs, 'planivo-documentation.md', 'text/markdown');
       toast.success('Documentation downloaded');
-    } catch (error) {
-      toast.error('Failed to download documentation');
     } finally {
       setDownloadingDocs(false);
     }

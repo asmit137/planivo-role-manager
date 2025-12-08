@@ -1,0 +1,596 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2024-12-08",
+  "database": "PostgreSQL",
+  "platform": "Supabase",
+  
+  "enums": {
+    "app_role": {
+      "description": "User role hierarchy levels",
+      "values": [
+        "super_admin",
+        "general_admin", 
+        "workplace_supervisor",
+        "facility_supervisor",
+        "department_head",
+        "staff"
+      ]
+    },
+    "training_event_status": {
+      "description": "Training event lifecycle states",
+      "values": ["draft", "published", "cancelled", "completed"]
+    },
+    "training_event_type": {
+      "description": "Types of training events",
+      "values": ["training", "workshop", "seminar", "webinar", "meeting", "conference", "other"]
+    },
+    "training_location_type": {
+      "description": "Event location options",
+      "values": ["online", "physical", "hybrid"]
+    }
+  },
+
+  "tables": {
+    "profiles": {
+      "description": "User profile information linked to auth.users",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "references": "auth.users.id" },
+        "email": { "type": "text", "nullable": false },
+        "full_name": { "type": "text", "nullable": false },
+        "is_active": { "type": "boolean", "default": true },
+        "force_password_change": { "type": "boolean", "default": false },
+        "created_by": { "type": "uuid", "nullable": true },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "user_roles": {
+      "description": "Role assignments with organizational scope",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "user_id": { "type": "uuid", "nullable": false, "references": "profiles.id" },
+        "role": { "type": "app_role", "nullable": false },
+        "workspace_id": { "type": "uuid", "nullable": true, "references": "workspaces.id" },
+        "facility_id": { "type": "uuid", "nullable": true, "references": "facilities.id" },
+        "department_id": { "type": "uuid", "nullable": true, "references": "departments.id" },
+        "specialty_id": { "type": "uuid", "nullable": true, "references": "departments.id" },
+        "created_by": { "type": "uuid", "nullable": true },
+        "created_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "organizations": {
+      "description": "Top-level organizational entities",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "name": { "type": "text", "nullable": false },
+        "description": { "type": "text", "nullable": true },
+        "is_active": { "type": "boolean", "default": true },
+        "created_by": { "type": "uuid", "nullable": true },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "workspaces": {
+      "description": "Operational units within organizations",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "name": { "type": "text", "nullable": false },
+        "organization_id": { "type": "uuid", "nullable": true, "references": "organizations.id" },
+        "max_vacation_splits": { "type": "integer", "default": 3 },
+        "min_vacation_notice_days": { "type": "integer", "default": 14 },
+        "max_concurrent_vacations": { "type": "integer", "default": 3 },
+        "vacation_year_start_month": { "type": "integer", "default": 1 },
+        "created_by": { "type": "uuid", "nullable": true },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "facilities": {
+      "description": "Physical or logical locations within workspaces",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "name": { "type": "text", "nullable": false },
+        "workspace_id": { "type": "uuid", "nullable": false, "references": "workspaces.id" },
+        "parent_facility_id": { "type": "uuid", "nullable": true, "references": "facilities.id" },
+        "created_by": { "type": "uuid", "nullable": true },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "departments": {
+      "description": "Functional units within facilities or templates",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "name": { "type": "text", "nullable": false },
+        "facility_id": { "type": "uuid", "nullable": true, "references": "facilities.id" },
+        "parent_department_id": { "type": "uuid", "nullable": true, "references": "departments.id" },
+        "category": { "type": "text", "nullable": true },
+        "is_template": { "type": "boolean", "default": false },
+        "min_staffing": { "type": "integer", "default": 1 },
+        "created_by": { "type": "uuid", "nullable": true },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "categories": {
+      "description": "System-wide department grouping categories",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "name": { "type": "text", "nullable": false },
+        "description": { "type": "text", "nullable": true },
+        "is_system_default": { "type": "boolean", "default": false },
+        "is_active": { "type": "boolean", "default": true },
+        "created_by": { "type": "uuid", "nullable": true },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "workspace_categories": {
+      "description": "Category assignments to workspaces",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "workspace_id": { "type": "uuid", "nullable": false, "references": "workspaces.id" },
+        "category_id": { "type": "uuid", "nullable": false, "references": "categories.id" },
+        "created_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "workspace_departments": {
+      "description": "Department template assignments to workspaces",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "workspace_id": { "type": "uuid", "nullable": false, "references": "workspaces.id" },
+        "department_template_id": { "type": "uuid", "nullable": false, "references": "departments.id" },
+        "created_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "vacation_types": {
+      "description": "Types of vacation/leave available",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "name": { "type": "text", "nullable": false },
+        "description": { "type": "text", "nullable": true },
+        "max_days": { "type": "integer", "nullable": true },
+        "requires_documentation": { "type": "boolean", "default": false },
+        "is_active": { "type": "boolean", "default": true },
+        "created_by": { "type": "uuid", "nullable": true },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "vacation_plans": {
+      "description": "Vacation requests from staff",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "staff_id": { "type": "uuid", "nullable": false, "references": "profiles.id" },
+        "created_by": { "type": "uuid", "nullable": false, "references": "profiles.id" },
+        "department_id": { "type": "uuid", "nullable": false, "references": "departments.id" },
+        "vacation_type_id": { "type": "uuid", "nullable": false, "references": "vacation_types.id" },
+        "total_days": { "type": "integer", "nullable": false },
+        "status": { 
+          "type": "text", 
+          "default": "draft",
+          "allowed_values": ["draft", "department_pending", "facility_pending", "workspace_pending", "approved", "rejected"]
+        },
+        "notes": { "type": "text", "nullable": true },
+        "submitted_at": { "type": "timestamp", "nullable": true },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "vacation_splits": {
+      "description": "Individual date segments within vacation plans",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "vacation_plan_id": { "type": "uuid", "nullable": false, "references": "vacation_plans.id" },
+        "start_date": { "type": "date", "nullable": false },
+        "end_date": { "type": "date", "nullable": false },
+        "days": { "type": "integer", "nullable": false },
+        "status": { "type": "text", "default": "pending" },
+        "conflict_data": { "type": "jsonb", "default": "[]" },
+        "created_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "vacation_approvals": {
+      "description": "Approval records for vacation plans",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "vacation_plan_id": { "type": "uuid", "nullable": false, "references": "vacation_plans.id" },
+        "approver_id": { "type": "uuid", "nullable": false, "references": "profiles.id" },
+        "approval_level": { "type": "integer", "nullable": false, "description": "1=Dept Head, 2=Facility Sup, 3=Workplace Sup" },
+        "status": { "type": "text", "nullable": false },
+        "comments": { "type": "text", "nullable": true },
+        "has_conflict": { "type": "boolean", "default": false },
+        "conflict_reason": { "type": "text", "nullable": true },
+        "conflicting_plans": { "type": "jsonb", "nullable": true },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "tasks": {
+      "description": "Task definitions with scope-based visibility",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "title": { "type": "text", "nullable": false },
+        "description": { "type": "text", "nullable": true },
+        "created_by": { "type": "uuid", "nullable": false, "references": "profiles.id" },
+        "scope_type": { "type": "text", "nullable": false, "allowed_values": ["workspace", "facility", "department"] },
+        "workspace_id": { "type": "uuid", "nullable": true, "references": "workspaces.id" },
+        "facility_id": { "type": "uuid", "nullable": true, "references": "facilities.id" },
+        "department_id": { "type": "uuid", "nullable": true, "references": "departments.id" },
+        "due_date": { "type": "date", "nullable": true },
+        "priority": { "type": "text", "default": "medium", "allowed_values": ["low", "medium", "high", "urgent"] },
+        "status": { "type": "text", "default": "active", "allowed_values": ["active", "in_progress", "completed", "cancelled"] },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "task_assignments": {
+      "description": "Task-to-user assignments",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "task_id": { "type": "uuid", "nullable": false, "references": "tasks.id" },
+        "assigned_to": { "type": "uuid", "nullable": false, "references": "profiles.id" },
+        "status": { "type": "text", "default": "pending" },
+        "notes": { "type": "text", "nullable": true },
+        "completed_at": { "type": "timestamp", "nullable": true },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "schedules": {
+      "description": "Staff schedules created by Facility Supervisors",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "name": { "type": "text", "nullable": false },
+        "created_by": { "type": "uuid", "nullable": false, "references": "profiles.id" },
+        "department_id": { "type": "uuid", "nullable": false, "references": "departments.id" },
+        "facility_id": { "type": "uuid", "nullable": true, "references": "facilities.id" },
+        "workspace_id": { "type": "uuid", "nullable": true, "references": "workspaces.id" },
+        "start_date": { "type": "date", "nullable": false },
+        "end_date": { "type": "date", "nullable": false },
+        "shift_count": { "type": "integer", "default": 1 },
+        "status": { "type": "text", "default": "draft", "allowed_values": ["draft", "published"] },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "shifts": {
+      "description": "Shift definitions within schedules",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "schedule_id": { "type": "uuid", "nullable": false, "references": "schedules.id" },
+        "name": { "type": "text", "nullable": false },
+        "start_time": { "type": "time", "nullable": false },
+        "end_time": { "type": "time", "nullable": false },
+        "shift_order": { "type": "integer", "nullable": false },
+        "required_staff": { "type": "integer", "default": 1 },
+        "color": { "type": "text", "default": "#3b82f6" },
+        "created_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "shift_assignments": {
+      "description": "Staff assignments to shifts",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "shift_id": { "type": "uuid", "nullable": false, "references": "shifts.id" },
+        "staff_id": { "type": "uuid", "nullable": false, "references": "profiles.id" },
+        "assigned_by": { "type": "uuid", "nullable": false, "references": "profiles.id" },
+        "assignment_date": { "type": "date", "nullable": false },
+        "status": { "type": "text", "default": "scheduled" },
+        "notes": { "type": "text", "nullable": true },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "training_events": {
+      "description": "Training and meeting events",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "title": { "type": "text", "nullable": false },
+        "description": { "type": "text", "nullable": true },
+        "created_by": { "type": "uuid", "nullable": false, "references": "profiles.id" },
+        "organization_id": { "type": "uuid", "nullable": true, "references": "organizations.id" },
+        "event_type": { "type": "training_event_type", "default": "training" },
+        "location_type": { "type": "training_location_type", "default": "physical" },
+        "location_address": { "type": "text", "nullable": true },
+        "online_link": { "type": "text", "nullable": true },
+        "start_datetime": { "type": "timestamp", "nullable": false },
+        "end_datetime": { "type": "timestamp", "nullable": false },
+        "max_participants": { "type": "integer", "nullable": true },
+        "status": { "type": "training_event_status", "default": "draft" },
+        "enable_video_conference": { "type": "boolean", "default": false },
+        "jitsi_room_name": { "type": "text", "nullable": true },
+        "jitsi_moderator_password": { "type": "text", "nullable": true },
+        "allow_recording": { "type": "boolean", "default": false },
+        "require_lobby": { "type": "boolean", "default": true },
+        "max_video_participants": { "type": "integer", "default": 500 },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "training_registrations": {
+      "description": "User registrations for training events",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "event_id": { "type": "uuid", "nullable": false, "references": "training_events.id" },
+        "user_id": { "type": "uuid", "nullable": false, "references": "profiles.id" },
+        "status": { "type": "text", "default": "registered" },
+        "reminder_sent": { "type": "boolean", "default": false },
+        "registered_at": { "type": "timestamp", "default": "now()" },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "training_attendance": {
+      "description": "Attendance tracking for training events",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "event_id": { "type": "uuid", "nullable": false, "references": "training_events.id" },
+        "user_id": { "type": "uuid", "nullable": false, "references": "profiles.id" },
+        "joined_at": { "type": "timestamp", "default": "now()" },
+        "left_at": { "type": "timestamp", "nullable": true },
+        "duration_minutes": { "type": "integer", "nullable": true },
+        "attendance_status": { "type": "text", "default": "present" },
+        "ip_address": { "type": "text", "nullable": true },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "training_meeting_chat": {
+      "description": "Persistent chat messages from training meetings",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "event_id": { "type": "uuid", "nullable": false, "references": "training_events.id" },
+        "user_id": { "type": "uuid", "nullable": false, "references": "profiles.id" },
+        "message": { "type": "text", "nullable": false },
+        "sent_at": { "type": "timestamp", "default": "now()" },
+        "created_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true,
+      "realtime_enabled": true
+    },
+
+    "jitsi_server_config": {
+      "description": "Jitsi server configuration per organization",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "organization_id": { "type": "uuid", "nullable": true, "references": "organizations.id" },
+        "server_url": { "type": "text", "nullable": false },
+        "app_id": { "type": "text", "nullable": true },
+        "app_secret": { "type": "text", "nullable": true },
+        "is_active": { "type": "boolean", "default": true },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "conversations": {
+      "description": "Messaging conversations",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "title": { "type": "text", "nullable": true },
+        "is_group": { "type": "boolean", "default": false },
+        "workspace_id": { "type": "uuid", "nullable": true, "references": "workspaces.id" },
+        "created_by": { "type": "uuid", "nullable": true },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "conversation_participants": {
+      "description": "Participants in conversations",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "conversation_id": { "type": "uuid", "nullable": false, "references": "conversations.id" },
+        "user_id": { "type": "uuid", "nullable": false },
+        "joined_at": { "type": "timestamp", "default": "now()" },
+        "last_read_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "messages": {
+      "description": "Individual messages in conversations",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "conversation_id": { "type": "uuid", "nullable": false, "references": "conversations.id" },
+        "sender_id": { "type": "uuid", "nullable": false },
+        "content": { "type": "text", "nullable": false },
+        "is_edited": { "type": "boolean", "default": false },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "notifications": {
+      "description": "System-generated notifications",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "user_id": { "type": "uuid", "nullable": false },
+        "title": { "type": "text", "nullable": false },
+        "message": { "type": "text", "nullable": false },
+        "type": { "type": "text", "nullable": false },
+        "related_id": { "type": "uuid", "nullable": true },
+        "is_read": { "type": "boolean", "default": false },
+        "read_at": { "type": "timestamp", "nullable": true },
+        "created_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "module_definitions": {
+      "description": "System module registry",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "key": { "type": "text", "nullable": false, "unique": true },
+        "name": { "type": "text", "nullable": false },
+        "description": { "type": "text", "nullable": true },
+        "icon": { "type": "text", "nullable": true },
+        "depends_on": { "type": "text[]", "nullable": true },
+        "is_active": { "type": "boolean", "default": true },
+        "created_at": { "type": "timestamp", "default": "now()" },
+        "updated_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "role_module_access": {
+      "description": "Role-to-module permission mappings",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "role": { "type": "app_role", "nullable": false },
+        "module_id": { "type": "uuid", "nullable": true, "references": "module_definitions.id" },
+        "can_view": { "type": "boolean", "default": false },
+        "can_edit": { "type": "boolean", "default": false },
+        "can_delete": { "type": "boolean", "default": false },
+        "can_admin": { "type": "boolean", "default": false },
+        "created_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    },
+
+    "workspace_module_access": {
+      "description": "Workspace-level module access overrides",
+      "columns": {
+        "id": { "type": "uuid", "primary_key": true, "default": "gen_random_uuid()" },
+        "workspace_id": { "type": "uuid", "nullable": true, "references": "workspaces.id" },
+        "module_id": { "type": "uuid", "nullable": true, "references": "module_definitions.id" },
+        "is_enabled": { "type": "boolean", "default": true },
+        "created_at": { "type": "timestamp", "default": "now()" }
+      },
+      "rls_enabled": true
+    }
+  },
+
+  "functions": {
+    "has_role": {
+      "description": "Check if user has a specific role",
+      "parameters": ["_user_id uuid", "_role app_role"],
+      "returns": "boolean"
+    },
+    "has_role_in_workspace": {
+      "description": "Check if user has role in specific workspace",
+      "parameters": ["_user_id uuid", "_role app_role", "_workspace_id uuid"],
+      "returns": "boolean"
+    },
+    "get_user_modules": {
+      "description": "Get all modules accessible to user",
+      "parameters": ["_user_id uuid"],
+      "returns": "TABLE(module_id uuid, module_key text, module_name text, can_view boolean, can_edit boolean, can_delete boolean, can_admin boolean)"
+    },
+    "has_module_access": {
+      "description": "Check if user has access to specific module",
+      "parameters": ["_user_id uuid", "_module_key text"],
+      "returns": "boolean"
+    },
+    "get_user_workspaces": {
+      "description": "Get all workspaces user belongs to",
+      "parameters": ["_user_id uuid"],
+      "returns": "SETOF uuid"
+    },
+    "check_vacation_conflicts": {
+      "description": "Check for vacation conflicts in department",
+      "parameters": ["_vacation_plan_id uuid", "_department_id uuid"],
+      "returns": "jsonb"
+    },
+    "check_user_vacation_overlap": {
+      "description": "Check if user has overlapping vacations",
+      "parameters": ["_staff_id uuid", "_splits jsonb"],
+      "returns": "jsonb"
+    },
+    "can_view_task": {
+      "description": "Check if user can view specific task",
+      "parameters": ["_user_id uuid", "_task_id uuid"],
+      "returns": "boolean"
+    },
+    "user_has_conversation_access": {
+      "description": "Check if user can access conversation",
+      "parameters": ["conversation_uuid uuid", "user_uuid uuid"],
+      "returns": "boolean"
+    }
+  },
+
+  "edge_functions": {
+    "bootstrap-admin": {
+      "description": "Create initial Super Admin account",
+      "method": "POST",
+      "auth_required": false
+    },
+    "create-user": {
+      "description": "Create new user with role assignment",
+      "method": "POST",
+      "auth_required": true
+    },
+    "bulk-create-staff": {
+      "description": "Bulk create staff users",
+      "method": "POST",
+      "auth_required": true
+    },
+    "bulk-upload-users": {
+      "description": "Process Excel template for user import",
+      "method": "POST",
+      "auth_required": true
+    },
+    "create-notification": {
+      "description": "Create system notification",
+      "method": "POST",
+      "auth_required": true
+    },
+    "scheduling-reminder": {
+      "description": "Automated scheduling reminder cron job",
+      "method": "POST",
+      "auth_required": false,
+      "scheduled": true
+    },
+    "validate-module-system": {
+      "description": "Validate module configuration",
+      "method": "POST",
+      "auth_required": true
+    }
+  }
+}
