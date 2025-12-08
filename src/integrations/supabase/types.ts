@@ -717,6 +717,116 @@ export type Database = {
           },
         ]
       }
+      training_events: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          end_datetime: string
+          event_type: Database["public"]["Enums"]["training_event_type"]
+          id: string
+          location_address: string | null
+          location_type: Database["public"]["Enums"]["training_location_type"]
+          max_participants: number | null
+          online_link: string | null
+          organization_id: string | null
+          start_datetime: string
+          status: Database["public"]["Enums"]["training_event_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          end_datetime: string
+          event_type?: Database["public"]["Enums"]["training_event_type"]
+          id?: string
+          location_address?: string | null
+          location_type?: Database["public"]["Enums"]["training_location_type"]
+          max_participants?: number | null
+          online_link?: string | null
+          organization_id?: string | null
+          start_datetime: string
+          status?: Database["public"]["Enums"]["training_event_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          end_datetime?: string
+          event_type?: Database["public"]["Enums"]["training_event_type"]
+          id?: string
+          location_address?: string | null
+          location_type?: Database["public"]["Enums"]["training_location_type"]
+          max_participants?: number | null
+          online_link?: string | null
+          organization_id?: string | null
+          start_datetime?: string
+          status?: Database["public"]["Enums"]["training_event_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_registrations: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          registered_at: string
+          reminder_sent: boolean | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          registered_at?: string
+          reminder_sent?: boolean | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          registered_at?: string
+          reminder_sent?: boolean | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_registrations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "training_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_registrations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1214,6 +1324,16 @@ export type Database = {
         | "facility_supervisor"
         | "department_head"
         | "staff"
+      training_event_status: "draft" | "published" | "cancelled" | "completed"
+      training_event_type:
+        | "training"
+        | "workshop"
+        | "seminar"
+        | "webinar"
+        | "meeting"
+        | "conference"
+        | "other"
+      training_location_type: "online" | "physical" | "hybrid"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1349,6 +1469,17 @@ export const Constants = {
         "department_head",
         "staff",
       ],
+      training_event_status: ["draft", "published", "cancelled", "completed"],
+      training_event_type: [
+        "training",
+        "workshop",
+        "seminar",
+        "webinar",
+        "meeting",
+        "conference",
+        "other",
+      ],
+      training_location_type: ["online", "physical", "hybrid"],
     },
   },
 } as const
