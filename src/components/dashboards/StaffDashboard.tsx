@@ -10,12 +10,19 @@ import { useLocation } from 'react-router-dom';
 import { ClipboardList, Calendar, MessageSquare, Bell, CalendarClock } from 'lucide-react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorState } from '@/components/layout/ErrorState';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
 const StaffDashboard = () => {
   const { hasAccess } = useModuleContext();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const activeTab = searchParams.get('tab');
+
+  // Real-time subscriptions for live updates
+  useRealtimeSubscription({ table: 'task_assignments', invalidateQueries: ['my-tasks'] });
+  useRealtimeSubscription({ table: 'vacation_plans', invalidateQueries: ['my-vacation'] });
+  useRealtimeSubscription({ table: 'shift_assignments', invalidateQueries: ['my-schedule'] });
+  useRealtimeSubscription({ table: 'notifications', invalidateQueries: ['notifications'] });
 
   return (
     <ErrorBoundary

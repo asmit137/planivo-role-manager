@@ -16,6 +16,7 @@ import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
 import { NotificationHub } from '@/modules/notifications';
 import { MessagingHub } from '@/modules/messaging';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
 const WorkplaceSupervisorDashboard = () => {
   const { user } = useAuth();
@@ -23,6 +24,11 @@ const WorkplaceSupervisorDashboard = () => {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const activeTab = searchParams.get('tab');
+
+  // Real-time subscriptions for live updates
+  useRealtimeSubscription({ table: 'tasks', invalidateQueries: ['workspace-tasks-count'] });
+  useRealtimeSubscription({ table: 'vacation_plans', invalidateQueries: ['workspace-approvals-count'] });
+  useRealtimeSubscription({ table: 'vacation_approvals', invalidateQueries: ['workspace-conflicts-count'] });
 
   const { data: userRole } = useQuery({
     queryKey: ['workplace-supervisor-role', user?.id],

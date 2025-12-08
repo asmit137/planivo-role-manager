@@ -17,6 +17,7 @@ import { useLocation } from 'react-router-dom';
 import { NotificationHub } from '@/modules/notifications';
 import { MessagingHub } from '@/modules/messaging';
 import { FacilitySchedulingHub } from '@/components/scheduling/FacilitySchedulingHub';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
 const FacilitySupervisorDashboard = () => {
   const { user } = useAuth();
@@ -24,6 +25,14 @@ const FacilitySupervisorDashboard = () => {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const activeTab = searchParams.get('tab');
+
+  // Real-time subscriptions for live updates
+  useRealtimeSubscription({ table: 'tasks', invalidateQueries: ['facility-tasks'] });
+  useRealtimeSubscription({ table: 'vacation_plans', invalidateQueries: ['facility-approvals'] });
+  useRealtimeSubscription({ table: 'vacation_approvals', invalidateQueries: ['facility-conflicts'] });
+  useRealtimeSubscription({ table: 'schedules', invalidateQueries: ['schedules'] });
+  useRealtimeSubscription({ table: 'shifts', invalidateQueries: ['shifts'] });
+  useRealtimeSubscription({ table: 'shift_assignments', invalidateQueries: ['shift-assignments'] });
 
   const { data: userRole } = useQuery({
     queryKey: ['facility-supervisor-role', user?.id],

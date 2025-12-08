@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
 const GeneralAdminDashboard = () => {
   const { user } = useAuth();
@@ -23,6 +24,11 @@ const GeneralAdminDashboard = () => {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const activeTab = searchParams.get('tab');
+
+  // Real-time subscriptions for live updates
+  useRealtimeSubscription({ table: 'facilities', invalidateQueries: ['workspace-stats'] });
+  useRealtimeSubscription({ table: 'user_roles', invalidateQueries: ['workspace-stats'] });
+  useRealtimeSubscription({ table: 'departments', invalidateQueries: ['workspace-stats'] });
 
   const { data: userRole } = useQuery({
     queryKey: ['general-admin-role', user?.id],

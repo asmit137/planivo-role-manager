@@ -21,12 +21,22 @@ import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { SourceCodeHub } from '@/components/admin/SourceCodeHub';
 import { FacilitySchedulingHub } from '@/components/scheduling';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
 const SuperAdminDashboard = () => {
   const { modules, hasAccess } = useModuleContext();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const activeTab = searchParams.get('tab') || 'dashboard';
+
+  // Real-time subscriptions for live updates
+  useRealtimeSubscription({ table: 'workspaces', invalidateQueries: ['workspaces'] });
+  useRealtimeSubscription({ table: 'profiles', invalidateQueries: ['totalUsers'] });
+  useRealtimeSubscription({ table: 'facilities', invalidateQueries: ['facilities-count'] });
+  useRealtimeSubscription({ table: 'departments', invalidateQueries: ['departments-count'] });
+  useRealtimeSubscription({ table: 'vacation_plans', invalidateQueries: ['vacation-stats', 'recent-activity'] });
+  useRealtimeSubscription({ table: 'tasks', invalidateQueries: ['task-stats', 'recent-activity'] });
+  useRealtimeSubscription({ table: 'organizations', invalidateQueries: ['organizations'] });
   
   const { data: workspaces, isLoading: workspacesLoading } = useQuery({
     queryKey: ['workspaces'],

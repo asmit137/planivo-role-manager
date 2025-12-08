@@ -13,6 +13,7 @@ import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
 import { ErrorBoundary } from 'react-error-boundary';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
 const DepartmentHeadDashboard = () => {
   const { user } = useAuth();
@@ -20,6 +21,13 @@ const DepartmentHeadDashboard = () => {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const activeTab = searchParams.get('tab');
+
+  // Real-time subscriptions for live updates
+  useRealtimeSubscription({ table: 'user_roles', invalidateQueries: ['staff-count'] });
+  useRealtimeSubscription({ table: 'vacation_plans', invalidateQueries: ['pending-vacations'] });
+  useRealtimeSubscription({ table: 'tasks', invalidateQueries: ['active-tasks'] });
+  useRealtimeSubscription({ table: 'schedules', invalidateQueries: ['schedules'] });
+  useRealtimeSubscription({ table: 'shift_assignments', invalidateQueries: ['shift-assignments'] });
 
   const { data: userRole, isLoading: roleLoading, error: roleError } = useQuery({
     queryKey: ['department-head-role', user?.id],
