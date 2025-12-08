@@ -326,6 +326,36 @@ export type Database = {
         }
         Relationships: []
       }
+      organizations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -1084,6 +1114,7 @@ export type Database = {
           max_vacation_splits: number
           min_vacation_notice_days: number | null
           name: string
+          organization_id: string | null
           updated_at: string
           vacation_year_start_month: number | null
         }
@@ -1095,6 +1126,7 @@ export type Database = {
           max_vacation_splits?: number
           min_vacation_notice_days?: number | null
           name: string
+          organization_id?: string | null
           updated_at?: string
           vacation_year_start_month?: number | null
         }
@@ -1106,10 +1138,19 @@ export type Database = {
           max_vacation_splits?: number
           min_vacation_notice_days?: number | null
           name?: string
+          organization_id?: string | null
           updated_at?: string
           vacation_year_start_month?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workspaces_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

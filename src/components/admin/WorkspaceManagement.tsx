@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Building2, Trash2, FolderTree, Settings } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Building2, Trash2, FolderTree, Settings, Building } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -17,6 +18,7 @@ import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
 const workspaceSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name too long'),
+  organization_id: z.string().uuid('Please select an organization'),
 });
 
 const workspaceSettingsSchema = z.object({
@@ -26,6 +28,7 @@ const workspaceSettingsSchema = z.object({
 const WorkspaceManagement = () => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
+  const [selectedOrgId, setSelectedOrgId] = useState('');
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
   const [manageDepartmentsOpen, setManageDepartmentsOpen] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState<any>(null);
@@ -54,12 +57,26 @@ const WorkspaceManagement = () => {
     invalidateQueries: ['workspace-departments'],
   });
 
+  const { data: organizations } = useQuery({
+    queryKey: ['organizations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: workspaces, isLoading } = useQuery({
     queryKey: ['workspaces'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('workspaces')
-        .select('*')
+        .select('*, organizations(id, name)')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -130,15 +147,19 @@ const WorkspaceManagement = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const validated = workspaceSchema.parse({ name });
+    mutationFn: async ({ name, organizationId }: { name: string; organizationId: string }) => {
+      const validated = workspaceSchema.parse({ name, organization_id: organizationId });
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
         .from('workspaces')
-        .insert([{ name: validated.name, created_by: user.id }])
+        .insert([{ 
+          name: validated.name, 
+          organization_id: validated.organization_id,
+          created_by: user.id 
+        }])
         .select()
         .single();
 
@@ -147,8 +168,10 @@ const WorkspaceManagement = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      queryClient.invalidateQueries({ queryKey: ['workspaces-by-org'] });
       toast.success('Workspace created successfully');
       setName('');
+      setSelectedOrgId('');
       setOpen(false);
     },
     onError: (error: any) => {
@@ -280,8 +303,13 @@ const WorkspaceManagement = () => {
       toast.error('Name must be at least 2 characters');
       return;
     }
+
+    if (!selectedOrgId) {
+      toast.error('Please select an organization');
+      return;
+    }
     
-    createMutation.mutate(trimmedName);
+    createMutation.mutate({ name: trimmedName, organizationId: selectedOrgId });
   };
 
   const isCategoryAssigned = (categoryId: string) => {
@@ -353,6 +381,21 @@ const WorkspaceManagement = () => {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
+                  <Label htmlFor="workspace-org">Organization</Label>
+                  <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select organization..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {organizations?.map((org) => (
+                        <SelectItem key={org.id} value={org.id}>
+                          {org.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="workspace-name">Workspace Name</Label>
                   <Input
                     id="workspace-name"
@@ -362,7 +405,7 @@ const WorkspaceManagement = () => {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+                <Button type="submit" className="w-full" disabled={createMutation.isPending || !selectedOrgId}>
                   {createMutation.isPending ? 'Creating...' : 'Create Workspace'}
                 </Button>
               </form>
@@ -389,7 +432,15 @@ const WorkspaceManagement = () => {
                     <Building2 className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">{workspace.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">{workspace.name}</h3>
+                      {(workspace as any).organizations && (
+                        <Badge variant="outline" className="text-xs">
+                          <Building className="h-3 w-3 mr-1" />
+                          {(workspace as any).organizations.name}
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       Created {new Date(workspace.created_at).toLocaleDateString()}
                     </p>

@@ -1,5 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Building2, FolderTree, Building } from 'lucide-react';
+import OrganizationManagement from './OrganizationManagement';
 import WorkspaceManagement from './WorkspaceManagement';
 import FacilityUserManagement from './FacilityUserManagement';
 import CategoryDepartmentManagement from './CategoryDepartmentManagement';
@@ -18,21 +19,29 @@ const OrganizationHub = () => {
       }
     >
       <div className="space-y-6">
-      <Tabs defaultValue="workspaces" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs defaultValue="organizations" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="organizations">
+            <Building className="h-4 w-4 mr-2" />
+            Organizations
+          </TabsTrigger>
           <TabsTrigger value="workspaces">
             <Building2 className="h-4 w-4 mr-2" />
             Workspaces
           </TabsTrigger>
           <TabsTrigger value="facilities">
-            <Building className="h-4 w-4 mr-2" />
+            <Building2 className="h-4 w-4 mr-2" />
             Facilities
           </TabsTrigger>
           <TabsTrigger value="categories">
             <FolderTree className="h-4 w-4 mr-2" />
-            Categories & Departments
+            Categories & Depts
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="organizations">
+          <OrganizationManagement />
+        </TabsContent>
 
         <TabsContent value="workspaces">
           <WorkspaceManagement />
