@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { User, Settings, Loader2, Mail, Briefcase } from 'lucide-react';
+import { User, Settings, Loader2, Mail, Briefcase, Phone } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 
@@ -22,6 +22,7 @@ const UserProfile = () => {
   const [profile, setProfile] = useState<any>(null);
   const [roles, setRoles] = useState<any[]>([]);
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -57,6 +58,7 @@ const UserProfile = () => {
       setProfile(profileData);
       setRoles(rolesData || []);
       setFullName(profileData?.full_name || '');
+      setPhone(profileData?.phone || '');
     } catch (error: any) {
       toast.error('Failed to load profile');
     }
@@ -75,13 +77,13 @@ const UserProfile = () => {
 
       const { error } = await supabase
         .from('profiles')
-        .update({ full_name: fullName.trim() })
+        .update({ full_name: fullName.trim(), phone: phone.trim() || null })
         .eq('id', user.id);
 
       if (error) throw error;
 
-      toast.success('Name updated successfully');
-      setProfile({ ...profile, full_name: fullName.trim() });
+      toast.success('Profile updated successfully');
+      setProfile({ ...profile, full_name: fullName.trim(), phone: phone.trim() || null });
     } catch (error: any) {
       toast.error(error.message || 'Failed to update name');
     } finally {
@@ -182,24 +184,38 @@ const UserProfile = () => {
 
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="fullName"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Enter your full name"
-                  disabled={loading}
-                />
-                <Button
-                  onClick={handleUpdateName}
-                  disabled={loading || fullName === profile?.full_name}
-                  size="sm"
-                >
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Update
-                </Button>
-              </div>
+              <Input
+                id="fullName"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Enter your full name"
+                disabled={loading}
+              />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                Phone
+              </Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Enter your phone number"
+                disabled={loading}
+              />
+            </div>
+
+            <Button
+              onClick={handleUpdateName}
+              disabled={loading || (fullName === profile?.full_name && phone === (profile?.phone || ''))}
+              className="w-full"
+            >
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Update Profile
+            </Button>
           </div>
 
           <Separator />
