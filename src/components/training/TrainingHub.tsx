@@ -5,6 +5,7 @@ import TrainingEventForm from './TrainingEventForm';
 import TrainingRegistrations from './TrainingRegistrations';
 import TrainingCalendarView from './TrainingCalendarView';
 import AttendanceChecklist from './AttendanceChecklist';
+import AttendanceEventSelector from './AttendanceEventSelector';
 import GroupManagement from './GroupManagement';
 import { useUserRole } from '@/hooks/useUserRole';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -15,6 +16,7 @@ import { useState } from 'react';
 const TrainingHub = () => {
   const { data: roles, isLoading } = useUserRole();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [attendanceEventId, setAttendanceEventId] = useState<string | null>(null);
   
   const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
   const isAdmin = roles?.some(r => 
@@ -60,7 +62,7 @@ const TrainingHub = () => {
                   <Users className="h-4 w-4 mr-2" />
                   Manage Events
                 </TabsTrigger>
-                <TabsTrigger value="attendance">
+                <TabsTrigger value="attendance" onClick={() => setAttendanceEventId(null)}>
                   <UserCheck className="h-4 w-4 mr-2" />
                   Attendance
                 </TabsTrigger>
@@ -110,14 +112,13 @@ const TrainingHub = () => {
               </TabsContent>
 
               <TabsContent value="attendance">
-                <TrainingEventList 
-                  showAll={true}
-                  isAdminView={true}
-                  onSelectEvent={setSelectedEventId}
+                <AttendanceEventSelector 
+                  onSelectEvent={setAttendanceEventId}
+                  selectedEventId={attendanceEventId}
                 />
-                {selectedEventId && (
+                {attendanceEventId && (
                   <div className="mt-6">
-                    <AttendanceChecklist eventId={selectedEventId} />
+                    <AttendanceChecklist eventId={attendanceEventId} />
                   </div>
                 )}
               </TabsContent>
