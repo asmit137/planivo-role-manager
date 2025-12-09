@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { PageHeader, LoadingState } from '@/components/layout';
 import { StatsCard } from '@/components/shared';
-import { Building2, Users, FolderTree } from 'lucide-react';
+import { Building2, Users, FolderTree, ClipboardList, Calendar, CalendarClock } from 'lucide-react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorState } from '@/components/layout/ErrorState';
 import FacilityUserManagement from '@/components/admin/FacilityUserManagement';
@@ -12,8 +12,11 @@ import CategoryDepartmentManagement from '@/components/admin/CategoryDepartmentM
 import WorkspaceModuleManagement from '@/components/admin/WorkspaceModuleManagement';
 import { VacationHub } from '@/modules/vacation';
 import TrainingHub from '@/components/training/TrainingHub';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import TaskManager from '@/components/tasks/TaskManager';
+import { SchedulingHub } from '@/components/scheduling';
+import { UnifiedUserHub } from '@/components/users';
+import { MessagingHub } from '@/modules/messaging';
+import { NotificationHub } from '@/modules/notifications';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
@@ -30,6 +33,9 @@ const GeneralAdminDashboard = () => {
   useRealtimeSubscription({ table: 'facilities', invalidateQueries: ['workspace-stats'] });
   useRealtimeSubscription({ table: 'user_roles', invalidateQueries: ['workspace-stats'] });
   useRealtimeSubscription({ table: 'departments', invalidateQueries: ['workspace-stats'] });
+  useRealtimeSubscription({ table: 'tasks', invalidateQueries: ['workspace-tasks-stats'] });
+  useRealtimeSubscription({ table: 'vacation_plans', invalidateQueries: ['workspace-vacation-stats'] });
+  useRealtimeSubscription({ table: 'schedules', invalidateQueries: ['workspace-schedules-stats'] });
 
   const { data: userRole } = useQuery({
     queryKey: ['general-admin-role', user?.id],
@@ -51,7 +57,7 @@ const GeneralAdminDashboard = () => {
     queryFn: async () => {
       if (!userRole?.workspace_id) return null;
 
-      const [facilities, users, departments] = await Promise.all([
+      const [facilities, users, departments, pendingVacations, activeTasks, publishedSchedules] = await Promise.all([
         supabase
           .from('facilities')
           .select('id', { count: 'exact', head: true })
@@ -64,12 +70,29 @@ const GeneralAdminDashboard = () => {
           .from('departments')
           .select('id', { count: 'exact', head: true })
           .eq('facility_id', 'in.(select id from facilities where workspace_id = ' + userRole.workspace_id + ')'),
+        supabase
+          .from('vacation_plans')
+          .select('id', { count: 'exact', head: true })
+          .in('status', ['department_pending', 'facility_pending', 'workspace_pending']),
+        supabase
+          .from('tasks')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', userRole.workspace_id)
+          .eq('status', 'active'),
+        supabase
+          .from('schedules')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', userRole.workspace_id)
+          .eq('status', 'published'),
       ]);
 
       return {
         facilities: facilities.count || 0,
         users: users.count || 0,
         departments: departments.count || 0,
+        pendingVacations: pendingVacations.count || 0,
+        activeTasks: activeTasks.count || 0,
+        publishedSchedules: publishedSchedules.count || 0,
       };
     },
     enabled: !!userRole?.workspace_id,
@@ -132,11 +155,41 @@ const GeneralAdminDashboard = () => {
           description="Create and manage meetings and training sessions"
         />
       )}
+      {activeTab === 'tasks' && (
+        <PageHeader 
+          title="Task Management" 
+          description="Manage tasks across the workspace"
+        />
+      )}
+      {activeTab === 'scheduling' && (
+        <PageHeader 
+          title="Scheduling" 
+          description="View and manage schedules across the workspace"
+        />
+      )}
+      {activeTab === 'staff' && (
+        <PageHeader 
+          title="Staff Management" 
+          description="Manage staff members in this workspace"
+        />
+      )}
+      {activeTab === 'messaging' && (
+        <PageHeader 
+          title="Messaging" 
+          description="Communicate with workspace members"
+        />
+      )}
+      {activeTab === 'notifications' && (
+        <PageHeader 
+          title="Notifications" 
+          description="View important updates"
+        />
+      )}
       
       <div className="space-y-6">
         {/* Stats Grid - Show in overview or on tabs */}
         {stats && !activeTab && (
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
             <StatsCard
               title="Facilities"
               value={stats.facilities}
@@ -151,6 +204,21 @@ const GeneralAdminDashboard = () => {
               title="Users"
               value={stats.users}
               icon={Users}
+            />
+            <StatsCard
+              title="Pending Vacations"
+              value={stats.pendingVacations}
+              icon={Calendar}
+            />
+            <StatsCard
+              title="Active Tasks"
+              value={stats.activeTasks}
+              icon={ClipboardList}
+            />
+            <StatsCard
+              title="Schedules"
+              value={stats.publishedSchedules}
+              icon={CalendarClock}
             />
           </div>
         )}
@@ -190,6 +258,36 @@ const GeneralAdminDashboard = () => {
           {activeTab === 'training' && hasAccess('training') && (
             <ModuleGuard moduleKey="training">
               <TrainingHub />
+            </ModuleGuard>
+          )}
+
+          {activeTab === 'tasks' && hasAccess('task_management') && (
+            <ModuleGuard moduleKey="task_management">
+              <TaskManager scopeType="workspace" scopeId={userRole.workspace_id} />
+            </ModuleGuard>
+          )}
+
+          {activeTab === 'scheduling' && hasAccess('scheduling') && (
+            <ModuleGuard moduleKey="scheduling">
+              <SchedulingHub />
+            </ModuleGuard>
+          )}
+
+          {activeTab === 'staff' && hasAccess('staff_management') && (
+            <ModuleGuard moduleKey="staff_management">
+              <UnifiedUserHub scope="workspace" scopeId={userRole.workspace_id} />
+            </ModuleGuard>
+          )}
+
+          {activeTab === 'messaging' && hasAccess('messaging') && (
+            <ModuleGuard moduleKey="messaging">
+              <MessagingHub />
+            </ModuleGuard>
+          )}
+
+          {activeTab === 'notifications' && hasAccess('notifications') && (
+            <ModuleGuard moduleKey="notifications">
+              <NotificationHub />
             </ModuleGuard>
           )}
         </div>

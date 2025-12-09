@@ -1,3 +1,6 @@
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/lib/auth';
 import { PageHeader } from '@/components/layout';
 import StaffTaskView from '@/components/tasks/StaffTaskView';
 import { VacationHub } from '@/modules/vacation';
@@ -8,22 +11,49 @@ import TrainingHub from '@/components/training/TrainingHub';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
-import { ClipboardList, Calendar, MessageSquare, Bell, CalendarClock, GraduationCap } from 'lucide-react';
+import { ClipboardList, Calendar } from 'lucide-react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorState } from '@/components/layout/ErrorState';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
 const StaffDashboard = () => {
+  const { user } = useAuth();
   const { hasAccess } = useModuleContext();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const activeTab = searchParams.get('tab');
 
   // Real-time subscriptions for live updates
-  useRealtimeSubscription({ table: 'task_assignments', invalidateQueries: ['my-tasks'] });
-  useRealtimeSubscription({ table: 'vacation_plans', invalidateQueries: ['my-vacation'] });
+  useRealtimeSubscription({ table: 'task_assignments', invalidateQueries: ['my-tasks', 'staff-stats'] });
+  useRealtimeSubscription({ table: 'vacation_plans', invalidateQueries: ['my-vacation', 'staff-stats'] });
   useRealtimeSubscription({ table: 'shift_assignments', invalidateQueries: ['my-schedule'] });
   useRealtimeSubscription({ table: 'notifications', invalidateQueries: ['notifications'] });
+
+  const { data: stats } = useQuery({
+    queryKey: ['staff-stats', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+
+      const [myTasks, myVacations] = await Promise.all([
+        supabase
+          .from('task_assignments')
+          .select('id', { count: 'exact', head: true })
+          .eq('assigned_to', user.id)
+          .eq('status', 'pending'),
+        supabase
+          .from('vacation_plans')
+          .select('id', { count: 'exact', head: true })
+          .eq('staff_id', user.id)
+          .neq('status', 'rejected'),
+      ]);
+
+      return {
+        myTasks: myTasks.count || 0,
+        myVacations: myVacations.count || 0,
+      };
+    },
+    enabled: !!user?.id,
+  });
 
   return (
     <ErrorBoundary
@@ -87,16 +117,16 @@ const StaffDashboard = () => {
                 <p className="text-sm font-medium text-muted-foreground">My Tasks</p>
                 <ClipboardList className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">-</p>
-              <p className="text-xs text-muted-foreground mt-2">View from Tasks tab</p>
+              <p className="text-3xl font-bold mt-2">{stats?.myTasks ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">Pending tasks assigned to you</p>
             </div>
             <div className="rounded-lg border bg-card p-6">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">My Vacation</p>
                 <Calendar className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">-</p>
-              <p className="text-xs text-muted-foreground mt-2">View from Vacation tab</p>
+              <p className="text-3xl font-bold mt-2">{stats?.myVacations ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">Your vacation requests</p>
             </div>
           </div>
         )}

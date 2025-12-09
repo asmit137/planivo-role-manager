@@ -50,6 +50,37 @@ const FacilitySupervisorDashboard = () => {
     enabled: !!user,
   });
 
+  const { data: stats } = useQuery({
+    queryKey: ['facility-stats', userRole?.facility_id],
+    queryFn: async () => {
+      if (!userRole?.facility_id) return null;
+
+      const [activeTasks, pendingApprovals, conflicts] = await Promise.all([
+        supabase
+          .from('tasks')
+          .select('id', { count: 'exact', head: true })
+          .eq('facility_id', userRole.facility_id)
+          .eq('status', 'active'),
+        supabase
+          .from('vacation_plans')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'facility_pending'),
+        supabase
+          .from('vacation_approvals')
+          .select('id', { count: 'exact', head: true })
+          .eq('has_conflict', true)
+          .eq('status', 'approved'),
+      ]);
+
+      return {
+        activeTasks: activeTasks.count || 0,
+        pendingApprovals: pendingApprovals.count || 0,
+        conflicts: conflicts.count || 0,
+      };
+    },
+    enabled: !!userRole?.facility_id,
+  });
+
   if (!userRole?.facility_id) {
     return <LoadingState message="Loading facility information..." />;
   }
@@ -134,24 +165,24 @@ const FacilitySupervisorDashboard = () => {
                 <p className="text-sm font-medium text-muted-foreground">Active Tasks</p>
                 <ClipboardList className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">-</p>
-              <p className="text-xs text-muted-foreground mt-2">View from Tasks tab</p>
+              <p className="text-3xl font-bold mt-2">{stats?.activeTasks ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">Facility-wide active tasks</p>
             </div>
             <div className="rounded-lg border bg-card p-6">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Pending Approvals</p>
                 <CheckSquare className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">-</p>
-              <p className="text-xs text-muted-foreground mt-2">View from Approvals tab</p>
+              <p className="text-3xl font-bold mt-2">{stats?.pendingApprovals ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">Awaiting your approval</p>
             </div>
             <div className="rounded-lg border bg-card p-6">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Conflicts</p>
                 <AlertCircle className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">-</p>
-              <p className="text-xs text-muted-foreground mt-2">View from Conflicts tab</p>
+              <p className="text-3xl font-bold mt-2">{stats?.conflicts ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">Approved with conflicts</p>
             </div>
           </div>
         )}
