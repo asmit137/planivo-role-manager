@@ -55,11 +55,37 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
     }
   }, [departmentId]);
 
-  // Fetch available departments (all template departments available in the system)
+  // Fetch available departments (workspace-assigned templates or all templates)
   const { data: availableDepartments } = useQuery({
-    queryKey: ['available-departments-for-scheduling'],
+    queryKey: ['available-departments-for-scheduling', departmentId],
     queryFn: async () => {
-      // Get all template departments (system-wide)
+      // Get workspace from current department's facility
+      const { data: currentDept } = await supabase
+        .from('departments')
+        .select('id, name, facility_id, facilities(workspace_id)')
+        .eq('id', departmentId)
+        .maybeSingle();
+
+      const workspaceId = (currentDept?.facilities as any)?.workspace_id;
+      
+      // Try workspace-assigned departments first
+      if (workspaceId) {
+        const { data: workspaceDepts } = await supabase
+          .from('workspace_departments')
+          .select('department_template_id, departments:department_template_id(id, name)')
+          .eq('workspace_id', workspaceId);
+
+        if (workspaceDepts && workspaceDepts.length > 0) {
+          return workspaceDepts
+            .filter(wd => wd.departments)
+            .map(wd => ({
+              id: (wd.departments as any).id,
+              name: (wd.departments as any).name
+            }));
+        }
+      }
+
+      // Fall back to all template departments
       const { data: templateDepts, error } = await supabase
         .from('departments')
         .select('id, name')
