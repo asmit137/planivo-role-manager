@@ -53,44 +53,50 @@ const DepartmentHeadDashboard = () => {
   });
 
   // Count queries for overview - MUST be before early returns
-  const { data: staffCount } = useQuery({
-    queryKey: ['staff-count', userRole?.department_id],
+  const { data: departmentStats } = useQuery({
+    queryKey: ['department-stats', userRole?.department_id],
     queryFn: async () => {
-      if (!userRole?.department_id) return 0;
-      const { count } = await supabase
-        .from('user_roles')
-        .select('*', { count: 'exact', head: true })
-        .eq('department_id', userRole.department_id)
-        .eq('role', 'staff');
-      return count || 0;
-    },
-    enabled: !!userRole?.department_id,
-  });
+      if (!userRole?.department_id) return null;
 
-  const { data: pendingVacations } = useQuery({
-    queryKey: ['pending-vacations', userRole?.department_id],
-    queryFn: async () => {
-      if (!userRole?.department_id) return 0;
-      const { count } = await supabase
-        .from('vacation_plans')
-        .select('*', { count: 'exact', head: true })
-        .eq('department_id', userRole.department_id)
-        .eq('status', 'draft');
-      return count || 0;
-    },
-    enabled: !!userRole?.department_id,
-  });
+      const today = new Date().toISOString().split('T')[0];
 
-  const { data: activeTasks } = useQuery({
-    queryKey: ['active-tasks', userRole?.department_id],
-    queryFn: async () => {
-      if (!userRole?.department_id) return 0;
-      const { count } = await supabase
-        .from('tasks')
-        .select('*', { count: 'exact', head: true })
-        .eq('department_id', userRole.department_id)
-        .eq('status', 'active');
-      return count || 0;
+      const [staffCount, pendingVacations, activeTasks, staffOnVacation, upcomingTraining] = await Promise.all([
+        supabase
+          .from('user_roles')
+          .select('*', { count: 'exact', head: true })
+          .eq('department_id', userRole.department_id)
+          .eq('role', 'staff'),
+        supabase
+          .from('vacation_plans')
+          .select('*', { count: 'exact', head: true })
+          .eq('department_id', userRole.department_id)
+          .eq('status', 'department_pending'),
+        supabase
+          .from('tasks')
+          .select('*', { count: 'exact', head: true })
+          .eq('department_id', userRole.department_id)
+          .eq('status', 'active'),
+        supabase
+          .from('vacation_splits')
+          .select('id, vacation_plans!inner(status, department_id)', { count: 'exact', head: true })
+          .lte('start_date', today)
+          .gte('end_date', today)
+          .eq('vacation_plans.status', 'approved')
+          .eq('vacation_plans.department_id', userRole.department_id),
+        supabase
+          .from('training_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'published')
+          .gt('start_datetime', new Date().toISOString()),
+      ]);
+
+      return {
+        staffCount: staffCount.count || 0,
+        pendingVacations: pendingVacations.count || 0,
+        activeTasks: activeTasks.count || 0,
+        staffOnVacation: staffOnVacation.count || 0,
+        upcomingTraining: upcomingTraining.count || 0,
+      };
     },
     enabled: !!userRole?.department_id,
   });
@@ -173,27 +179,46 @@ const DepartmentHeadDashboard = () => {
       
       <div className="space-y-4">
         {!['staff','vacation','tasks','messaging','notifications','scheduling'].includes(activeTab || '') && (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
             <div className="rounded-lg border bg-card p-6">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Total Staff</p>
                 <UserPlus className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">{staffCount || 0}</p>
+              <p className="text-3xl font-bold mt-2">{departmentStats?.staffCount || 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">In your department</p>
             </div>
             <div className="rounded-lg border bg-card p-6">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-muted-foreground">Pending Requests</p>
+                <p className="text-sm font-medium text-muted-foreground">Pending Approvals</p>
                 <Calendar className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">{pendingVacations || 0}</p>
+              <p className="text-3xl font-bold mt-2">{departmentStats?.pendingVacations || 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">Vacation requests</p>
             </div>
             <div className="rounded-lg border bg-card p-6">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Active Tasks</p>
                 <ClipboardList className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">{activeTasks || 0}</p>
+              <p className="text-3xl font-bold mt-2">{departmentStats?.activeTasks || 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">Department tasks</p>
+            </div>
+            <div className="rounded-lg border bg-card p-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">On Vacation Today</p>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-3xl font-bold mt-2">{departmentStats?.staffOnVacation || 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">Staff currently off</p>
+            </div>
+            <div className="rounded-lg border bg-card p-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">Upcoming Training</p>
+                <GraduationCap className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-3xl font-bold mt-2">{departmentStats?.upcomingTraining || 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">Scheduled events</p>
             </div>
           </div>
         )}

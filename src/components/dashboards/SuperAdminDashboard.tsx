@@ -1,7 +1,7 @@
 import { PageHeader } from '@/components/layout';
 import { StatsCard } from '@/components/shared';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Building2, Calendar, ClipboardList, CheckCircle, XCircle, Clock, TrendingUp, Building, LayoutDashboard, Folders, UserCircle, FolderTree, Settings, Code, CalendarClock, GraduationCap } from 'lucide-react';
+import { Users, Building2, Calendar, ClipboardList, CheckCircle, XCircle, Clock, TrendingUp, Building, LayoutDashboard, Folders, UserCircle, FolderTree, Settings, Code, CalendarClock, GraduationCap, MessageSquare, Video } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Separator } from '@/components/ui/separator';
@@ -52,6 +52,17 @@ const SuperAdminDashboard = () => {
     },
   });
 
+  const { data: organizations } = useQuery({
+    queryKey: ['organizations-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('organizations')
+        .select('*', { count: 'exact', head: true });
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
   const { data: totalUsers } = useQuery({
     queryKey: ['totalUsers'],
     queryFn: async () => {
@@ -83,6 +94,52 @@ const SuperAdminDashboard = () => {
         .select('*', { count: 'exact', head: true });
       if (error) throw error;
       return count || 0;
+    },
+  });
+
+  // Meetings & Training Stats
+  const { data: meetingStats } = useQuery({
+    queryKey: ['meeting-stats'],
+    queryFn: async () => {
+      const [totalMeetings, totalAttendance, upcomingMeetings] = await Promise.all([
+        supabase.from('training_events').select('*', { count: 'exact', head: true }),
+        supabase.from('training_attendance').select('*', { count: 'exact', head: true }),
+        supabase.from('training_events').select('*', { count: 'exact', head: true })
+          .eq('status', 'published')
+          .gt('start_datetime', new Date().toISOString()),
+      ]);
+      return {
+        totalMeetings: totalMeetings.count || 0,
+        totalAttendance: totalAttendance.count || 0,
+        upcomingMeetings: upcomingMeetings.count || 0,
+      };
+    },
+  });
+
+  // Messages Stats
+  const { data: messageStats } = useQuery({
+    queryKey: ['message-stats'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true });
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
+  // Schedules Stats  
+  const { data: scheduleStats } = useQuery({
+    queryKey: ['schedule-stats'],
+    queryFn: async () => {
+      const [totalSchedules, publishedSchedules] = await Promise.all([
+        supabase.from('schedules').select('*', { count: 'exact', head: true }),
+        supabase.from('schedules').select('*', { count: 'exact', head: true }).eq('status', 'published'),
+      ]);
+      return {
+        total: totalSchedules.count || 0,
+        published: publishedSchedules.count || 0,
+      };
     },
   });
 
@@ -246,7 +303,12 @@ const SuperAdminDashboard = () => {
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
           {/* Main Stats Grid */}
-          <div className="grid gap-6 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-8">
+            <StatsCard
+              title="Organizations"
+              value={organizations || 0}
+              icon={Building}
+            />
             <StatsCard
               title="Workspaces"
               value={workspaces?.length || 0}
@@ -261,12 +323,27 @@ const SuperAdminDashboard = () => {
             <StatsCard
               title="Facilities"
               value={facilities || 0}
-              icon={Building}
+              icon={LayoutDashboard}
             />
             <StatsCard
-              title="Departments"
-              value={departments || 0}
-              icon={FolderTree}
+              title="Total Meetings"
+              value={meetingStats?.totalMeetings || 0}
+              icon={Video}
+            />
+            <StatsCard
+              title="Meeting Attendance"
+              value={meetingStats?.totalAttendance || 0}
+              icon={GraduationCap}
+            />
+            <StatsCard
+              title="Total Messages"
+              value={messageStats || 0}
+              icon={MessageSquare}
+            />
+            <StatsCard
+              title="Published Schedules"
+              value={scheduleStats?.published || 0}
+              icon={CalendarClock}
             />
           </div>
 

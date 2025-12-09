@@ -9,7 +9,7 @@ import VacationApprovalWorkflow from '@/components/vacation/VacationApprovalWork
 import VacationCalendarView from '@/components/vacation/VacationCalendarView';
 import { VacationHub } from '@/modules/vacation';
 import TrainingHub from '@/components/training/TrainingHub';
-import { ClipboardList, CheckSquare, AlertCircle, CalendarClock, GraduationCap } from 'lucide-react';
+import { ClipboardList, CheckSquare, AlertCircle, CalendarClock, GraduationCap, Calendar, Users } from 'lucide-react';
 import VacationConflictDashboard from '@/components/vacation/VacationConflictDashboard';
 import { UnifiedUserHub } from '@/components/users';
 import { ModuleGuard } from '@/components/ModuleGuard';
@@ -55,7 +55,9 @@ const FacilitySupervisorDashboard = () => {
     queryFn: async () => {
       if (!userRole?.facility_id) return null;
 
-      const [activeTasks, pendingApprovals, conflicts] = await Promise.all([
+      const today = new Date().toISOString().split('T')[0];
+
+      const [activeTasks, pendingApprovals, conflicts, activeSchedules, staffOnVacation] = await Promise.all([
         supabase
           .from('tasks')
           .select('id', { count: 'exact', head: true })
@@ -70,12 +72,25 @@ const FacilitySupervisorDashboard = () => {
           .select('id', { count: 'exact', head: true })
           .eq('has_conflict', true)
           .eq('status', 'approved'),
+        supabase
+          .from('schedules')
+          .select('id', { count: 'exact', head: true })
+          .eq('facility_id', userRole.facility_id)
+          .eq('status', 'published'),
+        supabase
+          .from('vacation_splits')
+          .select('id, vacation_plans!inner(status)', { count: 'exact', head: true })
+          .lte('start_date', today)
+          .gte('end_date', today)
+          .eq('vacation_plans.status', 'approved'),
       ]);
 
       return {
         activeTasks: activeTasks.count || 0,
         pendingApprovals: pendingApprovals.count || 0,
         conflicts: conflicts.count || 0,
+        activeSchedules: activeSchedules.count || 0,
+        staffOnVacation: staffOnVacation.count || 0,
       };
     },
     enabled: !!userRole?.facility_id,
@@ -159,7 +174,7 @@ const FacilitySupervisorDashboard = () => {
       
       <div className="space-y-4">
         {!activeTab && (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
             <div className="rounded-lg border bg-card p-6">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Active Tasks</p>
@@ -183,6 +198,22 @@ const FacilitySupervisorDashboard = () => {
               </div>
               <p className="text-3xl font-bold mt-2">{stats?.conflicts ?? 0}</p>
               <p className="text-xs text-muted-foreground mt-2">Approved with conflicts</p>
+            </div>
+            <div className="rounded-lg border bg-card p-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">Active Schedules</p>
+                <CalendarClock className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-3xl font-bold mt-2">{stats?.activeSchedules ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">Published schedules</p>
+            </div>
+            <div className="rounded-lg border bg-card p-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">On Vacation Today</p>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-3xl font-bold mt-2">{stats?.staffOnVacation ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">Staff currently off</p>
             </div>
           </div>
         )}

@@ -9,7 +9,7 @@ import VacationApprovalWorkflow from '@/components/vacation/VacationApprovalWork
 import VacationCalendarView from '@/components/vacation/VacationCalendarView';
 import { VacationHub } from '@/modules/vacation';
 import TrainingHub from '@/components/training/TrainingHub';
-import { ClipboardList, CheckSquare, AlertCircle, GraduationCap } from 'lucide-react';
+import { ClipboardList, CheckSquare, AlertCircle, GraduationCap, Calendar, CalendarClock } from 'lucide-react';
 import VacationConflictDashboard from '@/components/vacation/VacationConflictDashboard';
 import { UnifiedUserHub } from '@/components/users';
 import { ModuleGuard } from '@/components/ModuleGuard';
@@ -46,49 +46,49 @@ const WorkplaceSupervisorDashboard = () => {
     enabled: !!user,
   });
 
-  // Fetch workspace tasks count
-  const { data: tasksCount } = useQuery({
-    queryKey: ['workspace-tasks-count', userRole?.workspace_id],
+  // Fetch workspace stats
+  const { data: stats } = useQuery({
+    queryKey: ['workspace-supervisor-stats', userRole?.workspace_id],
     queryFn: async () => {
-      if (!userRole?.workspace_id) return 0;
-      const { count, error } = await supabase
-        .from('tasks')
-        .select('*', { count: 'exact', head: true })
-        .eq('workspace_id', userRole.workspace_id)
-        .in('status', ['pending', 'in_progress']);
-      if (error) throw error;
-      return count || 0;
-    },
-    enabled: !!userRole?.workspace_id,
-  });
+      if (!userRole?.workspace_id) return null;
 
-  // Fetch pending approvals count (workspace_pending)
-  const { data: approvalsCount } = useQuery({
-    queryKey: ['workspace-approvals-count', userRole?.workspace_id],
-    queryFn: async () => {
-      if (!userRole?.workspace_id) return 0;
-      const { count, error } = await supabase
-        .from('vacation_plans')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'workspace_pending');
-      if (error) throw error;
-      return count || 0;
-    },
-    enabled: !!userRole?.workspace_id,
-  });
+      const today = new Date().toISOString().split('T')[0];
 
-  // Fetch conflicts count
-  const { data: conflictsCount } = useQuery({
-    queryKey: ['workspace-conflicts-count', userRole?.workspace_id],
-    queryFn: async () => {
-      if (!userRole?.workspace_id) return 0;
-      const { count, error } = await supabase
-        .from('vacation_approvals')
-        .select('*', { count: 'exact', head: true })
-        .eq('has_conflict', true)
-        .in('status', ['pending', 'approved']);
-      if (error) throw error;
-      return count || 0;
+      const [tasksCount, approvalsCount, conflictsCount, staffOnVacation, publishedSchedules] = await Promise.all([
+        supabase
+          .from('tasks')
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', userRole.workspace_id)
+          .eq('status', 'active'),
+        supabase
+          .from('vacation_plans')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'workspace_pending'),
+        supabase
+          .from('vacation_approvals')
+          .select('*', { count: 'exact', head: true })
+          .eq('has_conflict', true)
+          .in('status', ['pending', 'approved']),
+        supabase
+          .from('vacation_splits')
+          .select('id, vacation_plans!inner(status)', { count: 'exact', head: true })
+          .lte('start_date', today)
+          .gte('end_date', today)
+          .eq('vacation_plans.status', 'approved'),
+        supabase
+          .from('schedules')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', userRole.workspace_id)
+          .eq('status', 'published'),
+      ]);
+
+      return {
+        activeTasks: tasksCount.count || 0,
+        pendingApprovals: approvalsCount.count || 0,
+        conflicts: conflictsCount.count || 0,
+        staffOnVacation: staffOnVacation.count || 0,
+        publishedSchedules: publishedSchedules.count || 0,
+      };
     },
     enabled: !!userRole?.workspace_id,
   });
@@ -165,21 +165,21 @@ const WorkplaceSupervisorDashboard = () => {
       
       <div className="space-y-4">
         {!activeTab && (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
             <div className="rounded-lg border bg-card p-6">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Active Tasks</p>
                 <ClipboardList className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">{tasksCount ?? '-'}</p>
-              <p className="text-xs text-muted-foreground mt-2">Tasks in progress</p>
+              <p className="text-3xl font-bold mt-2">{stats?.activeTasks ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">Workspace tasks</p>
             </div>
             <div className="rounded-lg border bg-card p-6">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Pending Approvals</p>
                 <CheckSquare className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">{approvalsCount ?? '-'}</p>
+              <p className="text-3xl font-bold mt-2">{stats?.pendingApprovals ?? 0}</p>
               <p className="text-xs text-muted-foreground mt-2">Awaiting final approval</p>
             </div>
             <div className="rounded-lg border bg-card p-6">
@@ -187,8 +187,24 @@ const WorkplaceSupervisorDashboard = () => {
                 <p className="text-sm font-medium text-muted-foreground">Conflicts</p>
                 <AlertCircle className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">{conflictsCount ?? '-'}</p>
+              <p className="text-3xl font-bold mt-2">{stats?.conflicts ?? 0}</p>
               <p className="text-xs text-muted-foreground mt-2">Vacation conflicts</p>
+            </div>
+            <div className="rounded-lg border bg-card p-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">On Vacation Today</p>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-3xl font-bold mt-2">{stats?.staffOnVacation ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">Staff currently off</p>
+            </div>
+            <div className="rounded-lg border bg-card p-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">Active Schedules</p>
+                <CalendarClock className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-3xl font-bold mt-2">{stats?.publishedSchedules ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">Published schedules</p>
             </div>
           </div>
         )}

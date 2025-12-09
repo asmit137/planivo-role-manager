@@ -11,7 +11,7 @@ import TrainingHub from '@/components/training/TrainingHub';
 import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
-import { ClipboardList, Calendar } from 'lucide-react';
+import { ClipboardList, Calendar, CalendarClock, Bell } from 'lucide-react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorState } from '@/components/layout/ErrorState';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
@@ -34,7 +34,10 @@ const StaffDashboard = () => {
     queryFn: async () => {
       if (!user?.id) return null;
 
-      const [myTasks, myVacations] = await Promise.all([
+      const today = new Date().toISOString().split('T')[0];
+      const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      const [myTasks, myVacations, myUpcomingShifts, unreadMessages] = await Promise.all([
         supabase
           .from('task_assignments')
           .select('id', { count: 'exact', head: true })
@@ -45,11 +48,24 @@ const StaffDashboard = () => {
           .select('id', { count: 'exact', head: true })
           .eq('staff_id', user.id)
           .neq('status', 'rejected'),
+        supabase
+          .from('shift_assignments')
+          .select('id', { count: 'exact', head: true })
+          .eq('staff_id', user.id)
+          .gte('assignment_date', today)
+          .lte('assignment_date', nextWeek),
+        supabase
+          .from('notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('is_read', false),
       ]);
 
       return {
         myTasks: myTasks.count || 0,
         myVacations: myVacations.count || 0,
+        upcomingShifts: myUpcomingShifts.count || 0,
+        unreadMessages: unreadMessages.count || 0,
       };
     },
     enabled: !!user?.id,
@@ -111,14 +127,14 @@ const StaffDashboard = () => {
       
       <div className="space-y-4">
         {!activeTab && (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-lg border bg-card p-6">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-muted-foreground">My Tasks</p>
+                <p className="text-sm font-medium text-muted-foreground">Pending Tasks</p>
                 <ClipboardList className="h-4 w-4 text-muted-foreground" />
               </div>
               <p className="text-3xl font-bold mt-2">{stats?.myTasks ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-2">Pending tasks assigned to you</p>
+              <p className="text-xs text-muted-foreground mt-2">Tasks assigned to you</p>
             </div>
             <div className="rounded-lg border bg-card p-6">
               <div className="flex items-center justify-between">
@@ -126,7 +142,23 @@ const StaffDashboard = () => {
                 <Calendar className="h-4 w-4 text-muted-foreground" />
               </div>
               <p className="text-3xl font-bold mt-2">{stats?.myVacations ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-2">Your vacation requests</p>
+              <p className="text-xs text-muted-foreground mt-2">Active vacation requests</p>
+            </div>
+            <div className="rounded-lg border bg-card p-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">Upcoming Shifts</p>
+                <CalendarClock className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-3xl font-bold mt-2">{stats?.upcomingShifts ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">Shifts in next 7 days</p>
+            </div>
+            <div className="rounded-lg border bg-card p-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">Unread Notifications</p>
+                <Bell className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-3xl font-bold mt-2">{stats?.unreadMessages ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-2">New messages & alerts</p>
             </div>
           </div>
         )}
