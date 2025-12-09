@@ -85,16 +85,26 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
     queryFn: async () => {
       if (!selectedStaffId) return [];
 
-      const { data, error } = await supabase
-        .from('vacation_splits')
-        .select(`*, vacation_plan:vacation_plan_id (staff_id, status)`)
-        .eq('vacation_plan.staff_id', selectedStaffId);
+      // First get vacation plans for this staff
+      const { data: plans, error: plansError } = await supabase
+        .from('vacation_plans')
+        .select('id, status')
+        .eq('staff_id', selectedStaffId)
+        .in('status', ['approved', 'department_pending', 'facility_pending', 'workspace_pending']);
 
-      if (error) throw error;
-      return data?.filter((v: any) => 
-        v.vacation_plan?.status === 'approved' || 
-        v.vacation_plan?.status?.includes('pending')
-      ) || [];
+      if (plansError) throw plansError;
+      if (!plans || plans.length === 0) return [];
+
+      const planIds = plans.map(p => p.id);
+
+      // Then get splits for those plans
+      const { data: splits, error: splitsError } = await supabase
+        .from('vacation_splits')
+        .select('*')
+        .in('vacation_plan_id', planIds);
+
+      if (splitsError) throw splitsError;
+      return splits || [];
     },
     enabled: !!selectedStaffId,
   });
