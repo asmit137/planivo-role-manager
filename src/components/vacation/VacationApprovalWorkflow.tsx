@@ -438,7 +438,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <p className="text-sm font-medium">Vacation Type</p>
                       <p className="text-sm text-muted-foreground">
@@ -482,15 +482,15 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                         {plan.vacation_splits.map((split: any, index: number) => (
                           <div
                             key={split.id}
-                            className="flex items-center justify-between p-2 bg-accent rounded"
+                            className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-2 sm:p-3 bg-accent rounded gap-2"
                           >
-                            <span className="text-sm">Segment {index + 1}</span>
-                            <span className="text-sm font-medium">
+                            <span className="text-sm font-medium">Segment {index + 1}</span>
+                            <span className="text-xs sm:text-sm font-medium">
                               {format(new Date(split.start_date), 'PPP')} →{' '}
                               {format(new Date(split.end_date), 'PPP')}
                             </span>
                             <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">
+                              <span className="text-xs sm:text-sm text-muted-foreground">
                                 {split.days} days
                               </span>
                               {split.status && split.status !== 'pending' && (
@@ -510,7 +510,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
 
                   <Separator />
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button
                       onClick={() => handleApprovalAction(plan, 'approve')}
                       className="flex-1"

@@ -147,15 +147,16 @@ const BulkUserUpload = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
             <Input
               type="file"
               accept=".xlsx,.xls"
               onChange={handleFileSelect}
               disabled={uploadMutation.isPending}
+              className="min-h-[44px]"
             />
             {file && (
-              <Badge variant="secondary" className="whitespace-nowrap">
+              <Badge variant="secondary" className="whitespace-nowrap py-2 justify-center">
                 {file.name}
               </Badge>
             )}
@@ -170,7 +171,7 @@ const BulkUserUpload = () => {
                 </AlertDescription>
               </Alert>
 
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

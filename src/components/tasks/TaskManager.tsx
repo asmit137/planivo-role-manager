@@ -252,7 +252,7 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Due Date</Label>
                 <Popover>
@@ -320,12 +320,12 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <Button type="submit" disabled={createTaskMutation.isPending}>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button type="submit" disabled={createTaskMutation.isPending} className="w-full sm:w-auto min-h-[44px]">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Task
               </Button>
-              <Button type="button" variant="outline" onClick={resetForm}>
+              <Button type="button" variant="outline" onClick={resetForm} className="w-full sm:w-auto min-h-[44px]">
                 Reset
               </Button>
             </div>
@@ -340,10 +340,10 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
         <CardContent>
           <div className="space-y-4">
             {tasks?.map((task) => (
-              <div key={task.id} className="border p-4 rounded-lg">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-semibold">{task.title}</h3>
-                  <span className={cn('text-sm font-medium', getPriorityColor(task.priority))}>
+              <div key={task.id} className="border p-3 sm:p-4 rounded-lg">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">
+                  <h3 className="font-semibold text-sm sm:text-base">{task.title}</h3>
+                  <span className={cn('text-xs sm:text-sm font-medium', getPriorityColor(task.priority))}>
                     {task.priority}
                   </span>
                 </div>
