@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -11,10 +11,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Loader2, Calendar, MapPin, Link as LinkIcon, Users, Video } from 'lucide-react';
+import { Loader2, Calendar, MapPin, Link as LinkIcon, Users, Video, UserCheck, Target } from 'lucide-react';
+import EventTargetSelector from './EventTargetSelector';
 
 const eventSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(200),
@@ -28,6 +29,9 @@ const eventSchema = z.object({
   organization_id: z.string().uuid('Please select an organization'),
   max_participants: z.number().min(1).optional().nullable(),
   status: z.enum(['draft', 'published']),
+  // Registration & targeting fields
+  registration_type: z.enum(['open', 'mandatory', 'invite_only']),
+  responsible_user_id: z.string().uuid().optional().nullable(),
   // Video conferencing fields
   enable_video_conference: z.boolean().optional(),
   allow_recording: z.boolean().optional(),
@@ -47,6 +51,8 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
   const { data: roles } = useUserRole();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 
   const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
 
@@ -100,6 +106,62 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
     enabled: !!eventId,
   });
 
+  // Fetch existing targets for editing
+  const { data: existingTargets } = useQuery({
+    queryKey: ['training-event-targets', eventId],
+    queryFn: async () => {
+      if (!eventId) return { departments: [], users: [] };
+      const { data, error } = await supabase
+        .from('training_event_targets')
+        .select('*')
+        .eq('event_id', eventId);
+      if (error) throw error;
+      
+      const departments = data?.filter(t => t.target_type === 'department').map(t => t.department_id!) || [];
+      const users = data?.filter(t => t.target_type === 'user').map(t => t.user_id!) || [];
+      return { departments, users };
+    },
+    enabled: !!eventId,
+  });
+
+  // Fetch potential coordinators (admins in org)
+  const { data: potentialCoordinators } = useQuery({
+    queryKey: ['potential-coordinators', userOrganization?.id, organizations],
+    queryFn: async () => {
+      const orgId = userOrganization?.id || organizations?.[0]?.id;
+      if (!orgId) return [];
+
+      // Get workspaces for this org
+      const { data: workspaces } = await supabase
+        .from('workspaces')
+        .select('id')
+        .eq('organization_id', orgId);
+
+      if (!workspaces?.length) return [];
+      const workspaceIds = workspaces.map(w => w.id);
+
+      // Get admin roles in those workspaces
+      const { data: adminRoles } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .in('workspace_id', workspaceIds)
+        .in('role', ['general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head']);
+
+      if (!adminRoles?.length) return [];
+      const userIds = [...new Set(adminRoles.map(r => r.user_id))];
+
+      // Get profiles
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', userIds)
+        .eq('is_active', true);
+
+      return profiles || [];
+    },
+    enabled: !!userOrganization?.id || !!organizations?.length,
+  });
+
   const form = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
     defaultValues: {
@@ -114,6 +176,9 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
       organization_id: existingEvent?.organization_id || userOrganization?.id || '',
       max_participants: existingEvent?.max_participants || null,
       status: (existingEvent?.status as EventFormData['status']) || 'draft',
+      // Registration defaults
+      registration_type: (existingEvent?.registration_type as EventFormData['registration_type']) || 'open',
+      responsible_user_id: existingEvent?.responsible_user_id || null,
       // Video conferencing defaults
       enable_video_conference: existingEvent?.enable_video_conference || false,
       allow_recording: existingEvent?.allow_recording || false,
@@ -122,8 +187,18 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
     },
   });
 
+  // Load existing targets when editing
+  useEffect(() => {
+    if (existingTargets) {
+      setSelectedDepartments(existingTargets.departments);
+      setSelectedUsers(existingTargets.users);
+    }
+  }, [existingTargets]);
+
   const locationType = form.watch('location_type');
   const enableVideoConference = form.watch('enable_video_conference');
+  const registrationType = form.watch('registration_type');
+  const organizationId = form.watch('organization_id');
 
   const createEventMutation = useMutation({
     mutationFn: async (data: EventFormData) => {
@@ -145,6 +220,9 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
         max_participants: data.max_participants || null,
         status: data.status,
         created_by: user?.id!,
+        // Registration fields
+        registration_type: data.registration_type,
+        responsible_user_id: data.responsible_user_id || null,
         // Video conferencing fields
         enable_video_conference: data.enable_video_conference || false,
         allow_recording: data.allow_recording || false,
@@ -153,6 +231,8 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
         jitsi_room_name: jitsiRoomName,
       };
 
+      let createdEventId = eventId;
+
       if (eventId) {
         const { error } = await supabase
           .from('training_events')
@@ -160,27 +240,84 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
           .eq('id', eventId);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data: newEvent, error } = await supabase
           .from('training_events')
-          .insert([eventData]);
+          .insert([eventData])
+          .select('id')
+          .single();
         if (error) throw error;
+        createdEventId = newEvent.id;
       }
 
-      // If publishing, create notifications for all org users
-      if (data.status === 'published' && !eventId) {
-        // Get all users in the organization's workspaces
-        const { data: orgUsers } = await supabase
-          .from('user_roles')
-          .select('user_id, workspaces!inner(organization_id)')
-          .eq('workspaces.organization_id', data.organization_id);
-        
-        if (orgUsers && orgUsers.length > 0) {
-          const uniqueUserIds = [...new Set(orgUsers.map(u => u.user_id))];
-          const notifications = uniqueUserIds.map(userId => ({
+      // Handle targets for mandatory/invite_only events
+      if (data.registration_type !== 'open' && createdEventId) {
+        // Delete existing targets first (for updates)
+        if (eventId) {
+          await supabase
+            .from('training_event_targets')
+            .delete()
+            .eq('event_id', eventId);
+        }
+
+        // Insert department targets
+        if (selectedDepartments.length > 0) {
+          const deptTargets = selectedDepartments.map(deptId => ({
+            event_id: createdEventId!,
+            target_type: 'department' as const,
+            department_id: deptId,
+            is_mandatory: data.registration_type === 'mandatory',
+          }));
+          await supabase.from('training_event_targets').insert(deptTargets);
+        }
+
+        // Insert user targets
+        if (selectedUsers.length > 0) {
+          const userTargets = selectedUsers.map(userId => ({
+            event_id: createdEventId!,
+            target_type: 'user' as const,
             user_id: userId,
-            title: 'New Training Event',
-            message: `A new training event "${data.title}" has been scheduled`,
-            type: 'system',
+            is_mandatory: data.registration_type === 'mandatory',
+          }));
+          await supabase.from('training_event_targets').insert(userTargets);
+        }
+      }
+
+      // Create notifications
+      if (data.status === 'published' && !eventId) {
+        let targetUserIds: string[] = [];
+
+        if (data.registration_type === 'open') {
+          // Notify all org users
+          const { data: orgUsers } = await supabase
+            .from('user_roles')
+            .select('user_id, workspaces!inner(organization_id)')
+            .eq('workspaces.organization_id', data.organization_id);
+          
+          targetUserIds = [...new Set(orgUsers?.map(u => u.user_id) || [])];
+        } else {
+          // Get users from selected departments
+          if (selectedDepartments.length > 0) {
+            const { data: deptUsers } = await supabase
+              .from('user_roles')
+              .select('user_id')
+              .in('department_id', selectedDepartments);
+            targetUserIds = [...new Set(deptUsers?.map(u => u.user_id) || [])];
+          }
+
+          // Add directly targeted users
+          targetUserIds = [...new Set([...targetUserIds, ...selectedUsers])];
+        }
+
+        if (targetUserIds.length > 0) {
+          const isMandatory = data.registration_type === 'mandatory';
+          const notifications = targetUserIds.map(userId => ({
+            user_id: userId,
+            title: isMandatory ? '🔴 Mandatory Training Event' : 'New Training Event',
+            message: isMandatory 
+              ? `You are required to attend "${data.title}". Please register immediately.`
+              : `A new training event "${data.title}" has been scheduled`,
+            type: isMandatory ? 'urgent' : 'system',
+            related_id: createdEventId,
           }));
 
           await supabase.from('notifications').insert(notifications);
@@ -190,7 +327,10 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
     onSuccess: () => {
       toast.success(eventId ? 'Event updated successfully' : 'Event created successfully');
       queryClient.invalidateQueries({ queryKey: ['training-events'] });
+      queryClient.invalidateQueries({ queryKey: ['training-events-calendar'] });
       form.reset();
+      setSelectedDepartments([]);
+      setSelectedUsers([]);
       onSuccess?.();
     },
     onError: (error: Error) => {
@@ -446,6 +586,93 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
                 )}
               />
             </div>
+
+            {/* Registration & Targeting Section */}
+            <Card className="border-dashed">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Registration & Targeting
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="registration_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Registration Type *</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select registration type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="open">Open Registration</SelectItem>
+                            <SelectItem value="mandatory">Mandatory Attendance</SelectItem>
+                            <SelectItem value="invite_only">Invite Only</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          {field.value === 'open' && 'Anyone in the organization can register'}
+                          {field.value === 'mandatory' && 'Selected departments/users must attend'}
+                          {field.value === 'invite_only' && 'Only selected departments/users can register'}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="responsible_user_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1">
+                          <UserCheck className="h-4 w-4" />
+                          Event Coordinator
+                        </FormLabel>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          value={field.value || undefined}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select coordinator (optional)" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {potentialCoordinators?.map((coord) => (
+                              <SelectItem key={coord.id} value={coord.id}>
+                                {coord.full_name} ({coord.email})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Coordinator can manage attendance and registrations
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Target selector for mandatory/invite_only */}
+                {registrationType !== 'open' && organizationId && (
+                  <EventTargetSelector
+                    organizationId={organizationId}
+                    registrationType={registrationType}
+                    selectedDepartments={selectedDepartments}
+                    selectedUsers={selectedUsers}
+                    onDepartmentsChange={setSelectedDepartments}
+                    onUsersChange={setSelectedUsers}
+                  />
+                )}
+              </CardContent>
+            </Card>
 
             {/* Video Conferencing Section */}
             <Card className="border-dashed">
