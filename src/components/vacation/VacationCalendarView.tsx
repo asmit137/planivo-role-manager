@@ -416,6 +416,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
               },
             }}
           />
+          </div>
           
           {/* Legend */}
           <div className="mt-8 pt-6 border-t">
