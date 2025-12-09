@@ -123,20 +123,27 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
   // Create schedule mutation
   const createSchedule = useMutation({
     mutationFn: async () => {
-      // Get facility and workspace from department
-      const { data: dept } = await supabase
-        .from('departments')
-        .select('facility_id, facilities(workspace_id)')
-        .eq('id', departmentId)
-        .single();
+      // Get user's facility and workspace from their role
+      const { data: userRole } = await supabase
+        .from('user_roles')
+        .select('facility_id, workspace_id, facilities(workspace_id)')
+        .eq('user_id', user?.id)
+        .not('facility_id', 'is', null)
+        .maybeSingle();
+
+      const facilityId = userRole?.facility_id;
+      const workspaceId = userRole?.workspace_id || (userRole?.facilities as any)?.workspace_id;
+
+      // Use first selected department for the schedule
+      const primaryDepartmentId = selectedDepartments[0] || departmentId;
 
       const { data: schedule, error: scheduleError } = await supabase
         .from('schedules')
         .insert({
           name,
-          department_id: departmentId,
-          facility_id: dept?.facility_id,
-          workspace_id: (dept?.facilities as any)?.workspace_id,
+          department_id: primaryDepartmentId,
+          facility_id: facilityId,
+          workspace_id: workspaceId,
           start_date: startDate,
           end_date: endDate,
           shift_count: shiftCount,
@@ -145,7 +152,10 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
         .select()
         .single();
 
-      if (scheduleError) throw scheduleError;
+      if (scheduleError) {
+        console.error('Schedule creation error:', scheduleError);
+        throw scheduleError;
+      }
 
       // Create shifts
       const shiftsToInsert = shifts.slice(0, shiftCount).map((shift, index) => ({
