@@ -4,7 +4,7 @@ import { Calendar, Users, LayoutDashboard } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { ShiftCalendarView } from './ShiftCalendarView';
-import { StaffAssignments } from './StaffAssignments';
+import { InteractiveStaffCalendar } from './InteractiveStaffCalendar';
 import { SchedulingDashboard } from './SchedulingDashboard';
 import { StaffScheduleView } from './StaffScheduleView';
 import { EmptyState } from '@/components/layout/EmptyState';
@@ -65,7 +65,7 @@ export const SchedulingHub: React.FC<SchedulingHubProps> = ({ departmentId }) =>
         </TabsList>
 
         <TabsContent value="assignments">
-          <StaffAssignments departmentId={effectiveDepartmentId} />
+          <InteractiveStaffCalendar departmentId={effectiveDepartmentId} />
         </TabsContent>
 
         <TabsContent value="calendar">
