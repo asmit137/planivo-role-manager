@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Switch } from '@/components/ui/switch';
+import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { toast } from 'sonner';
 import { Loader2, Calendar, MapPin, Link as LinkIcon, Users, Video, UserCheck, Target, X, AlertCircle } from 'lucide-react';
 import UserSelectionDialog from './UserSelectionDialog';
@@ -533,7 +534,12 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
                   <FormItem>
                     <FormLabel>Start Date & Time *</FormLabel>
                     <FormControl>
-                      <Input type="datetime-local" {...field} />
+                      <DateTimePicker 
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Select start date and time"
+                        minDate={new Date()}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -547,7 +553,12 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
                   <FormItem>
                     <FormLabel>End Date & Time *</FormLabel>
                     <FormControl>
-                      <Input type="datetime-local" {...field} />
+                      <DateTimePicker 
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Select end date and time"
+                        minDate={new Date()}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
