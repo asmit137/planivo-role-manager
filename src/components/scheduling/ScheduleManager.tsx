@@ -55,54 +55,24 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
     }
   }, [departmentId]);
 
-  // Fetch available departments (templates assigned to workspace or facility-specific)
+  // Fetch available departments (all template departments available in the system)
   const { data: availableDepartments } = useQuery({
-    queryKey: ['available-departments-for-scheduling', departmentId],
+    queryKey: ['available-departments-for-scheduling'],
     queryFn: async () => {
-      // Get current department's facility and workspace info
-      const { data: currentDept } = await supabase
+      // Get all template departments (system-wide)
+      const { data: templateDepts, error } = await supabase
         .from('departments')
-        .select('id, name, facility_id, facilities(workspace_id)')
-        .eq('id', departmentId)
-        .maybeSingle();
-
-      if (!currentDept) return [];
-
-      const workspaceId = (currentDept.facilities as any)?.workspace_id;
+        .select('id, name')
+        .eq('is_template', true)
+        .is('parent_department_id', null)
+        .order('name');
       
-      // Try workspace-assigned templates first
-      if (workspaceId) {
-        const { data: workspaceDepts } = await supabase
-          .from('workspace_departments')
-          .select(`
-            department_template_id,
-            departments!inner(id, name)
-          `)
-          .eq('workspace_id', workspaceId);
-
-        if (workspaceDepts && workspaceDepts.length > 0) {
-          return workspaceDepts
-            .filter(wd => wd.departments)
-            .map(wd => ({
-              id: wd.departments.id,
-              name: wd.departments.name
-            }));
-        }
+      if (error) {
+        console.error('Error fetching departments:', error);
+        return [];
       }
-
-      // Fall back to facility-specific departments
-      if (currentDept.facility_id) {
-        const { data: facilityDepts } = await supabase
-          .from('departments')
-          .select('id, name')
-          .eq('facility_id', currentDept.facility_id)
-          .is('parent_department_id', null)
-          .order('name');
-        
-        return facilityDepts || [];
-      }
-
-      return [{ id: currentDept.id, name: currentDept.name }];
+      
+      return templateDepts || [];
     },
   });
 
