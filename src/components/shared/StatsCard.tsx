@@ -26,12 +26,12 @@ export function StatsCard({
   className,
 }: StatsCardProps) {
   return (
-    <Card className={cn('hover:shadow-medium transition-shadow', className)}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        {Icon && <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />}
+    <Card className={cn('hover:shadow-medium transition-shadow min-w-0', className)}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
+        <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{title}</CardTitle>
+        {Icon && <Icon className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0 ml-1" aria-hidden="true" />}
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
         {isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-8 w-20" />
@@ -39,7 +39,7 @@ export function StatsCard({
           </div>
         ) : (
           <>
-            <div className="text-2xl font-bold">{value}</div>
+            <div className="text-lg sm:text-2xl font-bold truncate">{value}</div>
             {description && (
               <p className="text-xs text-muted-foreground mt-1">{description}</p>
             )}
