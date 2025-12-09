@@ -19,7 +19,8 @@ const userSchema = z.object({
   facility_id: z.string().uuid('Invalid facility').optional().nullable(),
   department_id: z.string().uuid('Invalid department').optional().nullable(),
   specialty_id: z.string().uuid().optional().nullable(),
-  role: z.enum(['staff', 'department_head', 'facility_supervisor', 'workplace_supervisor']),
+  organization_id: z.string().uuid().optional().nullable(),
+  role: z.enum(['staff', 'department_head', 'facility_supervisor', 'workplace_supervisor', 'general_admin', 'organization_admin']),
 });
 
 interface UnifiedUserCreationProps {
@@ -33,7 +34,8 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
   const [facilityId, setFacilityId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [specialtyId, setSpecialtyId] = useState('');
-  const [role, setRole] = useState<'staff' | 'department_head' | 'facility_supervisor' | 'workplace_supervisor'>('staff');
+  const [organizationId, setOrganizationId] = useState('');
+  const [role, setRole] = useState<'staff' | 'department_head' | 'facility_supervisor' | 'workplace_supervisor' | 'general_admin' | 'organization_admin'>('staff');
   const queryClient = useQueryClient();
   
   // Get current user's roles to determine permissions
@@ -45,6 +47,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     
     const roleHierarchy: AppRole[] = [
       'super_admin',
+      'organization_admin',
       'general_admin',
       'workplace_supervisor',
       'facility_supervisor',
@@ -67,6 +70,8 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
   const getAvailableRoles = (): AppRole[] => {
     switch (highestRole) {
       case 'super_admin':
+        return ['organization_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'];
+      case 'organization_admin':
       case 'general_admin':
         return ['workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'];
       case 'workplace_supervisor':
@@ -84,7 +89,8 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
   
   // Check if department is required based on role
   const isDepartmentRequired = role === 'staff' || role === 'department_head';
-  const isFacilityRequired = role !== 'workplace_supervisor';
+  const isFacilityRequired = !['workplace_supervisor', 'general_admin', 'organization_admin'].includes(role);
+  const isOrganizationRequired = role === 'organization_admin';
   
   // Auto-scope facility and department based on creator's role
   useEffect(() => {
@@ -99,6 +105,20 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       }
     }
   }, [currentUserRole, highestRole]);
+
+  // Fetch organizations (for organization_admin role)
+  const { data: organizations } = useQuery({
+    queryKey: ['organizations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+    enabled: role === 'organization_admin',
+  });
 
   // Fetch facilities
   const { data: facilities } = useQuery({
@@ -188,11 +208,29 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       }
 
       // Role-specific validation
-      if (userData.role === 'staff' || userData.role === 'department_head') {
+      if (userData.role === 'organization_admin') {
+        if (!userData.organization_id) throw new Error('Organization is required for this role');
+      } else if (userData.role === 'staff' || userData.role === 'department_head') {
         if (!userData.facility_id) throw new Error('Facility is required for this role');
         if (!userData.department_id) throw new Error('Department is required for this role');
       } else if (userData.role === 'facility_supervisor') {
         if (!userData.facility_id) throw new Error('Facility is required for this role');
+      }
+
+      // For organization_admin, call edge function with organization_id
+      if (userData.role === 'organization_admin') {
+        const { data, error } = await supabase.functions.invoke('create-user', {
+          body: {
+            email: userData.email,
+            password: '123456',
+            full_name: userData.full_name,
+            role: 'organization_admin',
+            organization_id: userData.organization_id,
+            force_password_change: true,
+          },
+        });
+        if (error) throw error;
+        return data;
       }
 
       // Get workspace_id from facility if facility is selected
@@ -273,6 +311,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       facility_id: facilityId || null,
       department_id: departmentId || null,
       specialty_id: specialtyId || null,
+      organization_id: organizationId || null,
       role,
     });
   };
@@ -283,6 +322,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     setFacilityId('');
     setDepartmentId('');
     setSpecialtyId('');
+    setOrganizationId('');
     setRole('staff');
   };
 
@@ -297,16 +337,18 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     setSpecialtyId('');
   };
 
-  const handleRoleChange = (value: 'staff' | 'department_head' | 'facility_supervisor' | 'workplace_supervisor') => {
+  const handleRoleChange = (value: 'staff' | 'department_head' | 'facility_supervisor' | 'workplace_supervisor' | 'general_admin' | 'organization_admin') => {
     setRole(value);
-    // Clear department if switching to a role that doesn't need it
-    if (value === 'workplace_supervisor' || value === 'facility_supervisor') {
+    // Clear fields based on role requirements
+    if (['workplace_supervisor', 'facility_supervisor', 'general_admin', 'organization_admin'].includes(value)) {
       setDepartmentId('');
       setSpecialtyId('');
     }
-    // Clear facility if switching to workplace_supervisor
-    if (value === 'workplace_supervisor') {
+    if (['workplace_supervisor', 'general_admin', 'organization_admin'].includes(value)) {
       setFacilityId('');
+    }
+    if (value !== 'organization_admin') {
+      setOrganizationId('');
     }
   };
 
@@ -373,6 +415,12 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  {availableRoles.includes('organization_admin') && (
+                    <SelectItem value="organization_admin">Organization Admin</SelectItem>
+                  )}
+                  {availableRoles.includes('general_admin') && (
+                    <SelectItem value="general_admin">General Admin</SelectItem>
+                  )}
                   {availableRoles.includes('workplace_supervisor') && (
                     <SelectItem value="workplace_supervisor">Workplace Supervisor</SelectItem>
                   )}
@@ -388,6 +436,8 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
+                {role === 'organization_admin' && 'Organization-level access - manages workspaces, facilities, and users within an organization'}
+                {role === 'general_admin' && 'General admin access - manages the workspace'}
                 {role === 'workplace_supervisor' && 'Workspace-level access - no facility/department required'}
                 {role === 'facility_supervisor' && 'Facility-level access - department not required'}
                 {role === 'department_head' && 'Department-level access - requires facility and department'}
@@ -396,26 +446,59 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
             </div>
           </div>
 
-          {/* Organization Assignment - Shows conditionally based on role */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <Building2 className="h-4 w-4" />
-              Organization Assignment
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Organization Selector - Shows only for organization_admin role */}
+          {role === 'organization_admin' && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Building2 className="h-4 w-4" />
+                Organization Selection
+              </div>
               <div className="space-y-2">
-                <Label htmlFor="facility">
-                  Facility {role !== 'workplace_supervisor' ? '*' : '(Optional)'}
-                </Label>
+                <Label htmlFor="organization">Organization *</Label>
                 <Select 
-                  value={facilityId} 
-                  onValueChange={handleFacilityChange} 
-                  required={role !== 'workplace_supervisor'}
-                  disabled={highestRole === 'department_head' || highestRole === 'facility_supervisor'}
+                  value={organizationId} 
+                  onValueChange={setOrganizationId}
+                  required
                 >
-                  <SelectTrigger id="facility">
-                    <SelectValue placeholder="Select facility" />
+                  <SelectTrigger id="organization">
+                    <SelectValue placeholder="Select organization" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {organizations?.map((org) => (
+                      <SelectItem key={org.id} value={org.id}>
+                        {org.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  This user will become the owner/admin of the selected organization
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Organization Assignment - Shows conditionally based on role (not for organization_admin) */}
+          {role !== 'organization_admin' && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Building2 className="h-4 w-4" />
+                Organization Assignment
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="facility">
+                    Facility {isFacilityRequired ? '*' : '(Optional)'}
+                  </Label>
+                  <Select 
+                    value={facilityId} 
+                    onValueChange={handleFacilityChange} 
+                    required={isFacilityRequired}
+                    disabled={highestRole === 'department_head' || highestRole === 'facility_supervisor' || !isFacilityRequired}
+                  >
+                    <SelectTrigger id="facility">
+                      <SelectValue placeholder={!isFacilityRequired ? "Not required for this role" : "Select facility"} />
                   </SelectTrigger>
                   <SelectContent>
                     {facilities?.map((facility) => (
@@ -508,7 +591,8 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                 )}
               </div>
             )}
-          </div>
+            </div>
+          )}
 
           <Alert>
             <Stethoscope className="h-4 w-4" />

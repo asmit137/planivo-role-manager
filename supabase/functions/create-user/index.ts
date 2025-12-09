@@ -50,7 +50,7 @@ serve(async (req) => {
     }
 
     // Parse request body first
-    const { email, password, full_name, role, workspace_id, facility_id, department_id, specialty_id, force_password_change }: CreateUserRequest = await req.json();
+    const { email, password, full_name, role, workspace_id, facility_id, department_id, specialty_id, organization_id, force_password_change }: CreateUserRequest = await req.json();
 
     // Validate required fields
     if (!email || !password || !full_name || !role) {
@@ -188,6 +188,21 @@ serve(async (req) => {
         JSON.stringify({ error: "Failed to create role" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // If creating organization_admin and organization_id provided, update organization's owner_id
+    if (role === 'organization_admin' && organization_id) {
+      const { error: orgUpdateError } = await supabaseClient
+        .from('organizations')
+        .update({ owner_id: newUser.user.id })
+        .eq('id', organization_id);
+      
+      if (orgUpdateError) {
+        console.error("Organization owner update error:", orgUpdateError);
+        // Don't rollback, user is created successfully, just log the error
+      } else {
+        console.log(`Updated organization ${organization_id} owner to ${newUser.user.id}`);
+      }
     }
 
     console.log(`Successfully created user: ${email} with role: ${role}`);
