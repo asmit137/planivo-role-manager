@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { PageHeader, LoadingState, ErrorState } from '@/components/layout';
 import { StatsCard } from '@/components/shared';
-import { Building, Users, MapPin, Briefcase, AlertTriangle } from 'lucide-react';
+import { Building, Users, MapPin, Briefcase, AlertTriangle, Calendar, ListTodo, GraduationCap, Clock, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -12,6 +12,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import WorkspaceManagement from '@/components/admin/WorkspaceManagement';
 import { UnifiedUserHub } from '@/components/users';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { 
+  OrganizationFacilitiesView, 
+  OrganizationVacationMonitor, 
+  OrganizationScheduleMonitor, 
+  OrganizationTaskMonitor, 
+  OrganizationTrainingMonitor 
+} from '@/components/organization';
 
 const OrganizationAdminDashboard = () => {
   const { user } = useAuth();
@@ -85,10 +92,59 @@ const OrganizationAdminDashboard = () => {
         userCount = count || 0;
       }
 
+      // Get pending vacation count
+      let pendingVacations = 0;
+      if (workspaceIds.length > 0) {
+        const { data: facilities } = await supabase
+          .from('facilities')
+          .select('id')
+          .in('workspace_id', workspaceIds);
+        const facilityIds = facilities?.map(f => f.id) || [];
+        
+        if (facilityIds.length > 0) {
+          const { data: departments } = await supabase
+            .from('departments')
+            .select('id')
+            .in('facility_id', facilityIds);
+          const departmentIds = departments?.map(d => d.id) || [];
+          
+          if (departmentIds.length > 0) {
+            const { count } = await supabase
+              .from('vacation_plans')
+              .select('*', { count: 'exact', head: true })
+              .in('department_id', departmentIds)
+              .in('status', ['department_pending', 'facility_pending', 'workspace_pending']);
+            pendingVacations = count || 0;
+          }
+        }
+      }
+
+      // Get active tasks count
+      let activeTasks = 0;
+      if (workspaceIds.length > 0) {
+        const { count } = await supabase
+          .from('tasks')
+          .select('*', { count: 'exact', head: true })
+          .in('workspace_id', workspaceIds)
+          .eq('status', 'active');
+        activeTasks = count || 0;
+      }
+
+      // Get upcoming training count
+      const { count: upcomingTraining } = await supabase
+        .from('training_events')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organization.id)
+        .eq('status', 'published')
+        .gt('start_datetime', new Date().toISOString());
+
       return {
         workspaces: workspaceCount || 0,
         facilities: facilityCount,
         users: userCount,
+        pendingVacations,
+        activeTasks,
+        upcomingTraining: upcomingTraining || 0,
       };
     },
     enabled: !!organization,
@@ -129,14 +185,10 @@ const OrganizationAdminDashboard = () => {
     return current >= max * 0.9;
   };
 
-  const isAtLimit = (current: number, max: number | null) => {
-    if (max === null) return false;
-    return current >= max;
-  };
-
   // Overview content
   const renderOverview = () => (
     <div className="space-y-6">
+      {/* Resource Usage */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
@@ -217,6 +269,29 @@ const OrganizationAdminDashboard = () => {
         </Card>
       </div>
 
+      {/* Activity Overview */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatsCard
+          title="Pending Vacations"
+          value={stats?.pendingVacations || 0}
+          icon={Clock}
+          description="Awaiting approval"
+        />
+        <StatsCard
+          title="Active Tasks"
+          value={stats?.activeTasks || 0}
+          icon={ListTodo}
+          description="In progress"
+        />
+        <StatsCard
+          title="Upcoming Training"
+          value={stats?.upcomingTraining || 0}
+          icon={GraduationCap}
+          description="Scheduled events"
+        />
+      </div>
+
+      {/* Organization Details */}
       <Card>
         <CardHeader>
           <CardTitle>Organization Details</CardTitle>
@@ -252,14 +327,19 @@ const OrganizationAdminDashboard = () => {
     <div className="space-y-6">
       <PageHeader
         title={organization.name}
-        description="Manage your organization's workspaces, facilities, and users"
+        description="Manage and monitor your organization's resources and activities"
       />
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="w-full justify-start overflow-x-auto">
+        <TabsList className="w-full justify-start overflow-x-auto flex-wrap h-auto gap-1">
           <TabsTrigger value="">Overview</TabsTrigger>
           <TabsTrigger value="workspaces">Workspaces</TabsTrigger>
+          <TabsTrigger value="facilities">Facilities</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="vacation">Vacation</TabsTrigger>
+          <TabsTrigger value="schedules">Schedules</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks</TabsTrigger>
+          <TabsTrigger value="training">Training</TabsTrigger>
         </TabsList>
 
         <TabsContent value="" className="mt-6">
@@ -274,6 +354,10 @@ const OrganizationAdminDashboard = () => {
           />
         </TabsContent>
 
+        <TabsContent value="facilities" className="mt-6">
+          <OrganizationFacilitiesView organizationId={organization.id} />
+        </TabsContent>
+
         <TabsContent value="users" className="mt-6">
           <UnifiedUserHub 
             mode="organization_admin" 
@@ -281,6 +365,22 @@ const OrganizationAdminDashboard = () => {
             maxUsers={organization.max_users}
             currentUserCount={stats?.users || 0}
           />
+        </TabsContent>
+
+        <TabsContent value="vacation" className="mt-6">
+          <OrganizationVacationMonitor organizationId={organization.id} />
+        </TabsContent>
+
+        <TabsContent value="schedules" className="mt-6">
+          <OrganizationScheduleMonitor organizationId={organization.id} />
+        </TabsContent>
+
+        <TabsContent value="tasks" className="mt-6">
+          <OrganizationTaskMonitor organizationId={organization.id} />
+        </TabsContent>
+
+        <TabsContent value="training" className="mt-6">
+          <OrganizationTrainingMonitor organizationId={organization.id} />
         </TabsContent>
       </Tabs>
     </div>
