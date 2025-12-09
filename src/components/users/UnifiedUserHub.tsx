@@ -385,10 +385,10 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
       
       <Card className="border-2">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <CardTitle>{scopeTitle}</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-lg sm:text-xl">{scopeTitle}</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
                 {scopeDescription}
                 {maxUsers !== null && maxUsers !== undefined && (
                   <span className="ml-2 text-muted-foreground">
@@ -397,16 +397,16 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
                 )}
               </CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full sm:w-auto">
               {hasEditPermission && (
                 <ActionButton 
                   onClick={() => setUnifiedCreateOpen(true)} 
-                  className="bg-gradient-primary"
+                  className="bg-gradient-primary w-full sm:w-auto min-h-[44px]"
                   disabled={isAtUserLimit}
                   title={isAtUserLimit ? 'User limit reached' : undefined}
                 >
                   <UserPlus className="mr-2 h-4 w-4" />
-                  {detectedScope === 'department' ? 'Add Staff' : 'Create User'}
+                  <span className="sm:inline">{detectedScope === 'department' ? 'Add Staff' : 'Create User'}</span>
                 </ActionButton>
               )}
             </div>

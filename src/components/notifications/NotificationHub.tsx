@@ -93,17 +93,18 @@ const NotificationHub = () => {
       }
     >
       <Card className="border-2">
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <CardTitle>All Notifications</CardTitle>
-            <CardDescription>View and manage your notifications</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">All Notifications</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">View and manage your notifications</CardDescription>
           </div>
           {unreadCount > 0 && (
             <Button
               variant="outline"
               onClick={() => markAllAsReadMutation.mutate()}
               disabled={markAllAsReadMutation.isPending}
+              className="w-full sm:w-auto min-h-[44px]"
             >
               <Check className="h-4 w-4 mr-2" />
               Mark All as Read
@@ -117,11 +118,11 @@ const NotificationHub = () => {
             {notifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`p-4 border rounded-lg ${
+                className={`p-3 sm:p-4 border rounded-lg ${
                   !notification.is_read ? 'bg-primary/5 border-primary/20' : 'bg-muted/30'
                 }`}
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center gap-2">
                       <h4 className="font-semibold">{notification.title}</h4>

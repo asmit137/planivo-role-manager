@@ -80,9 +80,9 @@ const MessagesList = () => {
               return (
                 <div
                   key={message.id}
-                  className="p-4 border rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                  className="p-3 sm:p-4 border rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         {message.conversation?.is_group && (

@@ -341,20 +341,22 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ fa
           </div>
         )}
 
-        <TabsList className="grid w-full grid-cols-3 mb-6">
-          <TabsTrigger value="schedules" className="flex items-center gap-2">
-            <ClipboardList className="h-4 w-4" />
-            <span className="hidden sm:inline">Schedules</span>
-          </TabsTrigger>
-          <TabsTrigger value="calendar" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            <span className="hidden sm:inline">Calendar</span>
-          </TabsTrigger>
-          <TabsTrigger value="dashboard" className="flex items-center gap-2">
-            <LayoutDashboard className="h-4 w-4" />
-            <span className="hidden sm:inline">Dashboard</span>
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto scrollbar-hide -mx-2 px-2 mb-6">
+          <TabsList className="grid w-max min-w-full grid-cols-3 gap-1">
+            <TabsTrigger value="schedules" className="flex items-center gap-2 min-h-[44px] px-3">
+              <ClipboardList className="h-4 w-4" />
+              <span className="hidden sm:inline">Schedules</span>
+            </TabsTrigger>
+            <TabsTrigger value="calendar" className="flex items-center gap-2 min-h-[44px] px-3">
+              <Calendar className="h-4 w-4" />
+              <span className="hidden sm:inline">Calendar</span>
+            </TabsTrigger>
+            <TabsTrigger value="dashboard" className="flex items-center gap-2 min-h-[44px] px-3">
+              <LayoutDashboard className="h-4 w-4" />
+              <span className="hidden sm:inline">Dashboard</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="schedules">
           <div className="space-y-6">
@@ -367,10 +369,10 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ fa
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 {/* Department Filter */}
                 <Select value={filterDepartmentId} onValueChange={setFilterDepartmentId}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[180px] min-h-[44px]">
                     <Filter className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="All Departments" />
                   </SelectTrigger>
@@ -387,13 +389,13 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ fa
                 {/* Create Button */}
                 <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                   <DialogTrigger asChild>
-                    <Button>
+                    <Button className="min-h-[44px]">
                       <Plus className="h-4 w-4 mr-2" />
                       <span className="hidden sm:inline">Create Schedule</span>
                       <span className="sm:hidden">New</span>
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Create New Schedule</DialogTitle>
                     </DialogHeader>

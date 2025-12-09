@@ -284,19 +284,19 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-xl font-semibold">Schedules</h2>
-          <p className="text-sm text-muted-foreground">Manage department schedules and shifts</p>
+          <h2 className="text-lg sm:text-xl font-semibold">Schedules</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">Manage department schedules and shifts</p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full sm:w-auto min-h-[44px]">
               <Plus className="h-4 w-4 mr-2" />
               Create Schedule
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
             <DialogHeader>
               <DialogTitle>Create New Schedule</DialogTitle>
             </DialogHeader>
@@ -312,7 +312,7 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
                     placeholder="e.g., Week 1 Schedule"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="startDate">Start Date</Label>
                     <Input
@@ -417,7 +417,7 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
                           placeholder="e.g., Morning Shift"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <Label>Start Time</Label>
                           <Input

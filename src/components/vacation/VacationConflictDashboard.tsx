@@ -197,18 +197,18 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <AlertCircle className="h-5 w-5 text-destructive" />
               Vacation Conflict Dashboard
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
               Monitor overlapping vacation schedules across specialties
             </CardDescription>
           </div>
           {hasActiveFilters && (
-            <Button variant="ghost" size="sm" onClick={clearFilters}>
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="w-full sm:w-auto min-h-[40px]">
               <X className="h-4 w-4 mr-2" />
               Clear Filters
             </Button>
