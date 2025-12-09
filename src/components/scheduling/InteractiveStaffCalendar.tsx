@@ -381,14 +381,14 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
               {/* Day headers */}
               <div className="grid grid-cols-7 gap-1 mb-1">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
+                  <div key={day} className="text-center text-xs sm:text-sm font-medium text-muted-foreground py-2 min-w-[40px]">
                     {day}
                   </div>
                 ))}
               </div>
 
               {/* Calendar grid */}
-              <div className="grid grid-cols-7 gap-1">
+              <div className="grid grid-cols-7 gap-1" style={{ minWidth: '280px' }}>
                 {calendarDays.map((day) => {
                   const dateStr = format(day, 'yyyy-MM-dd');
                   const inScheduleRange = isDateInScheduleRange(day);
