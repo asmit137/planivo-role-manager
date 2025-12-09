@@ -199,7 +199,7 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
             <div className="flex items-center gap-2 justify-between">
               {hasAccess('notifications') && <NotificationBell />}
               {hasAccess('messaging') && <MessagingPanel />}
-              <UserProfile />
+              <UserProfile collapsed={false} />
             </div>
             <Button onClick={signOut} variant="outline" size="sm" className="w-full min-h-[44px]">
               <LogOut className="mr-2 h-4 w-4" />
@@ -210,7 +210,7 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
           <div className="flex flex-col gap-2 items-center">
             {hasAccess('notifications') && <NotificationBell />}
             {hasAccess('messaging') && <MessagingPanel />}
-            <UserProfile />
+            <UserProfile collapsed={true} />
             <Button onClick={signOut} variant="ghost" size="icon" className="w-full min-h-[44px] min-w-[44px]">
               <LogOut className="h-4 w-4" />
             </Button>

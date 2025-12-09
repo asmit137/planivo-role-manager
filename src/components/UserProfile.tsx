@@ -16,7 +16,11 @@ import { User, Settings, Loader2, Mail, Briefcase, Phone } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 
-const UserProfile = () => {
+interface UserProfileProps {
+  collapsed?: boolean;
+}
+
+const UserProfile = ({ collapsed = false }: UserProfileProps) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState<any>(null);
@@ -146,9 +150,9 @@ const UserProfile = () => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <User className="h-4 w-4 mr-2" />
-          Profile
+        <Button variant={collapsed ? "ghost" : "outline"} size={collapsed ? "icon" : "sm"} className={collapsed ? "min-h-[44px] min-w-[44px]" : ""}>
+          <User className={collapsed ? "h-4 w-4" : "h-4 w-4 mr-2"} />
+          {!collapsed && "Profile"}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
