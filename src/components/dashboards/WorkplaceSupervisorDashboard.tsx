@@ -165,46 +165,46 @@ const WorkplaceSupervisorDashboard = () => {
       
       <div className="space-y-4">
         {!activeTab && (
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
-            <div className="rounded-lg border bg-card p-6">
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+            <div className="rounded-lg border bg-card p-4 sm:p-6">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-muted-foreground">Active Tasks</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Active Tasks</p>
                 <ClipboardList className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">{stats?.activeTasks ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-2">Workspace tasks</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-2">{stats?.activeTasks ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Workspace tasks</p>
             </div>
-            <div className="rounded-lg border bg-card p-6">
+            <div className="rounded-lg border bg-card p-4 sm:p-6">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-muted-foreground">Pending Approvals</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Pending Approvals</p>
                 <CheckSquare className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">{stats?.pendingApprovals ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-2">Awaiting final approval</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-2">{stats?.pendingApprovals ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Awaiting final approval</p>
             </div>
-            <div className="rounded-lg border bg-card p-6">
+            <div className="rounded-lg border bg-card p-4 sm:p-6">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-muted-foreground">Conflicts</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Conflicts</p>
                 <AlertCircle className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">{stats?.conflicts ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-2">Vacation conflicts</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-2">{stats?.conflicts ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Vacation conflicts</p>
             </div>
-            <div className="rounded-lg border bg-card p-6">
+            <div className="rounded-lg border bg-card p-4 sm:p-6">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-muted-foreground">On Vacation Today</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">On Vacation Today</p>
                 <Calendar className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">{stats?.staffOnVacation ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-2">Staff currently off</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-2">{stats?.staffOnVacation ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Staff currently off</p>
             </div>
-            <div className="rounded-lg border bg-card p-6">
+            <div className="rounded-lg border bg-card p-4 sm:p-6">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-muted-foreground">Active Schedules</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Active Schedules</p>
                 <CalendarClock className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">{stats?.publishedSchedules ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-2">Published schedules</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-2">{stats?.publishedSchedules ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Published schedules</p>
             </div>
           </div>
         )}

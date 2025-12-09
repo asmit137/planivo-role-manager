@@ -189,7 +189,7 @@ const OrganizationAdminDashboard = () => {
   const renderOverview = () => (
     <div className="space-y-6">
       {/* Resource Usage */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -270,7 +270,7 @@ const OrganizationAdminDashboard = () => {
       </div>
 
       {/* Activity Overview */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
         <StatsCard
           title="Pending Vacations"
           value={stats?.pendingVacations || 0}
@@ -331,16 +331,18 @@ const OrganizationAdminDashboard = () => {
       />
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="w-full justify-start overflow-x-auto flex-wrap h-auto gap-1">
-          <TabsTrigger value="">Overview</TabsTrigger>
-          <TabsTrigger value="workspaces">Workspaces</TabsTrigger>
-          <TabsTrigger value="facilities">Facilities</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="vacation">Vacation</TabsTrigger>
-          <TabsTrigger value="schedules">Schedules</TabsTrigger>
-          <TabsTrigger value="tasks">Tasks</TabsTrigger>
-          <TabsTrigger value="training">Training</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto scrollbar-hide -mx-2 px-2">
+          <TabsList className="w-max min-w-full justify-start gap-1 h-auto py-1">
+            <TabsTrigger value="" className="min-h-[40px] px-3 text-xs sm:text-sm">Overview</TabsTrigger>
+            <TabsTrigger value="workspaces" className="min-h-[40px] px-3 text-xs sm:text-sm">Workspaces</TabsTrigger>
+            <TabsTrigger value="facilities" className="min-h-[40px] px-3 text-xs sm:text-sm">Facilities</TabsTrigger>
+            <TabsTrigger value="users" className="min-h-[40px] px-3 text-xs sm:text-sm">Users</TabsTrigger>
+            <TabsTrigger value="vacation" className="min-h-[40px] px-3 text-xs sm:text-sm">Vacation</TabsTrigger>
+            <TabsTrigger value="schedules" className="min-h-[40px] px-3 text-xs sm:text-sm">Schedules</TabsTrigger>
+            <TabsTrigger value="tasks" className="min-h-[40px] px-3 text-xs sm:text-sm">Tasks</TabsTrigger>
+            <TabsTrigger value="training" className="min-h-[40px] px-3 text-xs sm:text-sm">Training</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="" className="mt-6">
           {renderOverview()}

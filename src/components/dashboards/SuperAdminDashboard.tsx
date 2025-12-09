@@ -303,7 +303,7 @@ const SuperAdminDashboard = () => {
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
           {/* Main Stats Grid */}
-          <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-8">
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8">
             <StatsCard
               title="Organizations"
               value={organizations || 0}
@@ -348,7 +348,7 @@ const SuperAdminDashboard = () => {
           </div>
 
           {/* Vacation & Task Stats */}
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -424,7 +424,7 @@ const SuperAdminDashboard = () => {
           </div>
 
           {/* Recent Activity */}
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle>Recent Vacation Plans</CardTitle>

@@ -127,38 +127,38 @@ const StaffDashboard = () => {
       
       <div className="space-y-4">
         {!activeTab && (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-lg border bg-card p-6">
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg border bg-card p-4 sm:p-6">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-muted-foreground">Pending Tasks</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Pending Tasks</p>
                 <ClipboardList className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">{stats?.myTasks ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-2">Tasks assigned to you</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-2">{stats?.myTasks ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Tasks assigned to you</p>
             </div>
-            <div className="rounded-lg border bg-card p-6">
+            <div className="rounded-lg border bg-card p-4 sm:p-6">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-muted-foreground">My Vacation</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">My Vacation</p>
                 <Calendar className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">{stats?.myVacations ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-2">Active vacation requests</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-2">{stats?.myVacations ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Active vacation requests</p>
             </div>
-            <div className="rounded-lg border bg-card p-6">
+            <div className="rounded-lg border bg-card p-4 sm:p-6">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-muted-foreground">Upcoming Shifts</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Upcoming Shifts</p>
                 <CalendarClock className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">{stats?.upcomingShifts ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-2">Shifts in next 7 days</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-2">{stats?.upcomingShifts ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Shifts in next 7 days</p>
             </div>
-            <div className="rounded-lg border bg-card p-6">
+            <div className="rounded-lg border bg-card p-4 sm:p-6">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-muted-foreground">Unread Notifications</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Unread Notifications</p>
                 <Bell className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-3xl font-bold mt-2">{stats?.unreadMessages ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-2">New messages & alerts</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-2">{stats?.unreadMessages ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">New messages & alerts</p>
             </div>
           </div>
         )}
