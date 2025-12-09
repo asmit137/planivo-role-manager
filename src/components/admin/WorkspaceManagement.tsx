@@ -31,6 +31,11 @@ interface WorkspaceManagementProps {
   currentWorkspaceCount?: number;
 }
 
+const checkIsAtLimit = (max: number | null | undefined, current: number | undefined): boolean => {
+  if (max === null || max === undefined) return false;
+  return (current || 0) >= max;
+};
+
 const WorkspaceManagement = ({ organizationId, maxWorkspaces, currentWorkspaceCount }: WorkspaceManagementProps = {}) => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -382,17 +387,30 @@ const WorkspaceManagement = ({ organizationId, maxWorkspaces, currentWorkspaceCo
     return 0;
   };
 
+  const workspaceAtLimit = checkIsAtLimit(maxWorkspaces, currentWorkspaceCount);
+
   return (
     <Card className="border-2">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>Workspaces</CardTitle>
-            <CardDescription>Manage all system workspaces</CardDescription>
+            <CardDescription>
+              Manage all system workspaces
+              {maxWorkspaces !== null && maxWorkspaces !== undefined && (
+                <span className="ml-2 text-muted-foreground">
+                  ({currentWorkspaceCount || 0} / {maxWorkspaces} workspaces)
+                </span>
+              )}
+            </CardDescription>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-primary">
+              <Button 
+                className="bg-gradient-primary" 
+                disabled={workspaceAtLimit}
+                title={workspaceAtLimit ? 'Workspace limit reached' : undefined}
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 Create Workspace
               </Button>

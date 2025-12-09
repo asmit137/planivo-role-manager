@@ -343,6 +343,9 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
     ? 'Manage staff members in your department'
     : 'Create and manage user accounts';
 
+  // Check if user limit is reached
+  const isAtUserLimit = maxUsers !== null && maxUsers !== undefined && (currentUserCount || 0) >= maxUsers;
+
   return (
     <ErrorBoundary
       fallback={
@@ -385,17 +388,34 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>{scopeTitle}</CardTitle>
-              <CardDescription>{scopeDescription}</CardDescription>
+              <CardDescription>
+                {scopeDescription}
+                {maxUsers !== null && maxUsers !== undefined && (
+                  <span className="ml-2 text-muted-foreground">
+                    ({currentUserCount || 0} / {maxUsers} users)
+                  </span>
+                )}
+              </CardDescription>
             </div>
             <div className="flex gap-2">
               {hasEditPermission && (
-                <ActionButton onClick={() => setUnifiedCreateOpen(true)} className="bg-gradient-primary">
+                <ActionButton 
+                  onClick={() => setUnifiedCreateOpen(true)} 
+                  className="bg-gradient-primary"
+                  disabled={isAtUserLimit}
+                  title={isAtUserLimit ? 'User limit reached' : undefined}
+                >
                   <UserPlus className="mr-2 h-4 w-4" />
                   {detectedScope === 'department' ? 'Add Staff' : 'Create User'}
                 </ActionButton>
               )}
             </div>
           </div>
+          {isAtUserLimit && (
+            <div className="mt-2 p-2 bg-destructive/10 border border-destructive/20 rounded text-sm text-destructive">
+              User limit reached. Contact your administrator to increase the limit.
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {hasBulkUpload && detectedScope === 'system' ? (

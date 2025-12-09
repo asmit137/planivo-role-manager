@@ -69,7 +69,7 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
 
   const getPrimaryRole = () => {
     if (!roles || roles.length === 0) return null;
-    const roleHierarchy = ['super_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'];
+    const roleHierarchy = ['super_admin', 'organization_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'];
     for (const role of roleHierarchy) {
       if (roles.some(r => r.role === role)) {
         return role;

@@ -26,7 +26,13 @@ const userSchema = z.object({
   role: z.enum(['general_admin', 'facility_supervisor', 'department_head', 'staff']),
 });
 
-const FacilityUserManagement = () => {
+interface FacilityUserManagementProps {
+  maxFacilities?: number | null;
+  currentFacilityCount?: number;
+}
+
+const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: FacilityUserManagementProps) => {
+  const facilityAtLimit = maxFacilities !== null && maxFacilities !== undefined && (currentFacilityCount || 0) >= maxFacilities;
   const [facilityDialogOpen, setFacilityDialogOpen] = useState(false);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState('');
@@ -219,7 +225,11 @@ const FacilityUserManagement = () => {
             <div className="flex gap-2">
               <Dialog open={facilityDialogOpen} onOpenChange={setFacilityDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline">
+                  <Button 
+                    variant="outline" 
+                    disabled={facilityAtLimit}
+                    title={facilityAtLimit ? 'Facility limit reached' : undefined}
+                  >
                     <Building2 className="mr-2 h-4 w-4" />
                     Add Facility
                   </Button>
