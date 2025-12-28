@@ -1,0 +1,253 @@
+{
+  "audit_date": "2025-12-28",
+  "project_id": "zgoeyqqargujyhuojtsz",
+  "total_functions": 8,
+  "functions": [
+    {
+      "name": "admin-set-password",
+      "route": "/functions/v1/admin-set-password",
+      "trigger_type": "HTTP",
+      "auth_requirement": "NONE (CRITICAL ISSUE)",
+      "jwt_verified": false,
+      "roles_allowed": [],
+      "inputs": {
+        "body": {
+          "email": "string (required, email format)",
+          "password": "string (required, 6-128 chars)"
+        }
+      },
+      "outputs": {
+        "200": { "success": true, "message": "string" },
+        "400": { "error": "string", "details": "string[]" },
+        "404": { "error": "User not found" },
+        "429": { "error": "Rate limit exceeded" },
+        "500": { "error": "string" }
+      },
+      "rate_limiting": {
+        "enabled": true,
+        "limit": "5 per 60 seconds per email"
+      },
+      "input_validation": {
+        "schema": "zod",
+        "validated_fields": ["email", "password"]
+      },
+      "external_dependencies": ["supabase.auth.admin"],
+      "tables_touched": ["auth.users (via admin API)"],
+      "security_issues": ["P0-001: No authentication required"]
+    },
+    {
+      "name": "bootstrap-admin",
+      "route": "/functions/v1/bootstrap-admin",
+      "trigger_type": "HTTP",
+      "auth_requirement": "SECRET_KEY",
+      "jwt_verified": false,
+      "roles_allowed": [],
+      "inputs": {
+        "body": {
+          "email": "string (required)",
+          "password": "string (required)",
+          "full_name": "string (required)",
+          "bootstrap_secret": "string (required)"
+        }
+      },
+      "outputs": {
+        "200": { "success": true, "message": "string", "user": "object" },
+        "400": { "error": "string" },
+        "403": { "error": "Invalid bootstrap secret" },
+        "500": { "error": "string" }
+      },
+      "rate_limiting": {
+        "enabled": false
+      },
+      "input_validation": {
+        "schema": "none",
+        "validated_fields": []
+      },
+      "external_dependencies": ["supabase.auth.admin"],
+      "tables_touched": ["auth.users", "profiles", "user_roles", "conversations", "messages", "conversation_participants"],
+      "security_issues": ["P0-002: Hardcoded secret in code"]
+    },
+    {
+      "name": "bulk-create-staff",
+      "route": "/functions/v1/bulk-create-staff",
+      "trigger_type": "HTTP",
+      "auth_requirement": "JWT + ROLE",
+      "jwt_verified": true,
+      "roles_allowed": ["super_admin", "general_admin", "department_head"],
+      "inputs": {
+        "headers": { "Authorization": "Bearer <JWT>" },
+        "body": {
+          "emails": "string[] (required)",
+          "departmentId": "uuid (required)"
+        }
+      },
+      "outputs": {
+        "200": { "created": "number", "failed": "number", "errors": "string[]" },
+        "400": { "error": "string" }
+      },
+      "rate_limiting": {
+        "enabled": false
+      },
+      "input_validation": {
+        "schema": "manual",
+        "validated_fields": ["emails (array check)", "departmentId (presence)"]
+      },
+      "external_dependencies": ["supabase.auth.admin"],
+      "tables_touched": ["auth.users", "profiles", "user_roles", "departments", "facilities"],
+      "security_issues": ["P0-004: Hardcoded weak password '1234'", "P1-001: No rate limiting"]
+    },
+    {
+      "name": "bulk-upload-users",
+      "route": "/functions/v1/bulk-upload-users",
+      "trigger_type": "HTTP",
+      "auth_requirement": "JWT + ROLE",
+      "jwt_verified": true,
+      "roles_allowed": ["super_admin", "organization_admin", "general_admin"],
+      "inputs": {
+        "headers": { "Authorization": "Bearer <JWT>" },
+        "body": {
+          "users": "BulkUser[] (1-100 items)"
+        }
+      },
+      "outputs": {
+        "200": { "success": "number", "failed": "number", "errors": "object[]" },
+        "400": { "error": "string", "details": "string[]" },
+        "401": { "error": "Unauthorized" },
+        "403": { "error": "Forbidden" },
+        "429": { "error": "Rate limit exceeded" },
+        "500": { "error": "string" }
+      },
+      "rate_limiting": {
+        "enabled": true,
+        "limit": "5 per 300 seconds per user"
+      },
+      "input_validation": {
+        "schema": "zod",
+        "validated_fields": ["email", "full_name", "facility_name", "department_name", "role"]
+      },
+      "external_dependencies": ["supabase.auth.admin"],
+      "tables_touched": ["auth.users", "profiles", "user_roles", "facilities", "departments"],
+      "security_issues": ["P1-002: Weak default password '123456'"]
+    },
+    {
+      "name": "create-notification",
+      "route": "/functions/v1/create-notification",
+      "trigger_type": "HTTP",
+      "auth_requirement": "NONE (CRITICAL ISSUE)",
+      "jwt_verified": false,
+      "roles_allowed": [],
+      "inputs": {
+        "body": {
+          "user_id": "uuid (required)",
+          "title": "string (required)",
+          "message": "string (required)",
+          "type": "enum (required)",
+          "related_id": "uuid (optional)"
+        }
+      },
+      "outputs": {
+        "200": { "success": true, "notification": "object" },
+        "400": { "error": "Missing required fields" },
+        "500": { "error": "string" }
+      },
+      "rate_limiting": {
+        "enabled": false
+      },
+      "input_validation": {
+        "schema": "manual",
+        "validated_fields": ["user_id", "title", "message", "type (presence only)"]
+      },
+      "external_dependencies": [],
+      "tables_touched": ["notifications"],
+      "security_issues": ["P0-003: No authentication, allows arbitrary user targeting"]
+    },
+    {
+      "name": "create-user",
+      "route": "/functions/v1/create-user",
+      "trigger_type": "HTTP",
+      "auth_requirement": "JWT + ROLE",
+      "jwt_verified": true,
+      "roles_allowed": ["super_admin", "organization_admin", "general_admin", "workplace_supervisor", "facility_supervisor", "department_head"],
+      "inputs": {
+        "headers": { "Authorization": "Bearer <JWT>" },
+        "body": {
+          "email": "string (required)",
+          "password": "string (required)",
+          "full_name": "string (required)",
+          "role": "app_role (required)",
+          "workspace_id": "uuid (optional)",
+          "facility_id": "uuid (optional)",
+          "department_id": "uuid (optional)",
+          "specialty_id": "uuid (optional)",
+          "organization_id": "uuid (optional)",
+          "force_password_change": "boolean (optional)"
+        }
+      },
+      "outputs": {
+        "200": { "success": true, "user": "object" },
+        "400": { "error": "string", "details": "string[]" },
+        "401": { "error": "Unauthorized" },
+        "403": { "error": "Forbidden" },
+        "429": { "error": "Rate limit exceeded" },
+        "500": { "error": "string" }
+      },
+      "rate_limiting": {
+        "enabled": true,
+        "limit": "20 per 60 seconds per user"
+      },
+      "input_validation": {
+        "schema": "zod",
+        "validated_fields": ["email", "password", "full_name", "role", "workspace_id", "facility_id", "department_id", "specialty_id", "organization_id", "force_password_change"]
+      },
+      "external_dependencies": ["supabase.auth.admin"],
+      "tables_touched": ["auth.users", "profiles", "user_roles", "organizations"],
+      "security_issues": []
+    },
+    {
+      "name": "scheduling-reminder",
+      "route": "/functions/v1/scheduling-reminder",
+      "trigger_type": "HTTP (intended for CRON)",
+      "auth_requirement": "NONE",
+      "jwt_verified": false,
+      "roles_allowed": [],
+      "inputs": {},
+      "outputs": {
+        "200": { "success": true, "message": "string", "tasksCreated": "number", "notificationsCreated": "number" },
+        "500": { "success": false, "error": "string" }
+      },
+      "rate_limiting": {
+        "enabled": false
+      },
+      "input_validation": {
+        "schema": "none",
+        "validated_fields": []
+      },
+      "external_dependencies": [],
+      "tables_touched": ["user_roles", "departments", "tasks", "task_assignments", "notifications"],
+      "security_issues": ["P1-003: No authentication for cron function"]
+    },
+    {
+      "name": "validate-module-system",
+      "route": "/functions/v1/validate-module-system",
+      "trigger_type": "HTTP",
+      "auth_requirement": "UNKNOWN",
+      "jwt_verified": "NOT IN CONFIG",
+      "roles_allowed": [],
+      "inputs": {},
+      "outputs": {
+        "200": { "success": "boolean", "summary": "object", "results": "object[]", "timestamp": "string" },
+        "500": { "error": "string" }
+      },
+      "rate_limiting": {
+        "enabled": false
+      },
+      "input_validation": {
+        "schema": "none",
+        "validated_fields": []
+      },
+      "external_dependencies": [],
+      "tables_touched": ["module_definitions", "role_module_access", "workspace_module_access"],
+      "security_issues": ["P1-004: Missing from config.toml"]
+    }
+  ]
+}
