@@ -5,3 +5,4 @@ export { ShiftCalendarView } from './ShiftCalendarView';
 export { StaffAssignments } from './StaffAssignments';
 export { SchedulingDashboard } from './SchedulingDashboard';
 export { StaffScheduleView } from './StaffScheduleView';
+export { ScheduleDisplaySettings } from './ScheduleDisplaySettings';
