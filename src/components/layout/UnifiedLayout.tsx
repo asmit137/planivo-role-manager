@@ -15,6 +15,13 @@ const UnifiedLayout = ({ children }: UnifiedLayoutProps) => {
 
   return (
     <SidebarProvider>
+      {/* Skip to main content link for accessibility */}
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:outline-none"
+      >
+        Skip to main content
+      </a>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar 
           hasAccess={hasAccess}
@@ -26,7 +33,7 @@ const UnifiedLayout = ({ children }: UnifiedLayoutProps) => {
           <MobileHeader />
           
           {/* Main Content Area */}
-          <main className="flex-1 p-4 md:p-6 lg:p-8">
+          <main id="main-content" className="flex-1 p-4 md:p-6 lg:p-8" tabIndex={-1}>
             {children}
           </main>
 

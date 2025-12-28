@@ -205,15 +205,25 @@ export function PricingSection() {
               </CardContent>
 
               <CardFooter>
-                <Button
-                  asChild
-                  className="w-full"
-                  variant={plan.isPopular ? "default" : "outline"}
-                >
-                  <Link to={plan.isEnterprise ? "/contact" : "/auth"}>
-                    {plan.isEnterprise ? "Contact Sales" : plan.priceMonthly === 0 ? "Get Started Free" : "Start Free Trial"}
-                  </Link>
-                </Button>
+                {plan.isEnterprise ? (
+                  <Button
+                    asChild
+                    className="w-full"
+                    variant="outline"
+                  >
+                    <a href="mailto:sales@planivo.com">Contact Sales</a>
+                  </Button>
+                ) : (
+                  <Button
+                    asChild
+                    className="w-full"
+                    variant={plan.isPopular ? "default" : "outline"}
+                  >
+                    <Link to="/auth">
+                      {plan.priceMonthly === 0 ? "Get Started Free" : "Start Free Trial"}
+                    </Link>
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           ))}
