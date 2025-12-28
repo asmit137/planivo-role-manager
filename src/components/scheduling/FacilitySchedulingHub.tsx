@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Calendar, ClipboardList, LayoutDashboard, Clock, Send, Trash2, Filter } from 'lucide-react';
+import { Plus, Calendar, ClipboardList, LayoutDashboard, Clock, Send, Trash2, Filter, Monitor } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { LoadingState } from '@/components/layout/LoadingState';
@@ -19,6 +19,7 @@ import { EmptyState } from '@/components/layout/EmptyState';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { ShiftCalendarView } from './ShiftCalendarView';
 import { SchedulingDashboard } from './SchedulingDashboard';
+import { ScheduleDisplaySettings } from './ScheduleDisplaySettings';
 
 interface FacilitySchedulingHubProps {
   facilityId?: string;
@@ -342,7 +343,7 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ fa
         )}
 
         <div className="overflow-x-auto scrollbar-hide -mx-2 px-2 mb-6">
-          <TabsList className="grid w-max min-w-full grid-cols-3 gap-1">
+          <TabsList className="grid w-max min-w-full grid-cols-4 gap-1">
             <TabsTrigger value="schedules" className="flex items-center gap-2 min-h-[44px] px-3">
               <ClipboardList className="h-4 w-4" />
               <span className="hidden sm:inline">Schedules</span>
@@ -354,6 +355,10 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ fa
             <TabsTrigger value="dashboard" className="flex items-center gap-2 min-h-[44px] px-3">
               <LayoutDashboard className="h-4 w-4" />
               <span className="hidden sm:inline">Dashboard</span>
+            </TabsTrigger>
+            <TabsTrigger value="display" className="flex items-center gap-2 min-h-[44px] px-3">
+              <Monitor className="h-4 w-4" />
+              <span className="hidden sm:inline">Display</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -672,6 +677,10 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ fa
               description="Add departments to this facility first"
             />
           )}
+        </TabsContent>
+
+        <TabsContent value="display">
+          <ScheduleDisplaySettings facilityId={facilityId} />
         </TabsContent>
       </Tabs>
     </ErrorBoundary>

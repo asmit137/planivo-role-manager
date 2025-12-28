@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, Users, LayoutDashboard } from 'lucide-react';
+import { Calendar, Users, LayoutDashboard, Monitor } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { ShiftCalendarView } from './ShiftCalendarView';
 import { InteractiveStaffCalendar } from './InteractiveStaffCalendar';
 import { SchedulingDashboard } from './SchedulingDashboard';
 import { StaffScheduleView } from './StaffScheduleView';
+import { ScheduleDisplaySettings } from './ScheduleDisplaySettings';
 import { EmptyState } from '@/components/layout/EmptyState';
 
 interface SchedulingHubProps {
@@ -45,11 +46,11 @@ export const SchedulingHub: React.FC<SchedulingHubProps> = ({ departmentId }) =>
     );
   }
 
-  // Department Head sees assignments, calendar, dashboard (no schedule creation)
+  // Department Head sees assignments, calendar, dashboard, display (no schedule creation)
   return (
     <ErrorBoundary>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="assignments" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Assign Staff</span>
@@ -61,6 +62,10 @@ export const SchedulingHub: React.FC<SchedulingHubProps> = ({ departmentId }) =>
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <LayoutDashboard className="h-4 w-4" />
             <span className="hidden sm:inline">Dashboard</span>
+          </TabsTrigger>
+          <TabsTrigger value="display" className="flex items-center gap-2">
+            <Monitor className="h-4 w-4" />
+            <span className="hidden sm:inline">Display</span>
           </TabsTrigger>
         </TabsList>
 
@@ -74,6 +79,10 @@ export const SchedulingHub: React.FC<SchedulingHubProps> = ({ departmentId }) =>
 
         <TabsContent value="dashboard">
           <SchedulingDashboard departmentId={effectiveDepartmentId} />
+        </TabsContent>
+
+        <TabsContent value="display">
+          <ScheduleDisplaySettings departmentId={effectiveDepartmentId} />
         </TabsContent>
       </Tabs>
     </ErrorBoundary>
