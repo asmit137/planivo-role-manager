@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import Bootstrap from "./pages/Bootstrap";
 import Dashboard from "./pages/Dashboard";
 import MeetingRoom from "./pages/MeetingRoom";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const App = () => (
               <Route path="/" element={<Auth />} />
               <Route path="/bootstrap" element={<Bootstrap />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/meeting" element={<MeetingRoom />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
