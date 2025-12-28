@@ -19,6 +19,8 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<'login' | 'forgot'>('login');
+  const [resetSent, setResetSent] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -64,6 +66,36 @@ const Auth = () => {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email.trim()) {
+      toast.error('Please enter your email address');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const redirectUrl = `${window.location.origin}/reset-password`;
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      setResetSent(true);
+      toast.success('Password reset link sent to your email!');
+    } catch (error) {
+      toast.error('An error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-background">
       {/* Enhanced Background Pattern */}
@@ -89,56 +121,123 @@ const Auth = () => {
               </h1>
             </div>
           </div>
-          <CardTitle className="text-3xl font-display font-semibold">Welcome Back</CardTitle>
+          <CardTitle className="text-3xl font-display font-semibold">
+            {mode === 'login' ? 'Welcome Back' : 'Reset Password'}
+          </CardTitle>
           <CardDescription className="text-base pt-2">
-            Enterprise Workforce Management System
+            {mode === 'login' 
+              ? 'Enterprise Workforce Management System'
+              : resetSent 
+                ? 'Check your email for the reset link'
+                : 'Enter your email to receive a reset link'
+            }
           </CardDescription>
         </CardHeader>
         <CardContent className="px-8 pb-8">
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                placeholder="your.email@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+          {mode === 'login' ? (
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="your.email@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                  required
+                  className="border-2 h-11 focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                  required
+                  className="border-2 h-11 focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+              </div>
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => setMode('forgot')}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+              <Button
+                type="submit"
+                className="w-full h-11 bg-gradient-primary shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-base font-medium"
                 disabled={loading}
-                required
-                className="border-2 h-11 focus:ring-2 focus:ring-primary/20 transition-all"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
-                required
-                className="border-2 h-11 focus:ring-2 focus:ring-primary/20 transition-all"
-              />
-            </div>
-            <Button
-              type="submit"
-              className="w-full h-11 bg-gradient-primary shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-base font-medium"
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Signing in...
-                </>
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  'Sign In'
+                )}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={handleForgotPassword} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="reset-email" className="text-sm font-medium">Email Address</Label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="your.email@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading || resetSent}
+                  required
+                  className="border-2 h-11 focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+              </div>
+              {!resetSent ? (
+                <Button
+                  type="submit"
+                  className="w-full h-11 bg-gradient-primary shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-200 text-base font-medium"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    'Send Reset Link'
+                  )}
+                </Button>
               ) : (
-                'Sign In'
+                <p className="text-center text-sm text-muted-foreground">
+                  A password reset link has been sent to your email.
+                </p>
               )}
-            </Button>
-          </form>
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('login');
+                    setResetSent(false);
+                  }}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Back to Sign In
+                </button>
+              </div>
+            </form>
+          )}
           <div className="mt-8 pt-6 border-t border-border/50">
             <p className="text-center text-sm text-muted-foreground">
               Don't have an account? <span className="font-medium text-foreground">Contact your administrator</span>
