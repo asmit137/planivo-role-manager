@@ -10,7 +10,6 @@ import {
   Bell,
   Settings,
   LogOut,
-  User,
   ShieldCheck,
   CalendarClock,
   Code,
@@ -22,7 +21,6 @@ import {
   Mail,
   Activity
 } from 'lucide-react';
-import { useModuleContext } from '@/contexts/ModuleContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
 import NotificationBell from '@/components/notifications/NotificationBell';
@@ -62,61 +60,31 @@ const moduleConfig = [
   { key: 'notifications', label: 'Notifications', icon: Bell, path: '/dashboard?tab=notifications' },
 ];
 
-export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
+// Inner content component that uses sidebar context (must be rendered inside Sidebar)
+function SidebarInnerContent({ 
+  hasAccess, 
+  signOut, 
+  roleLabel, 
+  primaryRole, 
+  visibleModules, 
+  currentTab, 
+  handleNavigation, 
+  isActive 
+}: {
+  hasAccess: (moduleKey: string) => boolean;
+  signOut: () => void;
+  roleLabel: string;
+  primaryRole: string | null;
+  visibleModules: typeof moduleConfig;
+  currentTab: string;
+  handleNavigation: (path: string) => void;
+  isActive: (path: string) => boolean;
+}) {
   const { state } = useSidebar();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { data: roles } = useUserRole();
-  
   const collapsed = state === 'collapsed';
 
-  // Get current active tab from URL
-  const searchParams = new URLSearchParams(location.search);
-  const currentTab = searchParams.get('tab') || 'overview';
-
-  const getPrimaryRole = () => {
-    if (!roles || roles.length === 0) return null;
-    const roleHierarchy = ['super_admin', 'organization_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'];
-    for (const role of roleHierarchy) {
-      if (roles.some(r => r.role === role)) {
-        return role;
-      }
-    }
-    return 'staff';
-  };
-
-  const primaryRole = getPrimaryRole();
-
-  // Format role label
-  const getRoleLabel = () => {
-    if (!primaryRole) return '';
-    return primaryRole.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
-  };
-
-  // Filter modules based on permissions
-  const visibleModules = moduleConfig.filter(module => 
-    module.alwaysShow || hasAccess(module.key)
-  );
-
-  const handleNavigation = (path: string) => {
-    navigate(path);
-  };
-
-  const isActive = (modulePath: string) => {
-    if (modulePath === '/dashboard') {
-      return location.pathname === '/dashboard' && !searchParams.get('tab');
-    }
-    const pathTab = new URL(`http://dummy${modulePath}`).searchParams.get('tab');
-    return pathTab === currentTab;
-  };
-
   return (
-    <Sidebar
-      collapsible="icon"
-      className="border-r border-sidebar-border bg-sidebar z-40"
-    >
+    <>
       <SidebarContent className="bg-sidebar">
         {/* Branding with Toggle */}
         <div className={`px-4 py-6 border-b border-sidebar-border bg-sidebar flex items-center justify-between ${collapsed ? 'flex-col gap-4' : ''}`}>
@@ -124,7 +92,7 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
             <>
               <div>
                 <h1 className="text-xl font-display font-bold text-sidebar-foreground">Planivo</h1>
-                <p className="text-xs text-sidebar-foreground/60 mt-1">{getRoleLabel()}</p>
+                <p className="text-xs text-sidebar-foreground/60 mt-1">{roleLabel}</p>
               </div>
               <SidebarTrigger />
             </>
@@ -286,6 +254,72 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
           </div>
         )}
       </SidebarFooter>
+    </>
+  );
+}
+
+export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { data: roles } = useUserRole();
+
+  // Get current active tab from URL
+  const searchParams = new URLSearchParams(location.search);
+  const currentTab = searchParams.get('tab') || 'overview';
+
+  const getPrimaryRole = () => {
+    if (!roles || roles.length === 0) return null;
+    const roleHierarchy = ['super_admin', 'organization_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'];
+    for (const role of roleHierarchy) {
+      if (roles.some(r => r.role === role)) {
+        return role;
+      }
+    }
+    return 'staff';
+  };
+
+  const primaryRole = getPrimaryRole();
+
+  // Format role label
+  const getRoleLabel = () => {
+    if (!primaryRole) return '';
+    return primaryRole.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
+  // Filter modules based on permissions
+  const visibleModules = moduleConfig.filter(module => 
+    module.alwaysShow || hasAccess(module.key)
+  );
+
+  const handleNavigation = (path: string) => {
+    navigate(path);
+  };
+
+  const isActive = (modulePath: string) => {
+    if (modulePath === '/dashboard') {
+      return location.pathname === '/dashboard' && !searchParams.get('tab');
+    }
+    const pathTab = new URL(`http://dummy${modulePath}`).searchParams.get('tab');
+    return pathTab === currentTab;
+  };
+
+  return (
+    <Sidebar
+      collapsible="icon"
+      className="border-r border-sidebar-border bg-sidebar z-40"
+    >
+      <SidebarInnerContent
+        hasAccess={hasAccess}
+        signOut={signOut}
+        roleLabel={getRoleLabel()}
+        primaryRole={primaryRole}
+        visibleModules={visibleModules}
+        currentTab={currentTab}
+        handleNavigation={handleNavigation}
+        isActive={isActive}
+      />
     </Sidebar>
   );
 }
