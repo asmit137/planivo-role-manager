@@ -494,6 +494,83 @@ export type Database = {
           },
         ]
       }
+      schedule_display_tokens: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          department_id: string | null
+          expires_at: string | null
+          facility_id: string | null
+          id: string
+          is_active: boolean | null
+          last_accessed_at: string | null
+          name: string
+          refresh_interval_seconds: number | null
+          show_staff_names: boolean | null
+          token: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          department_id?: string | null
+          expires_at?: string | null
+          facility_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          name: string
+          refresh_interval_seconds?: number | null
+          show_staff_names?: boolean | null
+          token?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          department_id?: string | null
+          expires_at?: string | null
+          facility_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          name?: string
+          refresh_interval_seconds?: number | null
+          show_staff_names?: boolean | null
+          token?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_display_tokens_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_display_tokens_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_display_tokens_facility_id_fkey"
+            columns: ["facility_id"]
+            isOneToOne: false
+            referencedRelation: "facilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_display_tokens_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedules: {
         Row: {
           created_at: string
@@ -1706,6 +1783,7 @@ export type Database = {
         Args: { _department_id: string; _vacation_plan_id: string }
         Returns: Json
       }
+      get_public_schedule: { Args: { p_token: string }; Returns: Json }
       get_user_modules: {
         Args: { _user_id: string }
         Returns: {
