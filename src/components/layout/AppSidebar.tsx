@@ -19,7 +19,8 @@ import {
   Shield,
   BarChart3,
   Cog,
-  Mail
+  Mail,
+  Activity
 } from 'lucide-react';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -162,6 +163,16 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
             <SidebarGroupLabel>System</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => handleNavigation('/dashboard?tab=activity')}
+                    isActive={currentTab === 'activity'}
+                    className="w-full"
+                  >
+                    <Activity className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
+                    {!collapsed && <span>Live Activity</span>}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => handleNavigation('/dashboard?tab=analytics')}

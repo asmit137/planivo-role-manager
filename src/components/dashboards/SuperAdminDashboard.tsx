@@ -28,6 +28,7 @@ import { SecurityDashboard } from '@/components/admin/SecurityDashboard';
 import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
 import { SystemSettingsHub } from '@/components/admin/SystemSettingsHub';
 import { EmailManagement } from '@/components/admin/EmailManagement';
+import { RealTimeActivityMonitor } from '@/components/admin/RealTimeActivityMonitor';
 
 const SuperAdminDashboard = () => {
   const { modules, hasAccess } = useModuleContext();
@@ -327,7 +328,13 @@ const SuperAdminDashboard = () => {
           description="Manage notifications and send system announcements"
         />
       )}
-      {!['dashboard','modules','validator','organization','users','vacation','tasks','staff','messaging','notifications','source-code','scheduling','training','audit','security','analytics','settings','emails'].includes(activeTab) && (
+      {activeTab === 'activity' && (
+        <PageHeader 
+          title="Live Activity Monitor" 
+          description="Real-time view of all system events as they happen"
+        />
+      )}
+      {!['dashboard','modules','validator','organization','users','vacation','tasks','staff','messaging','notifications','source-code','scheduling','training','audit','security','analytics','settings','emails','activity'].includes(activeTab) && (
         <PageHeader 
           title="System Overview" 
           description="Manage your entire system from one centralized dashboard"
@@ -621,6 +628,10 @@ const SuperAdminDashboard = () => {
 
         {activeTab === 'emails' && (
           <EmailManagement />
+        )}
+
+        {activeTab === 'activity' && (
+          <RealTimeActivityMonitor />
         )}
       </div>
     </>
