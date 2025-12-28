@@ -2,6 +2,13 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Building2, Users, Calendar, CheckCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
+const scrollToSection = (id: string) => {
+  const element = document.getElementById(id);
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth' });
+  }
+};
+
 const stats = [
   { label: "Organizations", value: "500+", icon: Building2 },
   { label: "Active Users", value: "25,000+", icon: Users },
@@ -52,8 +59,13 @@ export function HeroSection() {
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="min-w-[180px]">
-              <Link to="/pricing">View Pricing</Link>
+            <Button 
+              variant="outline" 
+              size="lg" 
+              className="min-w-[180px]"
+              onClick={() => scrollToSection('pricing')}
+            >
+              View Pricing
             </Button>
           </div>
 

@@ -165,13 +165,14 @@ const Auth = () => {
                 />
               </div>
               <div className="text-right">
-                <button
+                <Button
                   type="button"
+                  variant="link"
                   onClick={() => setMode('forgot')}
-                  className="text-sm text-primary hover:underline"
+                  className="h-auto p-0 text-sm text-primary hover:underline"
                 >
                   Forgot Password?
-                </button>
+                </Button>
               </div>
               <Button
                 type="submit"
@@ -225,16 +226,17 @@ const Auth = () => {
                 </p>
               )}
               <div className="text-center">
-                <button
+                <Button
                   type="button"
+                  variant="link"
                   onClick={() => {
                     setMode('login');
                     setResetSent(false);
                   }}
-                  className="text-sm text-primary hover:underline"
+                  className="h-auto p-0 text-sm text-primary hover:underline"
                 >
                   Back to Sign In
-                </button>
+                </Button>
               </div>
             </form>
           )}
