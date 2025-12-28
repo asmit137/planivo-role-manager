@@ -14,7 +14,12 @@ import {
   ShieldCheck,
   CalendarClock,
   Code,
-  GraduationCap
+  GraduationCap,
+  FileText,
+  Shield,
+  BarChart3,
+  Cog,
+  Mail
 } from 'lucide-react';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -157,6 +162,56 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
             <SidebarGroupLabel>System</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => handleNavigation('/dashboard?tab=analytics')}
+                    isActive={currentTab === 'analytics'}
+                    className="w-full"
+                  >
+                    <BarChart3 className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
+                    {!collapsed && <span>Analytics</span>}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => handleNavigation('/dashboard?tab=audit')}
+                    isActive={currentTab === 'audit'}
+                    className="w-full"
+                  >
+                    <FileText className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
+                    {!collapsed && <span>Audit Logs</span>}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => handleNavigation('/dashboard?tab=security')}
+                    isActive={currentTab === 'security'}
+                    className="w-full"
+                  >
+                    <Shield className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
+                    {!collapsed && <span>Security</span>}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => handleNavigation('/dashboard?tab=emails')}
+                    isActive={currentTab === 'emails'}
+                    className="w-full"
+                  >
+                    <Mail className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
+                    {!collapsed && <span>Broadcasts</span>}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => handleNavigation('/dashboard?tab=settings')}
+                    isActive={currentTab === 'settings'}
+                    className="w-full"
+                  >
+                    <Cog className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
+                    {!collapsed && <span>Settings</span>}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => handleNavigation('/dashboard?tab=modules')}

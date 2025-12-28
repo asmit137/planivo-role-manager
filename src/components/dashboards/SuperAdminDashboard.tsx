@@ -23,6 +23,11 @@ import { SourceCodeHub } from '@/components/admin/SourceCodeHub';
 import { FacilitySchedulingHub } from '@/components/scheduling';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import TrainingHub from '@/components/training/TrainingHub';
+import { AuditLogsDashboard } from '@/components/admin/AuditLogsDashboard';
+import { SecurityDashboard } from '@/components/admin/SecurityDashboard';
+import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
+import { SystemSettingsHub } from '@/components/admin/SystemSettingsHub';
+import { EmailManagement } from '@/components/admin/EmailManagement';
 
 const SuperAdminDashboard = () => {
   const { modules, hasAccess } = useModuleContext();
@@ -292,7 +297,37 @@ const SuperAdminDashboard = () => {
           description="Create and manage meetings and training sessions"
         />
       )}
-      {!['dashboard','modules','validator','organization','users','vacation','tasks','staff','messaging','notifications','source-code','scheduling','training'].includes(activeTab) && (
+      {activeTab === 'audit' && (
+        <PageHeader 
+          title="Audit Logs" 
+          description="View and analyze all system changes and activities"
+        />
+      )}
+      {activeTab === 'security' && (
+        <PageHeader 
+          title="Security Dashboard" 
+          description="Monitor security events, rate limits, and role distribution"
+        />
+      )}
+      {activeTab === 'analytics' && (
+        <PageHeader 
+          title="Analytics" 
+          description="System-wide analytics and usage statistics"
+        />
+      )}
+      {activeTab === 'settings' && (
+        <PageHeader 
+          title="System Settings" 
+          description="Configure global system settings and integrations"
+        />
+      )}
+      {activeTab === 'emails' && (
+        <PageHeader 
+          title="Email & Broadcasts" 
+          description="Manage notifications and send system announcements"
+        />
+      )}
+      {!['dashboard','modules','validator','organization','users','vacation','tasks','staff','messaging','notifications','source-code','scheduling','training','audit','security','analytics','settings','emails'].includes(activeTab) && (
         <PageHeader 
           title="System Overview" 
           description="Manage your entire system from one centralized dashboard"
@@ -566,6 +601,26 @@ const SuperAdminDashboard = () => {
           <ModuleGuard moduleKey="training">
             <TrainingHub />
           </ModuleGuard>
+        )}
+
+        {activeTab === 'audit' && (
+          <AuditLogsDashboard />
+        )}
+
+        {activeTab === 'security' && (
+          <SecurityDashboard />
+        )}
+
+        {activeTab === 'analytics' && (
+          <AnalyticsDashboard />
+        )}
+
+        {activeTab === 'settings' && (
+          <SystemSettingsHub />
+        )}
+
+        {activeTab === 'emails' && (
+          <EmailManagement />
         )}
       </div>
     </>
