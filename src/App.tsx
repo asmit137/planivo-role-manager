@@ -10,6 +10,7 @@ import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
 import { useSecurityProtection } from "@/hooks/useSecurityProtection";
 import Auth from "./pages/Auth";
 import Bootstrap from "./pages/Bootstrap";
+import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import MeetingRoom from "./pages/MeetingRoom";
 import ResetPassword from "./pages/ResetPassword";
@@ -41,7 +42,8 @@ const App = () => (
             <AuthProvider>
               <ModuleProvider>
                 <Routes>
-                  <Route path="/" element={<Auth />} />
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/auth" element={<Auth />} />
                   <Route path="/bootstrap" element={<Bootstrap />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
