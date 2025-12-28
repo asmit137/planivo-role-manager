@@ -7,6 +7,7 @@ import { AuthProvider } from "@/lib/auth";
 import { ModuleProvider } from "@/contexts/ModuleContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
+import { useSecurityProtection } from "@/hooks/useSecurityProtection";
 import Auth from "./pages/Auth";
 import Bootstrap from "./pages/Bootstrap";
 import Dashboard from "./pages/Dashboard";
@@ -17,29 +18,42 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// Security wrapper component
+const SecurityWrapper = ({ children }: { children: React.ReactNode }) => {
+  useSecurityProtection({
+    disableRightClick: true,
+    disableDevTools: true,
+    disableTextSelection: false, // Keep text selection for UX
+  });
+  
+  return <>{children}</>;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <NetworkStatusIndicator />
-        <BrowserRouter>
-          <AuthProvider>
-            <ModuleProvider>
-              <Routes>
-                <Route path="/" element={<Auth />} />
-                <Route path="/bootstrap" element={<Bootstrap />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/meeting" element={<MeetingRoom />} />
-                <Route path="/schedule-display" element={<ScheduleDisplay />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </ModuleProvider>
-          </AuthProvider>
-        </BrowserRouter>
+        <SecurityWrapper>
+          <Toaster />
+          <Sonner />
+          <NetworkStatusIndicator />
+          <BrowserRouter>
+            <AuthProvider>
+              <ModuleProvider>
+                <Routes>
+                  <Route path="/" element={<Auth />} />
+                  <Route path="/bootstrap" element={<Bootstrap />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/meeting" element={<MeetingRoom />} />
+                  <Route path="/schedule-display" element={<ScheduleDisplay />} />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </ModuleProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </SecurityWrapper>
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>

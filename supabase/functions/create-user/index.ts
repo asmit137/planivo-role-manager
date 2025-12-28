@@ -1,22 +1,87 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface CreateUserRequest {
-  email: string;
-  password: string;
-  full_name: string;
-  role: 'super_admin' | 'organization_admin' | 'general_admin' | 'workplace_supervisor' | 'facility_supervisor' | 'department_head' | 'staff';
-  workspace_id?: string;
-  facility_id?: string;
-  department_id?: string;
-  specialty_id?: string;
-  organization_id?: string;
-  force_password_change?: boolean;
+// ============================================
+// Validation Schemas
+// ============================================
+
+const emailSchema = z
+  .string()
+  .min(1, 'Email is required')
+  .email('Invalid email format')
+  .max(255, 'Email must be less than 255 characters')
+  .transform((email) => email.toLowerCase().trim());
+
+const passwordSchema = z
+  .string()
+  .min(6, 'Password must be at least 6 characters')
+  .max(128, 'Password must be less than 128 characters');
+
+const fullNameSchema = z
+  .string()
+  .min(2, 'Name must be at least 2 characters')
+  .max(100, 'Name must be less than 100 characters')
+  .transform((name) => name.trim());
+
+const uuidSchema = z.string().uuid('Invalid UUID format').optional().nullable();
+
+const appRoleSchema = z.enum([
+  'super_admin',
+  'organization_admin',
+  'general_admin',
+  'workplace_supervisor',
+  'facility_supervisor',
+  'department_head',
+  'staff',
+]);
+
+const createUserSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+  full_name: fullNameSchema,
+  role: appRoleSchema,
+  workspace_id: uuidSchema,
+  facility_id: uuidSchema,
+  department_id: uuidSchema,
+  specialty_id: uuidSchema,
+  organization_id: uuidSchema,
+  force_password_change: z.boolean().optional().default(false),
+});
+
+// ============================================
+// Rate Limiting Helper
+// ============================================
+
+async function checkRateLimit(
+  supabase: any,
+  identifier: string,
+  actionType: string,
+  maxRequests: number = 10,
+  windowSeconds: number = 60
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('check_rate_limit', {
+      p_identifier: identifier,
+      p_action_type: actionType,
+      p_max_requests: maxRequests,
+      p_window_seconds: windowSeconds,
+    });
+
+    if (error) {
+      console.error('Rate limit check failed:', error);
+      return true;
+    }
+
+    return data === true;
+  } catch {
+    return true;
+  }
 }
 
 serve(async (req) => {
@@ -36,9 +101,17 @@ serve(async (req) => {
       }
     );
 
-    // Verify the requesting user is a super admin
+    // Verify the requesting user is authenticated
     const authHeader = req.headers.get("Authorization")!;
-    const token = authHeader.replace("Bearer ", "");
+    const token = authHeader?.replace("Bearer ", "");
+    
+    if (!token) {
+      return new Response(
+        JSON.stringify({ error: "No authorization token provided" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { data: { user: requestingUser }, error: authError } = await supabaseClient.auth.getUser(token);
 
     if (authError || !requestingUser) {
@@ -49,18 +122,39 @@ serve(async (req) => {
       );
     }
 
-    // Parse request body first
-    const { email, password, full_name, role, workspace_id, facility_id, department_id, specialty_id, organization_id, force_password_change }: CreateUserRequest = await req.json();
+    // Rate limiting: 20 user creations per minute per admin
+    const withinRateLimit = await checkRateLimit(
+      supabaseClient,
+      requestingUser.id,
+      'create_user',
+      20,
+      60
+    );
 
-    // Validate required fields
-    if (!email || !password || !full_name || !role) {
+    if (!withinRateLimit) {
+      console.warn(`Rate limit exceeded for user ${requestingUser.id} on create_user`);
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Parse and validate request body
+    const rawBody = await req.json();
+    const validationResult = createUserSchema.safeParse(rawBody);
+
+    if (!validationResult.success) {
+      const errors = validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`);
+      console.error("Validation error:", errors);
+      return new Response(
+        JSON.stringify({ error: "Validation failed", details: errors }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Check if requesting user has permission (super admin, organization admin, general admin, workplace supervisor, facility supervisor, or department head)
+    const { email, password, full_name, role, workspace_id, facility_id, department_id, specialty_id, organization_id, force_password_change } = validationResult.data;
+
+    // Check if requesting user has permission
     const { data: roles, error: roleError } = await supabaseClient
       .from("user_roles")
       .select("role, department_id, facility_id, workspace_id")
@@ -75,16 +169,13 @@ serve(async (req) => {
       );
     }
 
-    // Organization admins can only create users within their organization's scope
-    const isOrganizationAdmin = roles.some(r => r.role === "organization_admin");
-
     // Scope validation based on creator's role
     const isDepartmentHead = roles.some(r => r.role === "department_head");
     const isFacilitySupervisor = roles.some(r => r.role === "facility_supervisor");
     const isWorkplaceSupervisor = roles.some(r => r.role === "workplace_supervisor");
 
     // Department heads can only create staff in their department
-    if (isDepartmentHead) {
+    if (isDepartmentHead && !roles.some(r => r.role === 'super_admin')) {
       const departmentHeadRole = roles.find(r => r.role === "department_head");
       if (department_id && department_id !== departmentHeadRole?.department_id) {
         return new Response(
@@ -95,7 +186,7 @@ serve(async (req) => {
     }
 
     // Facility supervisors can only create within their facility
-    if (isFacilitySupervisor) {
+    if (isFacilitySupervisor && !roles.some(r => r.role === 'super_admin')) {
       const facilitySupervisorRole = roles.find(r => r.role === "facility_supervisor");
       if (facility_id && facility_id !== facilitySupervisorRole?.facility_id) {
         return new Response(
@@ -106,7 +197,7 @@ serve(async (req) => {
     }
 
     // Workplace supervisors can only create within their workspace
-    if (isWorkplaceSupervisor) {
+    if (isWorkplaceSupervisor && !roles.some(r => r.role === 'super_admin')) {
       const workplaceSupervisorRole = roles.find(r => r.role === "workplace_supervisor");
       if (workspace_id && workspace_id !== workplaceSupervisorRole?.workspace_id) {
         return new Response(
@@ -157,7 +248,6 @@ serve(async (req) => {
 
     if (profileError) {
       console.error("Profile creation error:", profileError);
-      // Rollback user creation
       await supabaseClient.auth.admin.deleteUser(newUser.user.id);
       return new Response(
         JSON.stringify({ error: "Failed to create profile" }),
@@ -182,7 +272,6 @@ serve(async (req) => {
 
     if (roleInsertError) {
       console.error("Role creation error:", roleInsertError);
-      // Rollback
       await supabaseClient.auth.admin.deleteUser(newUser.user.id);
       return new Response(
         JSON.stringify({ error: "Failed to create role" }),
@@ -199,7 +288,6 @@ serve(async (req) => {
       
       if (orgUpdateError) {
         console.error("Organization owner update error:", orgUpdateError);
-        // Don't rollback, user is created successfully, just log the error
       } else {
         console.log(`Updated organization ${organization_id} owner to ${newUser.user.id}`);
       }
@@ -219,10 +307,11 @@ serve(async (req) => {
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Unexpected error:", error);
+    const message = error instanceof Error ? error.message : "Internal server error";
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
