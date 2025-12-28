@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import NotificationBell from '@/components/notifications/NotificationBell';
 import MessagingPanel from '@/components/messaging/MessagingPanel';
 import UserProfile from '@/components/UserProfile';
+import { ThemeToggleSimple } from '@/components/ThemeToggle';
 import {
   Sidebar,
   SidebarContent,
@@ -197,6 +198,7 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
         {!collapsed ? (
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 justify-between">
+              <ThemeToggleSimple />
               {hasAccess('notifications') && <NotificationBell />}
               {hasAccess('messaging') && <MessagingPanel />}
               <UserProfile collapsed={false} />
@@ -208,6 +210,7 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
           </div>
         ) : (
           <div className="flex flex-col gap-2 items-center">
+            <ThemeToggleSimple />
             {hasAccess('notifications') && <NotificationBell />}
             {hasAccess('messaging') && <MessagingPanel />}
             <UserProfile collapsed={true} />
