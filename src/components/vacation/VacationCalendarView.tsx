@@ -73,7 +73,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
           .from('facilities')
           .select('id')
           .eq('workspace_id', userWorkspaceId);
-        
+
         if (facilities && facilities.length > 0) {
           const facilityIds = facilities.map(f => f.id);
           query = query.in('departments.facility_id', facilityIds);
@@ -115,7 +115,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
   // Get vacations for a specific date
   const getVacationsForDate = (date: Date) => {
     if (!vacations) return [];
-    
+
     return vacations.filter(vacation => {
       return vacation.vacation_splits?.some(split => {
         const start = parseISO(split.start_date);
@@ -129,7 +129,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
   const getVacationStatusColor = (vacationsOnDay: any[]) => {
     const hasApproved = vacationsOnDay.some(v => v.status === 'approved');
     const hasPending = vacationsOnDay.some(v => ['department_pending', 'facility_pending', 'workspace_pending'].includes(v.status));
-    
+
     if (hasApproved && hasPending) {
       return 'bg-purple-100 dark:bg-purple-950 border-purple-300 dark:border-purple-800 hover:bg-purple-200 dark:hover:bg-purple-900';
     }
@@ -145,11 +145,11 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
   // Get upcoming vacations filtered by time range
   const getUpcomingVacations = () => {
     if (!vacations) return [];
-    
+
     const dateRange = getDateRange();
     const today = new Date();
-    
-      return vacations
+
+    return vacations
       .flatMap(vacation => {
         return vacation.vacation_splits
           ?.map(split => ({
@@ -210,12 +210,12 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
               <CardTitle className="text-xl sm:text-2xl">Vacation Calendar</CardTitle>
               <CardDescription className="mt-1 text-sm">
                 {statusFilter === 'approved' ? 'Approved only' :
-                 statusFilter === 'pending' ? 'Pending only' :
-                 'All vacations'}
+                  statusFilter === 'pending' ? 'Pending only' :
+                    'All vacations'}
               </CardDescription>
             </div>
           </div>
-          
+
           {/* Filter Controls */}
           <div className="flex flex-col gap-3 pt-2">
             {/* Status Filters Row */}
@@ -248,7 +248,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                 </Button>
               </div>
             </div>
-            
+
             {/* Time Range Filters Row */}
             <div className="flex flex-col xs:flex-row xs:items-center gap-2">
               <span className="text-sm font-medium text-muted-foreground shrink-0">Range:</span>
@@ -300,22 +300,22 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
               classNames={{
                 months: "flex flex-col gap-4 sm:gap-8 w-full justify-center",
                 month: "space-y-4 flex-1",
-                caption: "flex justify-center pt-1 relative items-center mb-4 sm:mb-6",
-                caption_label: "text-lg sm:text-xl font-bold",
-                nav: "space-x-1 flex items-center",
-                nav_button: "h-9 w-9 sm:h-10 sm:w-10 bg-transparent p-0 opacity-50 hover:opacity-100 hover:bg-accent rounded-md transition-opacity",
-                nav_button_previous: "absolute left-0",
-                nav_button_next: "absolute right-0",
+                caption: "flex justify-center pt-1 relative items-center mb-4 sm:mb-8",
+                caption_label: "text-lg sm:text-2xl font-bold tracking-tight",
+                nav: "flex items-center",
+                nav_button: "h-10 w-10 bg-transparent p-0 opacity-60 hover:opacity-100 hover:bg-accent rounded-xl transition-all flex items-center justify-center z-20",
+                nav_button_previous: "absolute left-0 top-1/2 -translate-y-1/2",
+                nav_button_next: "absolute right-0 top-1/2 -translate-y-1/2",
                 table: "w-full border-collapse",
-                head_row: "flex w-full mb-2",
-                head_cell: "text-muted-foreground rounded-md font-semibold text-xs sm:text-sm flex-1 text-center py-2",
-                row: "flex w-full mt-1",
-                cell: "relative p-0.5 text-center focus-within:relative focus-within:z-20 flex-1",
-                day: "h-10 sm:h-14 w-full p-0 font-normal hover:bg-accent rounded-md transition-all touch-manipulation",
-                day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
-                day_today: "bg-accent text-accent-foreground font-bold ring-2 ring-primary ring-offset-1 sm:ring-offset-2",
-                day_outside: "text-muted-foreground opacity-30",
-                day_disabled: "text-muted-foreground opacity-30",
+                head_row: "flex w-full mb-4",
+                head_cell: "text-muted-foreground/60 rounded-md font-bold text-[0.65rem] sm:text-xs uppercase tracking-widest flex-1 text-center",
+                row: "flex w-full mt-2",
+                cell: "relative p-0.5 text-center focus-within:relative focus-within:z-20 flex-1 h-10 sm:h-16",
+                day: "h-full w-full p-0 font-normal hover:bg-accent/50 rounded-xl transition-all touch-manipulation",
+                day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground shadow-lg shadow-primary/20",
+                day_today: "bg-accent/30 text-accent-foreground font-bold ring-2 ring-primary/20 ring-offset-2",
+                day_outside: "text-muted-foreground opacity-20",
+                day_disabled: "text-muted-foreground opacity-20",
                 day_hidden: "invisible",
               }}
               components={{
@@ -329,95 +329,102 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                         <button
                           {...props}
                           className={cn(
-                            "h-10 sm:h-14 w-full p-1 font-normal hover:bg-accent rounded-md transition-all relative group touch-manipulation",
-                            hasVacations && `font-bold border-2 ${getVacationStatusColor(vacationsOnDay)}`
+                            "h-full w-full p-2 font-normal hover:bg-accent/50 rounded-xl transition-all relative group touch-manipulation flex flex-col items-center justify-center gap-1 overflow-hidden",
+                            hasVacations && `font-bold border-2 ${getVacationStatusColor(vacationsOnDay)}`,
+                            !hasVacations && "border border-transparent"
                           )}
                         >
-                          <time dateTime={format(date, "yyyy-MM-dd")} className="text-sm sm:text-base absolute top-0.5 sm:top-1.5 left-1 sm:left-2">
+                          <time
+                            dateTime={format(date, "yyyy-MM-dd")}
+                            className={cn(
+                              "text-sm sm:text-lg font-medium transition-colors w-full text-center",
+                              isSameDay(date, new Date()) ? "text-primary font-bold" : "text-foreground/70"
+                            )}
+                          >
                             {format(date, "d")}
                           </time>
+
                           {hasVacations && (
-                            <>
+                            <div className="w-full flex items-center justify-between">
                               <div className={cn(
-                                "absolute bottom-0.5 sm:bottom-1.5 right-0.5 sm:right-1.5 text-white text-[10px] sm:text-[11px] font-bold rounded-full h-5 w-5 sm:h-6 sm:w-6 flex items-center justify-center shadow-lg z-10 border border-white/30",
-                                vacationsOnDay.some(v => v.status === 'approved') ? "bg-emerald-600 dark:bg-emerald-500" : "bg-amber-600 dark:bg-amber-500"
+                                "text-white text-[9px] sm:text-[10px] font-black rounded-lg px-1.5 py-0.5 flex items-center justify-center shadow-md z-10 border border-white/10",
+                                vacationsOnDay.some(v => v.status === 'approved') ? "bg-emerald-500" : "bg-amber-500"
                               )}>
                                 {vacationsOnDay.length}
                               </div>
-                              {vacationsOnDay.length > 1 && (
-                                <div className="absolute bottom-0.5 sm:bottom-1.5 left-0.5 sm:left-1.5 hidden sm:flex gap-0.5">
-                                  {vacationsOnDay.slice(0, 3).map((_, idx) => (
-                                    <div 
-                                      key={idx} 
-                                      className={cn(
-                                        "h-1.5 w-1.5 rounded-full shadow-sm",
-                                        vacationsOnDay[idx]?.status === 'approved' ? "bg-emerald-600 dark:bg-emerald-400" : "bg-amber-600 dark:bg-amber-400"
-                                      )}
-                                    />
-                                  ))}
-                                </div>
-                              )}
-                            </>
+
+                              <div className="flex -space-x-1.5 overflow-hidden">
+                                {vacationsOnDay.slice(0, 3).map((v, idx) => (
+                                  <div
+                                    key={idx}
+                                    className={cn(
+                                      "h-2 w-2 sm:h-3 sm:w-3 rounded-full border-2 border-background shadow-sm",
+                                      v.status === 'approved' ? "bg-emerald-400" : "bg-amber-400"
+                                    )}
+                                  />
+                                ))}
+                              </div>
+                            </div>
                           )}
                         </button>
                       </PopoverTrigger>
                       {hasVacations && (
                         <PopoverContent className="w-[calc(100vw-2rem)] sm:w-96 p-3 sm:p-4 max-h-[60vh] overflow-y-auto" side="bottom" align="center">
-                        <div className="space-y-3">
-                          <h4 className="font-semibold text-lg border-b pb-2">
-                            {format(date, "MMMM d, yyyy")}
-                          </h4>
-                          <p className="text-sm text-muted-foreground">
-                            {vacationsOnDay.length} staff member{vacationsOnDay.length > 1 ? 's' : ''} on vacation
-                          </p>
-                          <div className="space-y-2 max-h-96 overflow-y-auto">
-                            {vacationsOnDay.map((vacation) => {
-                              const split = vacation.vacation_splits?.find(s => {
-                                const start = parseISO(s.start_date);
-                                const end = parseISO(s.end_date);
-                                return isWithinInterval(date, { start, end }) || isSameDay(date, start) || isSameDay(date, end);
-                              });
+                          <div className="space-y-3">
+                            <h4 className="font-semibold text-lg border-b pb-2">
+                              {format(date, "MMMM d, yyyy")}
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                              {vacationsOnDay.length} staff member{vacationsOnDay.length > 1 ? 's' : ''} on vacation
+                            </p>
+                            <div className="space-y-2 max-h-96 overflow-y-auto">
+                              {vacationsOnDay.map((vacation) => {
+                                const split = vacation.vacation_splits?.find(s => {
+                                  const start = parseISO(s.start_date);
+                                  const end = parseISO(s.end_date);
+                                  return isWithinInterval(date, { start, end }) || isSameDay(date, start) || isSameDay(date, end);
+                                });
 
-                              return (
-                                <div
-                                  key={vacation.id}
-                                  className="flex items-start gap-3 rounded-lg border bg-card p-3 hover:bg-accent/50 transition-colors"
-                                >
-                                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold flex-shrink-0">
-                                    {vacation.profiles?.full_name?.charAt(0) || '?'}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium truncate">
-                                      {vacation.profiles?.full_name || 'Unknown'}
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                      {vacation.departments?.name}
-                                    </p>
-                                    <div className="mt-1 flex items-center gap-1">
-                                      <Badge variant="secondary" className="text-xs">
-                                        {vacation.vacation_types?.name}
-                                      </Badge>
+                                return (
+                                  <div
+                                    key={vacation.id}
+                                    className="flex items-start gap-3 rounded-lg border bg-card p-3 hover:bg-accent/50 transition-colors"
+                                  >
+                                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold flex-shrink-0">
+                                      {vacation.profiles?.full_name?.charAt(0) || '?'}
                                     </div>
-                                    {split && (
-                                      <p className="text-xs text-muted-foreground mt-1">
-                                        {format(parseISO(split.start_date), "MMM d")} - {format(parseISO(split.end_date), "MMM d")} ({split.days} days)
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium truncate">
+                                        {vacation.profiles?.full_name || 'Unknown'}
                                       </p>
-                                    )}
+                                      <p className="text-sm text-muted-foreground">
+                                        {vacation.departments?.name}
+                                      </p>
+                                      <div className="mt-1 flex items-center gap-1">
+                                        <Badge variant="secondary" className="text-xs">
+                                          {vacation.vacation_types?.name}
+                                        </Badge>
+                                      </div>
+                                      {split && (
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {format(parseISO(split.start_date), "MMM d")} - {format(parseISO(split.end_date), "MMM d")} ({split.days} days)
+                                        </p>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      </PopoverContent>
-                    )}
-                  </Popover>
-                );
-              },
-            }}
-          />
+                        </PopoverContent>
+                      )}
+                    </Popover>
+                  );
+                },
+              }}
+            />
           </div>
-          
+
           {/* Legend */}
           <div className="mt-8 pt-6 border-t">
             <h4 className="text-sm font-semibold mb-4">Legend</h4>
@@ -450,22 +457,22 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
         <CardHeader>
           <CardTitle className="text-2xl">Upcoming Vacations</CardTitle>
           <CardDescription>
-            {statusFilter === 'approved' 
+            {statusFilter === 'approved'
               ? (timeFilter === 'all' ? 'All upcoming approved vacations' : `Approved vacations in the next ${timeFilter} days`)
               : statusFilter === 'pending'
-              ? (timeFilter === 'all' ? 'All upcoming pending vacations' : `Pending vacations in the next ${timeFilter} days`)
-              : (timeFilter === 'all' ? 'All upcoming vacations' : `All vacations in the next ${timeFilter} days`)}
+                ? (timeFilter === 'all' ? 'All upcoming pending vacations' : `Pending vacations in the next ${timeFilter} days`)
+                : (timeFilter === 'all' ? 'All upcoming vacations' : `All vacations in the next ${timeFilter} days`)}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {upcomingVacations.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground text-lg">
-                {statusFilter === 'approved' 
+                {statusFilter === 'approved'
                   ? 'No upcoming approved vacations in this time range'
                   : statusFilter === 'pending'
-                  ? 'No upcoming pending vacations in this time range'
-                  : 'No upcoming vacations in this time range'}
+                    ? 'No upcoming pending vacations in this time range'
+                    : 'No upcoming vacations in this time range'}
               </p>
             </div>
           ) : (
@@ -473,7 +480,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
               {upcomingVacations.map((item, index) => {
                 const isApproved = item.status === 'approved';
                 const isPending = ['department_pending', 'facility_pending', 'workspace_pending'].includes(item.status);
-                
+
                 return (
                   <div
                     key={`${item.id}-${item.split.id}-${index}`}
@@ -483,20 +490,20 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                       isPending && "bg-amber-50/50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
                     )}
                   >
-                  <div className="flex items-start gap-3">
-                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg flex-shrink-0">
-                      {item.profiles?.full_name?.charAt(0) || '?'}
+                    <div className="flex items-start gap-3">
+                      <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg flex-shrink-0">
+                        {item.profiles?.full_name?.charAt(0) || '?'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-base truncate">
+                          {item.profiles?.full_name || 'Unknown'}
+                        </p>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {item.departments?.name}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-base truncate">
-                        {item.profiles?.full_name || 'Unknown'}
-                      </p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {item.departments?.name}
-                      </p>
-                    </div>
-                  </div>
-                    
+
                     <div className="space-y-2">
                       <Badge className={cn(
                         isApproved && "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
@@ -505,10 +512,10 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                         item.status === 'workspace_pending' && "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800"
                       )}>
                         {isApproved ? '✓ Approved' :
-                         item.status === 'department_pending' ? '⏳ Dept. Pending' :
-                         item.status === 'facility_pending' ? '⏳ Facility Pending' :
-                         item.status === 'workspace_pending' ? '⏳ Workspace Pending' :
-                         item.status}
+                          item.status === 'department_pending' ? '⏳ Dept. Pending' :
+                            item.status === 'facility_pending' ? '⏳ Facility Pending' :
+                              item.status === 'workspace_pending' ? '⏳ Workspace Pending' :
+                                item.status}
                       </Badge>
                       <div className="flex items-center gap-2 text-sm">
                         <Badge variant="secondary">

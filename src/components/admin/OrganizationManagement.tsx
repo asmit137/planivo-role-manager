@@ -41,13 +41,13 @@ const OrganizationManagement = () => {
   // Owner fields (for create)
   const [ownerEmail, setOwnerEmail] = useState('');
   const [ownerName, setOwnerName] = useState('');
-  
+
   // Edit owner fields
   const [ownerMode, setOwnerMode] = useState<'keep' | 'select' | 'create'>('keep');
   const [editOwnerEmail, setEditOwnerEmail] = useState('');
   const [editOwnerName, setEditOwnerName] = useState('');
   const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(null);
-  
+
   // Limit fields
   const [maxWorkspaces, setMaxWorkspaces] = useState<LimitState>({ value: 5, unlimited: true });
   const [maxFacilities, setMaxFacilities] = useState<LimitState>({ value: 10, unlimited: true });
@@ -71,7 +71,7 @@ const OrganizationManagement = () => {
         .from('organizations')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data;
     },
@@ -83,14 +83,14 @@ const OrganizationManagement = () => {
     queryFn: async () => {
       const ownerIds = organizations?.map(o => o.owner_id).filter(Boolean) || [];
       if (ownerIds.length === 0) return {};
-      
+
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, email')
         .in('id', ownerIds);
-      
+
       if (error) throw error;
-      
+
       // Return as a lookup object
       const lookup: Record<string, { full_name: string; email: string }> = {};
       data?.forEach(p => {
@@ -108,7 +108,7 @@ const OrganizationManagement = () => {
         .from('workspaces')
         .select('*')
         .order('name');
-      
+
       if (error) throw error;
       return data;
     },
@@ -122,25 +122,25 @@ const OrganizationManagement = () => {
         .from('user_roles')
         .select('user_id')
         .eq('role', 'organization_admin');
-      
+
       if (error) throw error;
-      
+
       if (!data || data.length === 0) return [];
-      
+
       const userIds = data.map(r => r.user_id);
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, email')
         .in('id', userIds);
-      
+
       if (profilesError) throw profilesError;
       return profiles || [];
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: async (params: { 
-      name: string; 
+    mutationFn: async (params: {
+      name: string;
       description?: string;
       ownerEmail?: string;
       ownerName?: string;
@@ -149,7 +149,7 @@ const OrganizationManagement = () => {
       maxUsers?: number | null;
     }) => {
       const validated = organizationSchema.parse({ name: params.name, description: params.description });
-      
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
@@ -169,14 +169,14 @@ const OrganizationManagement = () => {
 
         if (ownerError) throw new Error(ownerError.message || 'Failed to create owner');
         if (ownerResult.error) throw new Error(ownerResult.error);
-        
+
         ownerId = ownerResult.user.id;
       }
 
       const { data, error } = await supabase
         .from('organizations')
-        .insert([{ 
-          name: validated.name, 
+        .insert([{
+          name: validated.name,
           description: validated.description || null,
           created_by: user.id,
           owner_id: ownerId,
@@ -202,9 +202,9 @@ const OrganizationManagement = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (params: { 
-      id: string; 
-      name: string; 
+    mutationFn: async (params: {
+      id: string;
+      name: string;
       description?: string;
       maxWorkspaces?: number | null;
       maxFacilities?: number | null;
@@ -215,9 +215,9 @@ const OrganizationManagement = () => {
       newOwnerName?: string;
     }) => {
       const validated = organizationSchema.parse({ name: params.name, description: params.description });
-      
+
       let ownerId: string | null | undefined = undefined; // undefined = no change
-      
+
       if (params.ownerMode === 'select' && params.selectedOwnerId) {
         ownerId = params.selectedOwnerId;
       } else if (params.ownerMode === 'create' && params.newOwnerEmail && params.newOwnerName) {
@@ -234,23 +234,23 @@ const OrganizationManagement = () => {
 
         if (ownerError) throw new Error(ownerError.message || 'Failed to create owner');
         if (ownerResult.error) throw new Error(ownerResult.error);
-        
+
         ownerId = ownerResult.user.id;
       }
 
-      const updateData: any = { 
-        name: validated.name, 
+      const updateData: any = {
+        name: validated.name,
         description: validated.description || null,
         max_workspaces: params.maxWorkspaces,
         max_facilities: params.maxFacilities,
         max_users: params.maxUsers,
       };
-      
+
       // Only update owner_id if changed
       if (ownerId !== undefined) {
         updateData.owner_id = ownerId;
       }
-      
+
       const { error } = await supabase
         .from('organizations')
         .update(updateData)
@@ -305,8 +305,8 @@ const OrganizationManagement = () => {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate({ 
-      name: name.trim(), 
+    createMutation.mutate({
+      name: name.trim(),
       description: description.trim(),
       ownerEmail: ownerEmail.trim() || undefined,
       ownerName: ownerName.trim() || undefined,
@@ -319,16 +319,16 @@ const OrganizationManagement = () => {
   const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedOrg) return;
-    
+
     // Validate create mode has required fields
     if (ownerMode === 'create' && (!editOwnerEmail.trim() || !editOwnerName.trim())) {
       toast.error('Please provide both name and email for the new owner');
       return;
     }
-    
-    updateMutation.mutate({ 
-      id: selectedOrg.id, 
-      name: name.trim(), 
+
+    updateMutation.mutate({
+      id: selectedOrg.id,
+      name: name.trim(),
       description: description.trim(),
       maxWorkspaces: maxWorkspaces.unlimited ? null : maxWorkspaces.value,
       maxFacilities: maxFacilities.unlimited ? null : maxFacilities.value,
@@ -344,14 +344,14 @@ const OrganizationManagement = () => {
     setSelectedOrg(org);
     setName(org.name);
     setDescription(org.description || '');
-    setMaxWorkspaces(org.max_workspaces === null 
-      ? { value: 5, unlimited: true } 
+    setMaxWorkspaces(org.max_workspaces === null
+      ? { value: 5, unlimited: true }
       : { value: org.max_workspaces, unlimited: false });
-    setMaxFacilities(org.max_facilities === null 
-      ? { value: 10, unlimited: true } 
+    setMaxFacilities(org.max_facilities === null
+      ? { value: 10, unlimited: true }
       : { value: org.max_facilities, unlimited: false });
-    setMaxUsers(org.max_users === null 
-      ? { value: 100, unlimited: true } 
+    setMaxUsers(org.max_users === null
+      ? { value: 100, unlimited: true }
       : { value: org.max_users, unlimited: false });
     // Set owner mode based on current owner
     setOwnerMode(org.owner_id ? 'keep' : 'create');
@@ -375,17 +375,17 @@ const OrganizationManagement = () => {
     return workspacesByOrg?.filter(w => w.organization_id === orgId) || [];
   };
 
-  const formatLimit = (value: number | null) => {
-    return value === null ? '∞' : value.toString();
+  const formatLimit = (value: number | null | undefined) => {
+    return (value === null || value === undefined) ? '∞' : value.toString();
   };
 
-  const LimitInput = ({ 
-    label, 
-    state, 
-    onChange 
-  }: { 
-    label: string; 
-    state: LimitState; 
+  const LimitInput = ({
+    label,
+    state,
+    onChange
+  }: {
+    label: string;
+    state: LimitState;
     onChange: (state: LimitState) => void;
   }) => (
     <div className="space-y-2">
@@ -458,7 +458,7 @@ const OrganizationManagement = () => {
                 </div>
 
                 <Separator />
-                
+
                 <div className="space-y-3">
                   <h4 className="font-medium flex items-center gap-2">
                     <User className="h-4 w-4" />
@@ -500,20 +500,20 @@ const OrganizationManagement = () => {
                     Set maximum resources this organization can create
                   </p>
                   <div className="space-y-4">
-                    <LimitInput 
-                      label="Max Workspaces" 
-                      state={maxWorkspaces} 
-                      onChange={setMaxWorkspaces} 
+                    <LimitInput
+                      label="Max Workspaces"
+                      state={maxWorkspaces}
+                      onChange={setMaxWorkspaces}
                     />
-                    <LimitInput 
-                      label="Max Facilities" 
-                      state={maxFacilities} 
-                      onChange={setMaxFacilities} 
+                    <LimitInput
+                      label="Max Facilities"
+                      state={maxFacilities}
+                      onChange={setMaxFacilities}
                     />
-                    <LimitInput 
-                      label="Max Users" 
-                      state={maxUsers} 
-                      onChange={setMaxUsers} 
+                    <LimitInput
+                      label="Max Users"
+                      state={maxUsers}
+                      onChange={setMaxUsers}
                     />
                   </div>
                 </div>
@@ -539,7 +539,7 @@ const OrganizationManagement = () => {
               const orgWorkspaces = getWorkspacesForOrg(org.id);
               const isExpanded = expandedOrgs.has(org.id);
               const owner = org.owner_id ? ownerProfiles?.[org.owner_id] : null;
-              
+
               return (
                 <Collapsible key={org.id} open={isExpanded} onOpenChange={() => toggleExpanded(org.id)}>
                   <div className="border-2 rounded-lg hover:border-primary/20 transition-colors">
@@ -610,7 +610,7 @@ const OrganizationManagement = () => {
                         </Button>
                       </div>
                     </div>
-                    
+
                     <CollapsibleContent>
                       <div className="px-4 pb-4 pt-0 ml-8 border-t">
                         <h4 className="text-sm font-medium text-muted-foreground mt-3 mb-2">Workspaces</h4>
@@ -677,15 +677,15 @@ const OrganizationManagement = () => {
                 <User className="h-4 w-4" />
                 Organization Owner
               </h4>
-              
+
               {selectedOrg?.owner_id && ownerProfiles?.[selectedOrg.owner_id] && (
                 <p className="text-sm text-muted-foreground">
                   Current Owner: <span className="font-medium">{ownerProfiles[selectedOrg.owner_id].full_name}</span> ({ownerProfiles[selectedOrg.owner_id].email})
                 </p>
               )}
 
-              <RadioGroup 
-                value={ownerMode} 
+              <RadioGroup
+                value={ownerMode}
                 onValueChange={(value) => setOwnerMode(value as 'keep' | 'select' | 'create')}
                 className="space-y-2"
               >
@@ -695,12 +695,12 @@ const OrganizationManagement = () => {
                     <Label htmlFor="owner-keep" className="cursor-pointer">Keep Current Owner</Label>
                   </div>
                 )}
-                
+
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="select" id="owner-select" />
                   <Label htmlFor="owner-select" className="cursor-pointer">Select Existing Admin</Label>
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="create" id="owner-create" />
                   <Label htmlFor="owner-create" className="cursor-pointer">Create New Owner</Label>
@@ -710,8 +710,8 @@ const OrganizationManagement = () => {
               {ownerMode === 'select' && (
                 <div className="space-y-2 pl-6">
                   <Label>Select Organization Admin</Label>
-                  <Select 
-                    value={selectedOwnerId || ''} 
+                  <Select
+                    value={selectedOwnerId || ''}
                     onValueChange={(value) => setSelectedOwnerId(value)}
                   >
                     <SelectTrigger>
@@ -769,20 +769,20 @@ const OrganizationManagement = () => {
             <div className="space-y-3">
               <h4 className="font-medium">Resource Limits</h4>
               <div className="space-y-4">
-                <LimitInput 
-                  label="Max Workspaces" 
-                  state={maxWorkspaces} 
-                  onChange={setMaxWorkspaces} 
+                <LimitInput
+                  label="Max Workspaces"
+                  state={maxWorkspaces}
+                  onChange={setMaxWorkspaces}
                 />
-                <LimitInput 
-                  label="Max Facilities" 
-                  state={maxFacilities} 
-                  onChange={setMaxFacilities} 
+                <LimitInput
+                  label="Max Facilities"
+                  state={maxFacilities}
+                  onChange={setMaxFacilities}
                 />
-                <LimitInput 
-                  label="Max Users" 
-                  state={maxUsers} 
-                  onChange={setMaxUsers} 
+                <LimitInput
+                  label="Max Users"
+                  state={maxUsers}
+                  onChange={setMaxUsers}
                 />
               </div>
             </div>
