@@ -23,6 +23,7 @@ import { ScheduleDisplaySettings } from './ScheduleDisplaySettings';
 
 interface FacilitySchedulingHubProps {
   facilityId?: string;
+  workspaceId?: string;
 }
 
 interface ShiftConfig {
@@ -36,7 +37,10 @@ interface ShiftConfig {
 const DEFAULT_SHIFT_COLORS = ['#3b82f6', '#10b981', '#f59e0b'];
 const DEFAULT_SHIFT_NAMES = ['Morning Shift', 'Afternoon Shift', 'Night Shift'];
 
-export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ facilityId: propFacilityId }) => {
+export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
+  facilityId: propFacilityId,
+  workspaceId: propWorkspaceId
+}) => {
   const [selectedFacilityId, setSelectedFacilityId] = useState<string>(propFacilityId || '');
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -48,14 +52,20 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ fa
   // Use the effective facility ID (prop or selected)
   const facilityId = propFacilityId || selectedFacilityId;
 
-  // Fetch all facilities for Super Admin facility selector
+  // Fetch all facilities for Super Admin / Workplace Supervisor facility selector
   const { data: allFacilities } = useQuery({
-    queryKey: ['all-facilities'],
+    queryKey: ['all-facilities', propWorkspaceId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('facilities')
         .select('id, name, workspaces(name)')
         .order('name');
+
+      if (propWorkspaceId) {
+        query = query.eq('workspace_id', propWorkspaceId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
@@ -555,8 +565,8 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({ fa
               <EmptyState
                 icon={ClipboardList}
                 title={filterDepartmentId === 'all' ? 'No schedules yet' : 'No schedules for this department'}
-                description={filterDepartmentId === 'all' 
-                  ? 'Create your first schedule for a department' 
+                description={filterDepartmentId === 'all'
+                  ? 'Create your first schedule for a department'
                   : 'Create a schedule for this department or select a different filter'
                 }
               />

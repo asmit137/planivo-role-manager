@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -17,7 +18,7 @@ import { cn } from '@/lib/utils';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
 interface TaskManagerProps {
-  scopeType: 'workspace' | 'facility' | 'department';
+  scopeType: 'workspace' | 'facility' | 'department' | 'organization';
   scopeId: string;
 }
 
@@ -44,6 +45,20 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
   const { data: availableStaff } = useQuery({
     queryKey: ['available-staff', scopeType, scopeId],
     queryFn: async () => {
+      if (scopeType === 'organization') {
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .order('full_name');
+
+        if (error) throw error;
+
+        return profiles.map(profile => ({
+          user_id: profile.id,
+          profiles: profile
+        }));
+      }
+
       let query = supabase
         .from('user_roles')
         .select('user_id')
@@ -67,17 +82,17 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
         .from('profiles')
         .select('id, full_name, email')
         .in('id', userIds);
-      
+
       if (profilesError) throw profilesError;
 
       const profilesArray = profiles || [];
-      
+
       return roles.map(role => ({
         user_id: role.user_id,
-        profiles: profilesArray.find(p => p.id === role.user_id) || { 
-          id: role.user_id, 
-          full_name: 'Unknown User', 
-          email: 'No email' 
+        profiles: profilesArray.find(p => p.id === role.user_id) || {
+          id: role.user_id,
+          full_name: 'Unknown User',
+          email: 'No email'
         }
       }));
     },
@@ -97,6 +112,8 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
         query = query.eq('facility_id', scopeId);
       } else if (scopeType === 'department') {
         query = query.eq('department_id', scopeId);
+      } else if (scopeType === 'organization') {
+        // Organization tasks don't have a specific ID, they are global
       }
 
       const { data: tasksData, error: tasksError } = await query.order('created_at', { ascending: false });
@@ -110,7 +127,7 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
         .from('task_assignments')
         .select('id, task_id, assigned_to, status')
         .in('task_id', taskIds);
-      
+
       if (assignError) throw assignError;
 
       // Fetch profiles for assigned users
@@ -119,7 +136,7 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
         .from('profiles')
         .select('id, full_name, email')
         .in('id', assignedUserIds);
-      
+
       if (profilesError) throw profilesError;
 
       const profilesArray = profiles || [];
@@ -147,6 +164,7 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
         workspace: 'workspace_id',
         facility: 'facility_id',
         department: 'department_id',
+        organization: null,
       }[scopeType];
 
       const { data: task, error: taskError } = await supabase
@@ -155,7 +173,7 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
           title: taskData.title,
           description: taskData.description,
           scope_type: scopeType,
-          [scopeField]: scopeId,
+          ...(scopeField ? { [scopeField]: scopeId } : {}),
           due_date: taskData.due_date,
           priority: taskData.priority,
           created_by: user?.id,
@@ -184,7 +202,10 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
       toast.success('Task created');
       resetForm();
     },
-    onError: () => toast.error('Failed to create task'),
+    onError: (error: any) => {
+      console.error('Task creation error:', error);
+      toast.error(`Failed to create task: ${error.message || 'Unknown error'}`);
+    },
   });
 
   const resetForm = () => {
@@ -294,7 +315,26 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
             </div>
 
             <div>
-              <Label>Assign To (Optional)</Label>
+              <div className="flex items-center justify-between mb-2">
+                <Label>Assign To (Optional)</Label>
+                {availableStaff && availableStaff.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => {
+                      if (selectedStaff.length === availableStaff.length) {
+                        setSelectedStaff([]);
+                      } else {
+                        setSelectedStaff(availableStaff.map((s: any) => s.user_id));
+                      }
+                    }}
+                  >
+                    {selectedStaff.length === availableStaff.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                )}
+              </div>
               <div className="border rounded-lg p-2 max-h-40 overflow-y-auto">
                 {availableStaff?.map((staff: any) => (
                   <label

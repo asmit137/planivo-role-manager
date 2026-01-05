@@ -85,7 +85,7 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vacation-plans-list'] });
-      toast.success('Vacation plan submitted to Department Head for approval');
+      toast.success('Vacation plan submitted for approval');
       setSubmittingPlan(null);
     },
     onError: (error: any) => {
@@ -145,7 +145,7 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
           <div className="space-y-4">
             {plans?.map((plan) => {
               const hasConflicts = plan.vacation_approvals?.some((a: any) => a.has_conflict);
-              
+
               return (
                 <Card key={plan.id} className="border-2">
                   {/* Conflict Alert Banner at Top */}
@@ -190,165 +190,165 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
                       </div>
                     </div>
                   )}
-                  
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                      <div>
-                        {!staffView && (
-                          <div className="flex items-center gap-2 mb-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-semibold">
-                              {plan.staff_profile?.full_name}
-                            </span>
-                            <span className="text-sm text-muted-foreground">
-                              ({plan.staff_profile?.email})
-                            </span>
+
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-2">
+                        <div>
+                          {!staffView && (
+                            <div className="flex items-center gap-2 mb-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-semibold">
+                                {plan.staff_profile?.full_name}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                ({plan.staff_profile?.email})
+                              </span>
+                            </div>
+                          )}
+                          <div className="text-sm text-muted-foreground">
+                            {plan.departments?.name}
                           </div>
-                        )}
-                        <div className="text-sm text-muted-foreground">
-                          {plan.departments?.name}
                         </div>
+                        {hasConflicts && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-1 cursor-help text-warning">
+                                  <AlertCircle className="h-4 w-4" />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <div className="space-y-1">
+                                  <p className="font-semibold text-xs">Conflicting Staff:</p>
+                                  {plan.vacation_approvals
+                                    ?.filter((a: any) => a.has_conflict)
+                                    .flatMap((a: any) => a.conflicting_plans || [])
+                                    .map((cp: any, idx: number) => (
+                                      <p key={idx} className="text-xs">
+                                        • {cp.staff_name}: {format(new Date(cp.start_date), 'MMM dd')} - {format(new Date(cp.end_date), 'MMM dd')}
+                                      </p>
+                                    ))}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                       </div>
-                      {hasConflicts && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center gap-1 cursor-help text-warning">
-                                <AlertCircle className="h-4 w-4" />
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              <div className="space-y-1">
-                                <p className="font-semibold text-xs">Conflicting Staff:</p>
-                                {plan.vacation_approvals
-                                  ?.filter((a: any) => a.has_conflict)
-                                  .flatMap((a: any) => a.conflicting_plans || [])
-                                  .map((cp: any, idx: number) => (
-                                    <p key={idx} className="text-xs">
-                                      • {cp.staff_name}: {format(new Date(cp.start_date), 'MMM dd')} - {format(new Date(cp.end_date), 'MMM dd')}
-                                    </p>
-                                  ))}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
+                      {getStatusBadge(plan.status)}
                     </div>
-                    {getStatusBadge(plan.status)}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm font-medium">Vacation Type</p>
-                      <p className="text-sm text-muted-foreground">
-                        {plan.vacation_types?.name}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Total Days</p>
-                      <p className="text-sm text-muted-foreground">{plan.total_days} days</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Created</p>
-                      <p className="text-sm text-muted-foreground">
-                        {format(new Date(plan.created_at), 'PPP')}
-                      </p>
-                    </div>
-                    {plan.submitted_at && (
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-sm font-medium">Submitted</p>
+                        <p className="text-sm font-medium">Vacation Type</p>
                         <p className="text-sm text-muted-foreground">
-                          {format(new Date(plan.submitted_at), 'PPP')}
+                          {plan.vacation_types?.name}
                         </p>
                       </div>
-                    )}
-                  </div>
-
-                  {plan.notes && (
-                    <div className="bg-accent p-3 rounded-lg">
-                      <p className="text-sm font-medium mb-1">Notes:</p>
-                      <p className="text-sm text-muted-foreground">{plan.notes}</p>
-                    </div>
-                  )}
-
-                  {plan.vacation_splits && plan.vacation_splits.length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium mb-2 flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        Vacation Periods ({plan.vacation_splits.length})
-                      </p>
-                      <div className="space-y-2">
-                        {plan.vacation_splits.map((split: any, index: number) => (
-                          <div
-                            key={split.id}
-                            className={cn(
-                              "flex items-center justify-between p-2 rounded",
-                              split.status === 'approved' && "bg-success/10 border border-success",
-                              split.status === 'rejected' && "bg-destructive/10 border border-destructive",
-                              split.status === 'pending' && "bg-accent"
-                            )}
-                          >
-                            <span className="text-sm">Period {index + 1}</span>
-                            <span className="text-sm font-medium">
-                              {format(new Date(split.start_date), 'PPP')} →{' '}
-                              {format(new Date(split.end_date), 'PPP')}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">
-                                {split.days} days
-                              </span>
-                              {split.status && split.status !== 'pending' && (
-                                <Badge className={cn(
-                                  split.status === 'approved' && 'bg-success text-success-foreground',
-                                  split.status === 'rejected' && 'bg-destructive text-destructive-foreground'
-                                )}>
-                                  {split.status === 'approved' ? '✓ Approved' : '✗ Rejected'}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                      <div>
+                        <p className="text-sm font-medium">Total Days</p>
+                        <p className="text-sm text-muted-foreground">{plan.total_days} days</p>
                       </div>
+                      <div>
+                        <p className="text-sm font-medium">Created</p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(plan.created_at), 'PPP')}
+                        </p>
+                      </div>
+                      {plan.submitted_at && (
+                        <div>
+                          <p className="text-sm font-medium">Submitted</p>
+                          <p className="text-sm text-muted-foreground">
+                            {format(new Date(plan.submitted_at), 'PPP')}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  )}
 
-                  {plan.status !== 'draft' && (
-                    <div className="border-t pt-4">
-                      <VacationApprovalTimeline
-                        currentStatus={plan.status}
-                        approvals={plan.vacation_approvals || []}
-                        departmentId={plan.department_id}
-                        facilityId={plan.departments?.facility_id}
-                        workspaceId={plan.departments?.facilities?.workspace_id}
-                      />
-                    </div>
-                  )}
+                    {plan.notes && (
+                      <div className="bg-accent p-3 rounded-lg">
+                        <p className="text-sm font-medium mb-1">Notes:</p>
+                        <p className="text-sm text-muted-foreground">{plan.notes}</p>
+                      </div>
+                    )}
 
-                  {plan.status === 'draft' && 
-                   (plan.created_by === user?.id || plan.staff_id === user?.id) && (
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        onClick={() => setSubmittingPlan(plan.id)}
-                        className="flex-1"
-                        disabled={submitMutation.isPending}
-                      >
-                        <Send className="h-4 w-4 mr-2" />
-                        Submit for Approval
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        onClick={() => setDeletingPlan(plan.id)}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
+                    {plan.vacation_splits && plan.vacation_splits.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Vacation Periods ({plan.vacation_splits.length})
+                        </p>
+                        <div className="space-y-2">
+                          {plan.vacation_splits.map((split: any, index: number) => (
+                            <div
+                              key={split.id}
+                              className={cn(
+                                "flex items-center justify-between p-2 rounded",
+                                split.status === 'approved' && "bg-success/10 border border-success",
+                                split.status === 'rejected' && "bg-destructive/10 border border-destructive",
+                                split.status === 'pending' && "bg-accent"
+                              )}
+                            >
+                              <span className="text-sm">Period {index + 1}</span>
+                              <span className="text-sm font-medium">
+                                {format(new Date(split.start_date), 'PPP')} →{' '}
+                                {format(new Date(split.end_date), 'PPP')}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">
+                                  {split.days} days
+                                </span>
+                                {split.status && split.status !== 'pending' && (
+                                  <Badge className={cn(
+                                    split.status === 'approved' && 'bg-success text-success-foreground',
+                                    split.status === 'rejected' && 'bg-destructive text-destructive-foreground'
+                                  )}>
+                                    {split.status === 'approved' ? '✓ Approved' : '✗ Rejected'}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {plan.status !== 'draft' && (
+                      <div className="border-t pt-4">
+                        <VacationApprovalTimeline
+                          currentStatus={plan.status}
+                          approvals={plan.vacation_approvals || []}
+                          departmentId={plan.department_id}
+                          facilityId={plan.departments?.facility_id}
+                          workspaceId={plan.departments?.facilities?.workspace_id}
+                        />
+                      </div>
+                    )}
+
+                    {plan.status === 'draft' &&
+                      (plan.created_by === user?.id || plan.staff_id === user?.id) && (
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            onClick={() => setSubmittingPlan(plan.id)}
+                            className="flex-1"
+                            disabled={submitMutation.isPending}
+                          >
+                            <Send className="h-4 w-4 mr-2" />
+                            Submit for Approval
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            onClick={() => setDeletingPlan(plan.id)}
+                            disabled={deleteMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                  </CardContent>
+                </Card>
+              );
             })}
 
             {plans?.length === 0 && (
@@ -371,7 +371,7 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
           <AlertDialogHeader>
             <AlertDialogTitle>Submit Vacation Plan?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will submit the vacation plan to the Department Head for Level 1 approval. 
+              This will submit the vacation plan for approval.
               You won't be able to edit it after submission.
             </AlertDialogDescription>
           </AlertDialogHeader>

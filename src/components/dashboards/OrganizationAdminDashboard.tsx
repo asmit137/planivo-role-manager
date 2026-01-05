@@ -11,13 +11,14 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import WorkspaceManagement from '@/components/admin/WorkspaceManagement';
 import { UnifiedUserHub } from '@/components/users';
+import StaffTaskView from '@/components/tasks/StaffTaskView';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
-import { 
-  OrganizationFacilitiesView, 
-  OrganizationVacationMonitor, 
-  OrganizationScheduleMonitor, 
-  OrganizationTaskMonitor, 
-  OrganizationTrainingMonitor 
+import {
+  OrganizationFacilitiesView,
+  OrganizationVacationMonitor,
+  OrganizationScheduleMonitor,
+  OrganizationTaskMonitor,
+  OrganizationTrainingMonitor
 } from '@/components/organization';
 
 const OrganizationAdminDashboard = () => {
@@ -45,7 +46,7 @@ const OrganizationAdminDashboard = () => {
         .select('*')
         .eq('owner_id', user.id)
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -100,14 +101,14 @@ const OrganizationAdminDashboard = () => {
           .select('id')
           .in('workspace_id', workspaceIds);
         const facilityIds = facilities?.map(f => f.id) || [];
-        
+
         if (facilityIds.length > 0) {
           const { data: departments } = await supabase
             .from('departments')
             .select('id')
             .in('facility_id', facilityIds);
           const departmentIds = departments?.map(d => d.id) || [];
-          
+
           if (departmentIds.length > 0) {
             const { count } = await supabase
               .from('vacation_plans')
@@ -164,8 +165,8 @@ const OrganizationAdminDashboard = () => {
 
   if (orgError || !organization) {
     return (
-      <ErrorState 
-        title="No Organization Found" 
+      <ErrorState
+        title="No Organization Found"
         message="You don't have an organization assigned to your account. Please contact the Super Admin."
       />
     );
@@ -202,8 +203,8 @@ const OrganizationAdminDashboard = () => {
               {formatLimit(stats?.workspaces || 0, organization.max_workspaces)}
             </div>
             {organization.max_workspaces && (
-              <Progress 
-                value={getUsagePercentage(stats?.workspaces || 0, organization.max_workspaces)} 
+              <Progress
+                value={getUsagePercentage(stats?.workspaces || 0, organization.max_workspaces)}
                 className="mt-2"
               />
             )}
@@ -228,8 +229,8 @@ const OrganizationAdminDashboard = () => {
               {formatLimit(stats?.facilities || 0, organization.max_facilities)}
             </div>
             {organization.max_facilities && (
-              <Progress 
-                value={getUsagePercentage(stats?.facilities || 0, organization.max_facilities)} 
+              <Progress
+                value={getUsagePercentage(stats?.facilities || 0, organization.max_facilities)}
                 className="mt-2"
               />
             )}
@@ -254,8 +255,8 @@ const OrganizationAdminDashboard = () => {
               {formatLimit(stats?.users || 0, organization.max_users)}
             </div>
             {organization.max_users && (
-              <Progress 
-                value={getUsagePercentage(stats?.users || 0, organization.max_users)} 
+              <Progress
+                value={getUsagePercentage(stats?.users || 0, organization.max_users)}
                 className="mt-2"
               />
             )}
@@ -349,7 +350,7 @@ const OrganizationAdminDashboard = () => {
         </TabsContent>
 
         <TabsContent value="workspaces" className="mt-6">
-          <WorkspaceManagement 
+          <WorkspaceManagement
             organizationId={organization.id}
             maxWorkspaces={organization.max_workspaces}
             currentWorkspaceCount={stats?.workspaces || 0}
@@ -361,8 +362,8 @@ const OrganizationAdminDashboard = () => {
         </TabsContent>
 
         <TabsContent value="users" className="mt-6">
-          <UnifiedUserHub 
-            mode="organization_admin" 
+          <UnifiedUserHub
+            mode="organization_admin"
             organizationId={organization.id}
             maxUsers={organization.max_users}
             currentUserCount={stats?.users || 0}
@@ -378,7 +379,18 @@ const OrganizationAdminDashboard = () => {
         </TabsContent>
 
         <TabsContent value="tasks" className="mt-6">
-          <OrganizationTaskMonitor organizationId={organization.id} />
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="overview">Organization Overview</TabsTrigger>
+              <TabsTrigger value="my-tasks">My Assigned Tasks</TabsTrigger>
+            </TabsList>
+            <TabsContent value="overview">
+              <OrganizationTaskMonitor organizationId={organization.id} />
+            </TabsContent>
+            <TabsContent value="my-tasks">
+              <StaffTaskView />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="training" className="mt-6">

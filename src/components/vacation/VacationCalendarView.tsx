@@ -25,7 +25,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
   const { data: roles } = useUserRole();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('30');
-  const [statusFilter, setStatusFilter] = useState<'approved' | 'pending' | 'all'>('approved');
+  const [statusFilter, setStatusFilter] = useState<'approved' | 'pending' | 'all'>('all');
 
   // Determine user's role and scope
   const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
@@ -45,48 +45,68 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
         .select(`
           id,
           staff_id,
+          department_id,
           vacation_type_id,
           status,
           total_days,
           profiles!vacation_plans_staff_id_fkey(id, full_name, email),
           departments!vacation_plans_department_id_fkey(id, name, facility_id),
           vacation_types(id, name),
-          vacation_splits(id, start_date, end_date, days, status)
+          vacation_splits(id, start_date, end_date, days)
         `);
 
-      // Apply status filter
+      // Apply status filter - ensure 'draft' is included when appropriate
       if (statusFilter === 'approved') {
         query = query.eq('status', 'approved');
       } else if (statusFilter === 'pending') {
         query = query.in('status', ['department_pending', 'facility_pending', 'workspace_pending']);
       } else {
-        // 'all' - show both approved and pending
-        query = query.in('status', ['approved', 'department_pending', 'facility_pending', 'workspace_pending']);
+        // 'all' - show all relevant statuses
+        query = query.in('status', ['draft', 'approved', 'department_pending', 'facility_pending', 'workspace_pending']);
       }
 
       // Apply role-based filtering
       if (isSuperAdmin) {
-        // Super admin sees all
+        // Super admin sees all, no additional filters
       } else if (isWorkplaceSupervisor && userWorkspaceId) {
-        // Workspace supervisor sees all in their workspace
+        // Workplace supervisor sees all departments in the workspace - get facility IDs first
         const { data: facilities } = await supabase
           .from('facilities')
           .select('id')
           .eq('workspace_id', userWorkspaceId);
 
-        if (facilities && facilities.length > 0) {
-          const facilityIds = facilities.map(f => f.id);
-          query = query.in('departments.facility_id', facilityIds);
+        const facilityIds = facilities?.map(f => f.id) || [];
+
+        const { data: depts } = await supabase
+          .from('departments')
+          .select('id')
+          .in('facility_id', facilityIds);
+
+        if (depts && depts.length > 0) {
+          query = query.in('department_id', depts.map(d => d.id));
+        } else {
+          query = query.eq('staff_id', user?.id);
         }
       } else if (isFacilitySupervisor && userFacilityId) {
-        // Facility supervisor sees all in their facility
-        query = query.eq('departments.facility_id', userFacilityId);
+        // Facility supervisor sees all departments in their facility
+        const { data: depts } = await supabase
+          .from('departments')
+          .select('id')
+          .eq('facility_id', userFacilityId);
+
+        if (depts) {
+          query = query.in('department_id', depts.map(d => d.id));
+        } else {
+          query = query.eq('staff_id', user?.id);
+        }
       } else if (isDepartmentHead && userDepartmentId) {
         // Department head sees their department
         query = query.eq('department_id', userDepartmentId);
       } else {
         // Staff sees own + approved in department
-        query = query.or(`staff_id.eq.${user?.id},department_id.eq.${userDepartmentId}`);
+        const staffFilters = [`staff_id.eq.${user?.id}`];
+        if (userDepartmentId) staffFilters.push(`department_id.eq.${userDepartmentId}`);
+        query = query.or(staffFilters.join(','));
       }
 
       const { data, error } = await query;

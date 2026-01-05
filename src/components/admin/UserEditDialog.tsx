@@ -32,18 +32,19 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [editRoleDepartmentId, setEditRoleDepartmentId] = useState('');
   const [editRoleSpecialtyId, setEditRoleSpecialtyId] = useState('');
-  
+  const [editRoleFacilityId, setEditRoleFacilityId] = useState('');
+
   // For scoped mode (Department Head editing staff)
   const [scopedDepartmentId, setScopedDepartmentId] = useState('');
   const [scopedSpecialtyId, setScopedSpecialtyId] = useState('');
-  
+
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (user) {
       setFullName(user.full_name || '');
       setIsActive(user.is_active ?? true);
-      
+
       // Initialize scoped mode fields
       if (mode === 'scoped' && user.roles?.length > 0) {
         const staffRole = user.roles.find((r: any) => r.role === 'staff' || r.role === 'department_head');
@@ -74,13 +75,13 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
     queryKey: ['user-module-access', user?.id],
     queryFn: async () => {
       if (!user?.roles || user.roles.length === 0) return [];
-      
+
       const roles = user.roles.map((r: any) => r.role);
       const { data, error } = await supabase
         .from('role_module_access')
         .select('*, module_definitions(*)')
         .in('role', roles);
-      
+
       if (error) throw error;
       return data;
     },
@@ -92,12 +93,13 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
     queryKey: ['user-specific-module-access', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      
+
       const { data, error } = await supabase
         .from('user_module_access')
-        .select('*, module_definitions!user_module_access_module_id_fkey(id, name, key)')
+        // Removing explicit FK hint which seems to be incorrect causing 404
+        .select('*, module_definitions(id, name, key)')
         .eq('user_id', user.id);
-      
+
       if (error) throw error;
       return data;
     },
@@ -134,9 +136,22 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
       const { data, error } = await supabase
         .from('departments')
         .select('*')
-        .is('is_template', false)
+        // Removing .is('is_template', false) as some valid departments might have null or be mislabeled
+        // logic should align with UnifiedUserCreation which only checks parent_department_id
         .is('parent_department_id', null)
         .order('name');
+      if (error) throw error;
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: workspaceDepartments } = useQuery({
+    queryKey: ['workspace-departments'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('workspace_departments')
+        .select('workspace_id, department_template_id');
       if (error) throw error;
       return data;
     },
@@ -224,7 +239,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
         .select('*')
         .eq('id', user.id)
         .single();
-      
+
       const { data: userRoles } = await supabase
         .from('user_roles')
         .select('*')
@@ -233,7 +248,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
       if (updatedProfile && userRoles) {
         onUserUpdate({ ...updatedProfile, roles: userRoles });
       }
-      
+
       toast.success('User updated successfully');
     },
     onError: (error: any) => {
@@ -258,8 +273,9 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['users'] });
+      await queryClient.invalidateQueries({ queryKey: ['unified-users'] });
       await queryClient.invalidateQueries({ queryKey: ['user-module-access', user.id] });
-      
+
       const { data: userRoles } = await supabase
         .from('user_roles')
         .select('*')
@@ -268,7 +284,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
       if (userRoles) {
         onUserUpdate({ ...user, roles: userRoles });
       }
-      
+
       toast.success('Role added successfully');
       setNewRole('general_admin');
       setNewWorkspaceId('');
@@ -282,21 +298,43 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
   });
 
   const updateRoleMutation = useMutation({
-    mutationFn: async ({ roleId, departmentId, specialtyId }: { roleId: string; departmentId: string; specialtyId: string }) => {
+    mutationFn: async ({ roleId, facilityId, departmentId, specialtyId }: { roleId: string; facilityId: string; departmentId: string; specialtyId: string }) => {
+      // If facility changed, get the workspace_id for that facility
+      let workspaceId = null;
+      if (facilityId) {
+        const { data: facility } = await supabase
+          .from('facilities')
+          .select('workspace_id')
+          .eq('id', facilityId)
+          .single();
+        if (facility) workspaceId = facility.workspace_id;
+      }
+
+      // Prepare update object
+      const updates: any = {
+        department_id: departmentId || null,
+        specialty_id: specialtyId || null,
+      };
+
+      // Only update facility and workspace if facilityId is provided (or cleared)
+      // Note: We might want to allow clearing facility too, but assuming for now edits mean typical re-assignment
+      if (facilityId !== undefined) {
+        updates.facility_id = facilityId || null;
+        if (workspaceId) updates.workspace_id = workspaceId;
+      }
+
       const { error } = await supabase
         .from('user_roles')
-        .update({
-          department_id: departmentId || null,
-          specialty_id: specialtyId || null,
-        })
+        .update(updates)
         .eq('id', roleId);
 
       if (error) throw error;
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['users'] });
+      await queryClient.invalidateQueries({ queryKey: ['unified-users'] });
       await queryClient.invalidateQueries({ queryKey: ['user-module-access', user.id] });
-      
+
       const { data: userRoles } = await supabase
         .from('user_roles')
         .select('*')
@@ -305,8 +343,9 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
       if (userRoles) {
         onUserUpdate({ ...user, roles: userRoles });
       }
-      
+
       setEditingRoleId(null);
+      setEditRoleFacilityId('');
       setEditRoleDepartmentId('');
       setEditRoleSpecialtyId('');
       toast.success('Role updated successfully');
@@ -327,8 +366,9 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['users'] });
+      await queryClient.invalidateQueries({ queryKey: ['unified-users'] });
       await queryClient.invalidateQueries({ queryKey: ['user-module-access', user.id] });
-      
+
       const { data: userRoles } = await supabase
         .from('user_roles')
         .select('*')
@@ -337,7 +377,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
       if (userRoles) {
         onUserUpdate({ ...user, roles: userRoles });
       }
-      
+
       toast.success('Role removed successfully');
     },
     onError: (error: any) => {
@@ -351,6 +391,22 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
   };
 
   const handleAddRole = () => {
+    // Validate required fields based on role
+    if (['facility_supervisor', 'department_head', 'staff', 'workplace_supervisor'].includes(newRole)) {
+      if (!newWorkspaceId) {
+        toast.error('Workspace is required for this role');
+        return;
+      }
+      // workplace_supervisor only needs workspace (actually usually facility too unless they manage whole workspace?)
+      // Assuming workplace_supervisor manages a workspace, so might not need facility.
+      // But facility_supervisor, department_head, staff DEFINITELY need a facility.
+
+      if (['facility_supervisor', 'department_head', 'staff'].includes(newRole) && !newFacilityId) {
+        toast.error('Facility is required for this role');
+        return;
+      }
+    }
+
     addRoleMutation.mutate();
   };
 
@@ -362,6 +418,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
 
   const handleEditRole = (roleData: any) => {
     setEditingRoleId(roleData.id);
+    setEditRoleFacilityId(roleData.facility_id || '');
     setEditRoleDepartmentId(roleData.department_id || '');
     setEditRoleSpecialtyId(roleData.specialty_id || '');
   };
@@ -370,6 +427,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
     if (editingRoleId) {
       updateRoleMutation.mutate({
         roleId: editingRoleId,
+        facilityId: editRoleFacilityId,
         departmentId: editRoleDepartmentId,
         specialtyId: editRoleSpecialtyId,
       });
@@ -378,6 +436,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
 
   const handleCancelRoleEdit = () => {
     setEditingRoleId(null);
+    setEditRoleFacilityId('');
     setEditRoleDepartmentId('');
     setEditRoleSpecialtyId('');
   };
@@ -388,13 +447,47 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
   };
 
   const getFilteredDepartments = () => {
-    if (!newFacilityId || !departments) return [];
-    return departments.filter(d => d.facility_id === newFacilityId);
+    if (!newWorkspaceId || !departments) return [];
+
+    // Get facility specific departments
+    const facilityDepts = newFacilityId
+      ? departments.filter(d => d.facility_id === newFacilityId)
+      : [];
+
+    // Get workspace template departments
+    const templateIds = workspaceDepartments
+      ?.filter(wd => wd.workspace_id === newWorkspaceId)
+      .map(wd => wd.department_template_id) || [];
+
+    const templateDepts = departments.filter(d => templateIds.includes(d.id));
+
+    // Combine and deduplicate
+    const combined = [...facilityDepts, ...templateDepts];
+    return Array.from(new Map(combined.map(item => [item.id, item])).values());
   };
 
   const getEditFilteredDepartments = (facilityId: string) => {
     if (!facilityId || !departments) return [];
-    return departments.filter(d => d.facility_id === facilityId);
+
+    // Need workspace ID for the facility to check templates
+    const facility = facilities?.find(f => f.id === facilityId);
+    const workspaceId = facility?.workspace_id;
+
+    // Get facility specific departments
+    const facilityDepts = departments.filter(d => d.facility_id === facilityId);
+
+    // Get workspace template departments
+    const templateIds = workspaceId && workspaceDepartments
+      ? workspaceDepartments
+        .filter(wd => wd.workspace_id === workspaceId)
+        .map(wd => wd.department_template_id)
+      : [];
+
+    const templateDepts = departments.filter(d => templateIds.includes(d.id));
+
+    // Combine and deduplicate
+    const combined = [...facilityDepts, ...templateDepts];
+    return Array.from(new Map(combined.map(item => [item.id, item])).values());
   };
 
   // Group module access by module
@@ -518,243 +611,278 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
             {/* Roles Section - Only show in full mode */}
             {mode === 'full' && (
               <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold mb-3">Current Roles</h3>
-                {user.roles && user.roles.length > 0 ? (
-                  <div className="space-y-2">
-                    {user.roles.map((roleData: any) => {
-                      const workspace = workspaces?.find(w => w.id === roleData.workspace_id);
-                      const facility = facilities?.find(f => f.id === roleData.facility_id);
-                      const department = departments?.find(d => d.id === roleData.department_id);
-                      const specialty = editSpecialties?.find(s => s.id === roleData.specialty_id);
-                      const isEditing = editingRoleId === roleData.id;
-                      
-                      return (
-                        <div key={roleData.id} className="p-3 border rounded-lg space-y-3">
-                          <div className="flex items-center justify-between">
-                            <Badge variant="outline">{roleData.role.replace(/_/g, ' ')}</Badge>
-                            <div className="flex gap-2">
-                              {!isEditing ? (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleEditRole(roleData)}
-                                  >
-                                    Edit
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleDeleteRole(roleData.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                </>
-                              ) : (
-                                <>
-                                  <Button
-                                    variant="default"
-                                    size="sm"
-                                    onClick={handleSaveRoleEdit}
-                                    disabled={updateRoleMutation.isPending}
-                                  >
-                                    Save
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleCancelRoleEdit}
-                                  >
-                                    Cancel
-                                  </Button>
-                                </>
-                              )}
+                <div>
+                  <h3 className="font-semibold mb-3">Current Roles</h3>
+                  {user.roles && user.roles.length > 0 ? (
+                    <div className="space-y-2">
+                      {user.roles.map((roleData: any) => {
+                        const workspace = workspaces?.find(w => w.id === roleData.workspace_id);
+                        const facility = facilities?.find(f => f.id === roleData.facility_id);
+                        const department = departments?.find(d => d.id === roleData.department_id);
+                        const specialty = editSpecialties?.find(s => s.id === roleData.specialty_id);
+                        const isEditing = editingRoleId === roleData.id;
+
+                        return (
+                          <div key={roleData.id} className="p-3 border rounded-lg space-y-3">
+                            <div className="flex items-center justify-between">
+                              <Badge variant="outline">{roleData.role.replace(/_/g, ' ')}</Badge>
+                              <div className="flex gap-2">
+                                {!isEditing ? (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEditRole(roleData)}
+                                    >
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleDeleteRole(roleData.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button
+                                      variant="default"
+                                      size="sm"
+                                      onClick={handleSaveRoleEdit}
+                                      disabled={updateRoleMutation.isPending}
+                                    >
+                                      Save
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={handleCancelRoleEdit}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                          
-                          {!isEditing ? (
-                            <div className="text-sm text-muted-foreground space-y-0.5">
-                              {workspace && <p>Workspace: {workspace.name}</p>}
-                              {facility && <p>Facility: {facility.name}</p>}
-                              {department && <p>Department: {department.name}</p>}
-                              {specialty && <p>Specialty: {specialty.name}</p>}
-                            </div>
-                          ) : (
-                            <div className="space-y-3">
+
+                            {!isEditing ? (
                               <div className="text-sm text-muted-foreground space-y-0.5">
                                 {workspace && <p>Workspace: {workspace.name}</p>}
                                 {facility && <p>Facility: {facility.name}</p>}
+                                {department && <p>Department: {department.name}</p>}
+                                {specialty && <p>Specialty: {specialty.name}</p>}
                               </div>
-                              
-                              {roleData.facility_id && (
+                            ) : (
+                              <div className="space-y-3">
+                                <div className="text-sm text-muted-foreground space-y-0.5">
+                                  {workspace && <p>Workspace: {workspace.name}</p>}
+                                </div>
+
+                                {/* Facility Select for Editing */}
                                 <div className="space-y-2">
-                                  <Label>Department</Label>
-                                  <Select 
-                                    value={editRoleDepartmentId} 
+                                  <Label>Facility</Label>
+                                  <Select
+                                    value={editRoleFacilityId}
                                     onValueChange={(val) => {
-                                      setEditRoleDepartmentId(val);
+                                      setEditRoleFacilityId(val);
+                                      setEditRoleDepartmentId('');
                                       setEditRoleSpecialtyId('');
                                     }}
                                   >
                                     <SelectTrigger>
-                                      <SelectValue placeholder="Select department" />
+                                      <SelectValue placeholder="Select facility" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {getEditFilteredDepartments(roleData.facility_id).map((dept) => (
-                                        <SelectItem key={dept.id} value={dept.id}>
-                                          {dept.name}
+                                      {/* Show facilities from the same workspace OR all facilities if current one is not found (fallback) */}
+                                      {roleData.workspace_id && facilities?.filter(f => f.workspace_id === roleData.workspace_id).map((facility) => (
+                                        <SelectItem key={facility.id} value={facility.id}>
+                                          {facility.name}
+                                        </SelectItem>
+                                      ))}
+                                      {/* If no workspace assigned or fallback needed, show all (or filtered by admin access which is already done in fetching) */}
+                                      {(!roleData.workspace_id) && facilities?.map(facility => (
+                                        <SelectItem key={facility.id} value={facility.id}>
+                                          {facility.name}
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
                                 </div>
-                              )}
 
-                              {editRoleDepartmentId && editSpecialties && editSpecialties.length > 0 && (
-                                <div className="space-y-2">
-                                  <Label>Specialty</Label>
-                                  <Select value={editRoleSpecialtyId} onValueChange={setEditRoleSpecialtyId}>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select specialty" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {editSpecialties.map((spec) => (
-                                        <SelectItem key={spec.id} value={spec.id}>
-                                          {spec.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No roles assigned</p>
-                )}
-              </div>
+                                {/* Department Select (Depends on Edit Facility ID) */}
+                                {editRoleFacilityId && (
+                                  <div className="space-y-2">
+                                    <Label>Department</Label>
+                                    <Select
+                                      value={editRoleDepartmentId}
+                                      onValueChange={(val) => {
+                                        setEditRoleDepartmentId(val);
+                                        setEditRoleSpecialtyId('');
+                                      }}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select department" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {getEditFilteredDepartments(editRoleFacilityId).length > 0 ? (
+                                          getEditFilteredDepartments(editRoleFacilityId).map((dept) => (
+                                            <SelectItem key={dept.id} value={dept.id}>
+                                              {dept.name}
+                                            </SelectItem>
+                                          ))
+                                        ) : (
+                                          <SelectItem value="no-depts" disabled>No departments found</SelectItem>
+                                        )}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
 
-              <div className="space-y-3 border-t pt-4">
-                <h3 className="font-semibold">Add New Role</h3>
-                
-                <div className="space-y-2">
-                  <Label>Role</Label>
-                  <Select value={newRole} onValueChange={setNewRole}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="super_admin">Super Admin</SelectItem>
-                      <SelectItem value="general_admin">General Admin</SelectItem>
-                      <SelectItem value="workplace_supervisor">Workplace Supervisor</SelectItem>
-                      <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
-                      <SelectItem value="department_head">Department Head</SelectItem>
-                      <SelectItem value="staff">Staff</SelectItem>
-                    </SelectContent>
-                  </Select>
+                                {editRoleDepartmentId && editSpecialties && editSpecialties.length > 0 && (
+                                  <div className="space-y-2">
+                                    <Label>Specialty</Label>
+                                    <Select value={editRoleSpecialtyId} onValueChange={setEditRoleSpecialtyId}>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select specialty" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {editSpecialties.map((spec) => (
+                                          <SelectItem key={spec.id} value={spec.id}>
+                                            {spec.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No roles assigned</p>
+                  )}
                 </div>
 
-                {newRole !== 'super_admin' && (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Workspace</Label>
-                      <Select value={newWorkspaceId} onValueChange={(val) => {
-                        setNewWorkspaceId(val);
-                        setNewFacilityId('');
-                        setNewDepartmentId('');
-                        setNewSpecialtyId('');
-                      }}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select workspace" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {workspaces?.map((workspace) => (
-                            <SelectItem key={workspace.id} value={workspace.id}>
-                              {workspace.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                <div className="space-y-3 border-t pt-4">
+                  <h3 className="font-semibold">Add New Role</h3>
 
-                    {newWorkspaceId && (
+                  <div className="space-y-2">
+                    <Label>Role</Label>
+                    <Select value={newRole} onValueChange={setNewRole}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="super_admin">Super Admin</SelectItem>
+                        <SelectItem value="general_admin">General Admin</SelectItem>
+                        <SelectItem value="workplace_supervisor">Workplace Supervisor</SelectItem>
+                        <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
+                        <SelectItem value="department_head">Department Head</SelectItem>
+                        <SelectItem value="staff">Staff</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {newRole !== 'super_admin' && (
+                    <>
                       <div className="space-y-2">
-                        <Label>Facility (Optional)</Label>
-                        <Select value={newFacilityId} onValueChange={(val) => {
-                          setNewFacilityId(val);
+                        <Label>Workspace</Label>
+                        <Select value={newWorkspaceId} onValueChange={(val) => {
+                          setNewWorkspaceId(val);
+                          setNewFacilityId('');
                           setNewDepartmentId('');
                           setNewSpecialtyId('');
                         }}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select facility" />
+                            <SelectValue placeholder="Select workspace" />
                           </SelectTrigger>
                           <SelectContent>
-                            {getFilteredFacilities().map((facility) => (
-                              <SelectItem key={facility.id} value={facility.id}>
-                                {facility.name}
+                            {workspaces?.map((workspace) => (
+                              <SelectItem key={workspace.id} value={workspace.id}>
+                                {workspace.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-                    )}
 
-                    {newFacilityId && (
-                      <div className="space-y-2">
-                        <Label>Department (Optional)</Label>
-                        <Select value={newDepartmentId} onValueChange={(val) => {
-                          setNewDepartmentId(val);
-                          setNewSpecialtyId('');
-                        }}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select department" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {getFilteredDepartments().map((dept) => (
-                              <SelectItem key={dept.id} value={dept.id}>
-                                {dept.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                      {newWorkspaceId && (
+                        <div className="space-y-2">
+                          <Label>Facility (Optional)</Label>
+                          <Select value={newFacilityId} onValueChange={(val) => {
+                            setNewFacilityId(val);
+                            setNewDepartmentId('');
+                            setNewSpecialtyId('');
+                          }}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select facility" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getFilteredFacilities().map((facility) => (
+                                <SelectItem key={facility.id} value={facility.id}>
+                                  {facility.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
 
-                    {newDepartmentId && specialties && specialties.length > 0 && (
-                      <div className="space-y-2">
-                        <Label>Specialty (Optional)</Label>
-                        <Select value={newSpecialtyId} onValueChange={setNewSpecialtyId}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select specialty" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {specialties.map((specialty) => (
-                              <SelectItem key={specialty.id} value={specialty.id}>
-                                {specialty.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </>
-                )}
+                      {newFacilityId && (
+                        <div className="space-y-2">
+                          <Label>Department (Optional)</Label>
+                          <Select value={newDepartmentId} onValueChange={(val) => {
+                            setNewDepartmentId(val);
+                            setNewSpecialtyId('');
+                          }}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select department" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getFilteredDepartments().map((dept) => (
+                                <SelectItem key={dept.id} value={dept.id}>
+                                  {dept.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
 
-                <Button 
-                  onClick={handleAddRole} 
-                  className="w-full"
-                  disabled={addRoleMutation.isPending}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  {addRoleMutation.isPending ? 'Adding...' : 'Add Role'}
-                </Button>
+                      {newDepartmentId && specialties && specialties.length > 0 && (
+                        <div className="space-y-2">
+                          <Label>Specialty (Optional)</Label>
+                          <Select value={newSpecialtyId} onValueChange={setNewSpecialtyId}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select specialty" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {specialties.map((specialty) => (
+                                <SelectItem key={specialty.id} value={specialty.id}>
+                                  {specialty.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <Button
+                    onClick={handleAddRole}
+                    className="w-full"
+                    disabled={addRoleMutation.isPending}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    {addRoleMutation.isPending ? 'Adding...' : 'Add Role'}
+                  </Button>
+                </div>
               </div>
-            </div>
             )}
 
             <Separator />
@@ -779,7 +907,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                     <ul className="mt-2 text-sm text-muted-foreground space-y-1">
                       {userSpecificAccess.map((access: any) => (
                         <li key={access.id} className="flex items-center gap-2">
-                          • {access.module_definitions?.name}: 
+                          • {access.module_definitions?.name}:
                           {access.can_view && <Badge variant="secondary" className="text-xs">View</Badge>}
                           {access.can_edit && <Badge variant="secondary" className="text-xs">Edit</Badge>}
                           {access.can_delete && <Badge variant="secondary" className="text-xs">Delete</Badge>}
@@ -796,7 +924,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                       const hasOverride = userSpecificAccess?.some(
                         (ua: any) => ua.module_id === access.module.id
                       );
-                      
+
                       return (
                         <div key={access.module.id} className={`border rounded-lg p-4 ${hasOverride ? 'border-primary/50 bg-primary/5' : ''}`}>
                           <div className="flex items-center justify-between mb-3">

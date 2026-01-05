@@ -96,11 +96,11 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     table: 'vacation_plans',
     invalidateQueries: ['vacation-plans', 'department-staff'],
   });
-
-  useRealtimeSubscription({
-    table: 'vacation_splits',
-    invalidateQueries: ['vacation-plans'],
-  });
+  +
+    useRealtimeSubscription({
+      table: 'vacation_splits',
+      invalidateQueries: ['vacation-plans'],
+    });
 
   useRealtimeSubscription({
     table: 'vacation_types',
@@ -124,29 +124,29 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     queryKey: ['department-staff', effectiveDepartmentId],
     queryFn: async () => {
       if (!effectiveDepartmentId) return [];
-      
+
       // First get user_roles for the department
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id, role')
         .eq('department_id', effectiveDepartmentId)
         .in('role', ['staff', 'department_head']);
-      
+
       if (rolesError) throw rolesError;
       if (!roles || roles.length === 0) return [];
-      
+
       // Get profile data for these users
       const userIds = roles.map(r => r.user_id);
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, email')
         .in('id', userIds);
-      
+
       if (profilesError) throw profilesError;
-      
+
       // Ensure profiles is always an array
       const profilesArray = profiles || [];
-      
+
       // Combine the data with safe fallback
       return roles
         .map(role => {
@@ -172,7 +172,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     mutationFn: async (planData: any) => {
       // Use the effective department ID
       const targetDepartmentId = effectiveDepartmentId;
-      
+
       if (!targetDepartmentId) {
         throw new Error('No department ID available');
       }
@@ -190,7 +190,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
           `You already have a vacation request from ${format(new Date(overlap.start_date), 'PPP')} to ${format(new Date(overlap.end_date), 'PPP')} (${overlap.vacation_type}) that overlaps with this date range. Please modify your existing request or choose different dates.`
         );
       }
-      
+
       const { data: plan, error: planError } = await supabase
         .from('vacation_plans')
         .insert({
@@ -223,6 +223,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vacation-plans'] });
+      queryClient.invalidateQueries({ queryKey: ['vacations'] });
       toast.success('Vacation plan created');
       resetForm();
     },
@@ -250,11 +251,11 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   const updateSplit = (index: number, field: keyof VacationSplit, value: any) => {
     const newSplits = [...splits];
     newSplits[index] = { ...newSplits[index], [field]: value };
-    
+
     if (field === 'start_date' || field === 'end_date') {
       const start = new Date(newSplits[index].start_date);
       const end = new Date(newSplits[index].end_date);
-      
+
       // Only validate if both dates are set and valid
       if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
         // Validate end date is not before start date
@@ -262,13 +263,13 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
           toast.error('End date cannot be before start date');
           return;
         }
-        
+
         const diffTime = Math.abs(end.getTime() - start.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
         newSplits[index].days = diffDays;
       }
     }
-    
+
     setSplits(newSplits);
   };
 
@@ -282,17 +283,17 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (isSuperAdmin && !selectedDepartment) {
       toast.error('Please select a department');
       return;
     }
-    
+
     if (!effectiveStaffOnly && !selectedStaff) {
       toast.error('Please select staff member');
       return;
     }
-    
+
     if (!selectedVacationType) {
       toast.error('Please select vacation type');
       return;

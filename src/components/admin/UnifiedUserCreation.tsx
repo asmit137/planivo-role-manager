@@ -37,14 +37,14 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
   const [organizationId, setOrganizationId] = useState('');
   const [role, setRole] = useState<'staff' | 'department_head' | 'facility_supervisor' | 'workplace_supervisor' | 'general_admin' | 'organization_admin'>('staff');
   const queryClient = useQueryClient();
-  
+
   // Get current user's roles to determine permissions
   const { data: currentUserRoles } = useUserRole();
-  
+
   // Determine highest role and scope
   const getHighestRole = (): AppRole | null => {
     if (!currentUserRoles || currentUserRoles.length === 0) return null;
-    
+
     const roleHierarchy: AppRole[] = [
       'super_admin',
       'organization_admin',
@@ -54,7 +54,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       'department_head',
       'staff'
     ];
-    
+
     for (const hierarchyRole of roleHierarchy) {
       if (currentUserRoles.some(r => r.role === hierarchyRole)) {
         return hierarchyRole;
@@ -62,10 +62,10 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     }
     return null;
   };
-  
+
   const highestRole = getHighestRole();
   const currentUserRole = currentUserRoles?.[0]; // Get first role for scope info
-  
+
   // Determine available roles based on creator's role
   const getAvailableRoles = (): AppRole[] => {
     switch (highestRole) {
@@ -84,14 +84,14 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
         return ['staff'];
     }
   };
-  
+
   const availableRoles = getAvailableRoles();
-  
+
   // Check if department is required based on role
   const isDepartmentRequired = role === 'staff' || role === 'department_head';
   const isFacilityRequired = !['workplace_supervisor', 'general_admin', 'organization_admin'].includes(role);
   const isOrganizationRequired = role === 'organization_admin';
-  
+
   // Auto-scope facility and department based on creator's role
   useEffect(() => {
     if (currentUserRole) {
@@ -105,6 +105,33 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       }
     }
   }, [currentUserRole, highestRole]);
+
+  // DIAGNOSTIC CHECK: Verify schema exists on mount
+  useEffect(() => {
+    const checkSchema = async () => {
+      try {
+        // Try to select the new columns. If they don't exist, this will throw.
+        const { error } = await supabase
+          .from('profiles')
+          .select('force_password_change')
+          .limit(1);
+
+        if (error && error.message.includes('does not exist')) {
+          toast.error("CRITICAL: Database is outdated. 'force_password_change' column is missing. Please run the Diagnostic Script!", {
+            duration: 10000,
+            action: {
+              label: "Get Script",
+              onClick: () => console.log("User notified of missing script")
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Schema check failed", e);
+      }
+    };
+
+    checkSchema();
+  }, []);
 
   // Fetch organizations (for organization_admin role)
   const { data: organizations } = useQuery({
@@ -142,7 +169,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     queryKey: ['departments-for-user-creation', facilityId, selectedWorkspaceId],
     queryFn: async () => {
       if (!facilityId) return [];
-      
+
       // First, check for workspace-assigned template departments
       if (selectedWorkspaceId) {
         const { data: workspaceDepts, error: wError } = await supabase
@@ -152,7 +179,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
             departments!inner(id, name, is_template)
           `)
           .eq('workspace_id', selectedWorkspaceId);
-        
+
         if (!wError && workspaceDepts && workspaceDepts.length > 0) {
           // Return template departments assigned to the workspace
           return workspaceDepts
@@ -163,7 +190,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
             }));
         }
       }
-      
+
       // Fall back to facility-specific departments
       const { data, error } = await supabase
         .from('departments')
@@ -171,7 +198,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
         .eq('facility_id', facilityId)
         .is('parent_department_id', null)
         .order('name');
-      
+
       if (error) throw error;
       return data || [];
     },
@@ -275,36 +302,47 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       handleReset();
       onOpenChange(false);
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
+      console.error('Edge Function Error Object:', error);
       let errorMessage = 'Failed to create user';
-      const rawMessage = error instanceof Error ? error.message : String(error);
 
-      if (rawMessage) {
-        // Try to parse structured validation errors (e.g. Zod arrays)
+      // Try to extract detailed error from Edge Function response
+      if (error.context && error.context.error) {
+        errorMessage = error.context.error;
+      } else if (error instanceof Error) {
+        // Try to parse structured validation errors (e.g. Zod arrays) from message
         try {
-          const parsed = JSON.parse(rawMessage);
+          const parsed = JSON.parse(error.message);
           if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.message) {
             errorMessage = parsed.map((e: { message: string }) => e.message).join(', ');
           } else {
-            errorMessage = rawMessage;
+            errorMessage = error.message;
           }
         } catch {
-          if (rawMessage.includes('already been registered') || rawMessage.includes('duplicate')) {
-            errorMessage = 'A user with this email already exists';
-          } else {
-            errorMessage = rawMessage;
-          }
+          errorMessage = error.message;
         }
+      } else if (typeof error === 'string') {
+        errorMessage = error;
       }
-      
+
+      // Check for specific database errors even if they are wrapped
+      if (errorMessage.includes('force_password_change')) {
+        errorMessage = "Database Error: Missing 'force_password_change' column. Please run the Diagnostic Script.";
+      } else if (errorMessage.includes('specialty_id')) {
+        errorMessage = "Database Error: Missing 'specialty_id' column. Please run the Diagnostic Script.";
+      } else if (errorMessage.includes('Edge Function returned a non-2xx status code')) {
+        // Fallback: If we can't read the body, it might be in the logs or content
+        console.log("Full error for debugging:", JSON.stringify(error, null, 2));
+        errorMessage = "System Error: Database schema mismatch. Please run the Diagnostic Script!";
+      }
+
       toast.error(errorMessage);
-      console.error(error);
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     createUserMutation.mutate({
       email: email.trim(),
       full_name: fullName.trim(),
@@ -369,7 +407,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
               <User className="h-4 w-4" />
               Basic Information
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email *</Label>
@@ -455,8 +493,8 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
               </div>
               <div className="space-y-2">
                 <Label htmlFor="organization">Organization *</Label>
-                <Select 
-                  value={organizationId} 
+                <Select
+                  value={organizationId}
                   onValueChange={setOrganizationId}
                   required
                 >
@@ -491,106 +529,106 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                   <Label htmlFor="facility">
                     Facility {isFacilityRequired ? '*' : '(Optional)'}
                   </Label>
-                  <Select 
-                    value={facilityId} 
-                    onValueChange={handleFacilityChange} 
+                  <Select
+                    value={facilityId}
+                    onValueChange={handleFacilityChange}
                     required={isFacilityRequired}
                     disabled={highestRole === 'department_head' || highestRole === 'facility_supervisor' || !isFacilityRequired}
                   >
                     <SelectTrigger id="facility">
                       <SelectValue placeholder={!isFacilityRequired ? "Not required for this role" : "Select facility"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {facilities?.map((facility) => (
-                      <SelectItem key={facility.id} value={facility.id}>
-                        {facility.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {(highestRole === 'department_head' || highestRole === 'facility_supervisor') && (
-                  <p className="text-xs text-muted-foreground">
-                    Auto-assigned to your facility
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="department">
-                  Department {isDepartmentRequired ? '*' : '(Optional)'}
-                </Label>
-                <Select 
-                  value={departmentId} 
-                  onValueChange={handleDepartmentChange}
-                  disabled={!facilityId || highestRole === 'department_head' || !isDepartmentRequired}
-                  required={isDepartmentRequired}
-                >
-                  <SelectTrigger id="department">
-                    <SelectValue placeholder={
-                      !facilityId ? "Select facility first" :
-                      !isDepartmentRequired ? "Not required" :
-                      departments?.length === 0 ? "No departments available" :
-                      "Select department"
-                    } />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments && departments.length > 0 ? (
-                      departments.map((dept) => (
-                        <SelectItem key={dept.id} value={dept.id}>
-                          {dept.name}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {facilities?.map((facility) => (
+                        <SelectItem key={facility.id} value={facility.id}>
+                          {facility.name}
                         </SelectItem>
-                      ))
-                    ) : (
-                      <div className="py-2 px-2 text-sm text-muted-foreground">
-                        No departments found for this facility
-                      </div>
-                    )}
-                  </SelectContent>
-                </Select>
-                {highestRole === 'department_head' && (
-                  <p className="text-xs text-muted-foreground">
-                    Auto-assigned to your department
-                  </p>
-                )}
-                {!isDepartmentRequired && (
-                  <p className="text-xs text-muted-foreground">
-                    Not required for {role === 'workplace_supervisor' ? 'Workplace' : 'Facility'} Supervisor
-                  </p>
-                )}
-                {facilityId && departments?.length === 0 && isDepartmentRequired && (
-                  <p className="text-xs text-destructive">
-                    No departments exist for this facility. Please create departments first in Organization management.
-                  </p>
-                )}
-              </div>
-            </div>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {(highestRole === 'department_head' || highestRole === 'facility_supervisor') && (
+                    <p className="text-xs text-muted-foreground">
+                      Auto-assigned to your facility
+                    </p>
+                  )}
+                </div>
 
-            {isDepartmentRequired && (
-              <div className="space-y-2">
-                <Label htmlFor="specialty">Specialty (Optional)</Label>
-                <Select 
-                  value={specialtyId} 
-                  onValueChange={setSpecialtyId}
-                  disabled={!departmentId}
-                >
-                  <SelectTrigger id="specialty">
-                    <SelectValue placeholder="Select specialty" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {specialties?.map((specialty) => (
-                      <SelectItem key={specialty.id} value={specialty.id}>
-                        {specialty.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {specialties && specialties.length === 0 && departmentId && (
-                  <p className="text-xs text-muted-foreground">
-                    No specialties available for this department
-                  </p>
-                )}
+                <div className="space-y-2">
+                  <Label htmlFor="department">
+                    Department {isDepartmentRequired ? '*' : '(Optional)'}
+                  </Label>
+                  <Select
+                    value={departmentId}
+                    onValueChange={handleDepartmentChange}
+                    disabled={!facilityId || highestRole === 'department_head' || !isDepartmentRequired}
+                    required={isDepartmentRequired}
+                  >
+                    <SelectTrigger id="department">
+                      <SelectValue placeholder={
+                        !facilityId ? "Select facility first" :
+                          !isDepartmentRequired ? "Not required" :
+                            departments?.length === 0 ? "No departments available" :
+                              "Select department"
+                      } />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments && departments.length > 0 ? (
+                        departments.map((dept) => (
+                          <SelectItem key={dept.id} value={dept.id}>
+                            {dept.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="py-2 px-2 text-sm text-muted-foreground">
+                          No departments found for this facility
+                        </div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {highestRole === 'department_head' && (
+                    <p className="text-xs text-muted-foreground">
+                      Auto-assigned to your department
+                    </p>
+                  )}
+                  {!isDepartmentRequired && (
+                    <p className="text-xs text-muted-foreground">
+                      Not required for {role === 'workplace_supervisor' ? 'Workplace' : 'Facility'} Supervisor
+                    </p>
+                  )}
+                  {facilityId && departments?.length === 0 && isDepartmentRequired && (
+                    <p className="text-xs text-destructive">
+                      No departments exist for this facility. Please create departments first in Organization management.
+                    </p>
+                  )}
+                </div>
               </div>
-            )}
+
+              {isDepartmentRequired && (
+                <div className="space-y-2">
+                  <Label htmlFor="specialty">Specialty (Optional)</Label>
+                  <Select
+                    value={specialtyId}
+                    onValueChange={setSpecialtyId}
+                    disabled={!departmentId}
+                  >
+                    <SelectTrigger id="specialty">
+                      <SelectValue placeholder="Select specialty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {specialties?.map((specialty) => (
+                        <SelectItem key={specialty.id} value={specialty.id}>
+                          {specialty.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {specialties && specialties.length === 0 && departmentId && (
+                    <p className="text-xs text-muted-foreground">
+                      No specialties available for this department
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

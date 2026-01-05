@@ -30,7 +30,7 @@ const VacationApprovalTimeline = ({
   facilityId,
   workspaceId,
 }: VacationApprovalTimelineProps) => {
-  
+
   // Fetch designated approvers for each level
   const { data: designatedApprovers } = useQuery({
     queryKey: ['designated-approvers', departmentId, facilityId, workspaceId],
@@ -49,7 +49,7 @@ const VacationApprovalTimeline = ({
           .eq('role', 'department_head')
           .eq('department_id', departmentId)
           .maybeSingle();
-        
+
         if (deptHead?.profiles) {
           results.level1 = (deptHead.profiles as any).full_name || 'Not Assigned';
         }
@@ -63,7 +63,7 @@ const VacationApprovalTimeline = ({
           .eq('role', 'facility_supervisor')
           .eq('facility_id', facilityId)
           .maybeSingle();
-        
+
         if (facilitySup?.profiles) {
           results.level2 = (facilitySup.profiles as any).full_name || 'Not Assigned';
         }
@@ -77,7 +77,7 @@ const VacationApprovalTimeline = ({
           .eq('role', 'workplace_supervisor')
           .eq('workspace_id', workspaceId)
           .maybeSingle();
-        
+
         if (workspaceSup?.profiles) {
           results.level3 = (workspaceSup.profiles as any).full_name || 'Not Assigned';
         }
@@ -87,7 +87,7 @@ const VacationApprovalTimeline = ({
     },
     enabled: !!(departmentId || facilityId || workspaceId),
   });
-  
+
   // Build the 3-level approval stages based on current status and approvals
   const stages: ApprovalStage[] = [
     {
@@ -148,13 +148,13 @@ const VacationApprovalTimeline = ({
                   className={cn(
                     'w-10 h-10 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border-2 transition-all shrink-0',
                     stage.status === 'approved' &&
-                      'bg-success border-success text-success-foreground',
+                    'bg-success border-success text-success-foreground',
                     stage.status === 'rejected' &&
-                      'bg-destructive border-destructive text-destructive-foreground',
+                    'bg-destructive border-destructive text-destructive-foreground',
                     stage.status === 'pending' &&
-                      'bg-warning border-warning text-warning-foreground animate-pulse',
+                    'bg-warning border-warning text-warning-foreground animate-pulse',
                     stage.status === 'waiting' &&
-                      'bg-muted border-border text-muted-foreground'
+                    'bg-muted border-border text-muted-foreground'
                   )}
                 >
                   {stage.status === 'approved' && <CheckCircle2 className="h-4 w-4 sm:h-6 sm:w-6" />}
@@ -162,7 +162,7 @@ const VacationApprovalTimeline = ({
                   {stage.status === 'pending' && <Clock className="h-4 w-4 sm:h-6 sm:w-6" />}
                   {stage.status === 'waiting' && <Hourglass className="h-4 w-4 sm:h-6 sm:w-6" />}
                 </div>
-                
+
                 {/* Connecting Line */}
                 {index < stages.length - 1 && (
                   <div
@@ -175,7 +175,7 @@ const VacationApprovalTimeline = ({
               </div>
             ))}
           </div>
-          
+
           {/* Labels below circles */}
           <div className="flex items-start justify-between sm:justify-center sm:gap-24 md:gap-40">
             {stages.map((stage) => (
@@ -183,11 +183,6 @@ const VacationApprovalTimeline = ({
                 <span className="text-xs sm:text-sm font-medium block mb-1">
                   L{stage.level}
                 </span>
-                {stage.approverName && (
-                  <span className="text-xs sm:text-sm text-muted-foreground block truncate">
-                    {stage.approverName}
-                  </span>
-                )}
               </div>
             ))}
           </div>
@@ -199,7 +194,7 @@ const VacationApprovalTimeline = ({
         {stages.map((stage) => {
           const stageApproval = approvals?.find(a => a.approval_level === stage.level);
           const stageHasConflict = stageApproval?.has_conflict;
-          
+
           return (
             <div
               key={stage.level}
@@ -240,21 +235,31 @@ const VacationApprovalTimeline = ({
                       </TooltipProvider>
                     )}
                   </div>
-                  {stage.approverName && (
-                    <p className="text-sm text-muted-foreground">
-                      👤 {stage.approverName}
-                    </p>
-                  )}
+                  <p className="text-sm text-muted-foreground">
+                    {stage.status === 'approved' ? '✅ Approved by: ' :
+                      stage.status === 'rejected' ? '❌ Rejected by: ' :
+                        '⏳ Pending with: '}
+                    <span className="font-medium text-foreground">{stage.role}</span>
+                  </p>
                 </div>
               </div>
 
               {stage.timestamp && (
                 <p className="text-xs text-muted-foreground mb-2">
-                  {stage.status === 'approved' && '✅ Approved on '}
-                  {stage.status === 'rejected' && '❌ Rejected on '}
-                  {stage.status === 'pending' && '⏳ Pending since '}
+                  {stage.status === 'approved' && 'Completed on '}
+                  {stage.status === 'rejected' && 'Action taken on '}
+                  {stage.status === 'pending' && 'Waiting since '}
                   {format(new Date(stage.timestamp), 'PPP p')}
                 </p>
+              )}
+
+              {stage.status === 'pending' && (
+                <div className="mt-2 p-2 bg-warning/10 border border-warning/20 rounded-md">
+                  <p className="text-xs text-warning flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Currently pending final decision from {stage.role}
+                  </p>
+                </div>
               )}
 
               {stage.status === 'waiting' && (
@@ -312,7 +317,7 @@ function getStageStatus(
   approvals: any[]
 ): 'approved' | 'rejected' | 'pending' | 'waiting' {
   const approval = approvals?.find((a) => a.approval_level === level);
-  
+
   // If there's an explicit approval record, use its status
   if (approval) {
     if (approval.status === 'approved') return 'approved';
@@ -324,7 +329,7 @@ function getStageStatus(
 
   // If the plan is draft, all levels are waiting
   if (currentStatus === 'draft') return 'waiting';
-  
+
   // Level 1 (Department Head)
   if (level === 1) {
     if (currentStatus === 'department_pending') return 'pending';
@@ -334,7 +339,7 @@ function getStageStatus(
     }
     return 'waiting';
   }
-  
+
   // Level 2 (Facility Supervisor)
   if (level === 2) {
     if (currentStatus === 'facility_pending') return 'pending';
@@ -346,7 +351,7 @@ function getStageStatus(
     if (currentStatus === 'department_pending') return 'waiting';
     return 'waiting';
   }
-  
+
   // Level 3 (Workspace Supervisor)
   if (level === 3) {
     if (currentStatus === 'workspace_pending') return 'pending';
@@ -362,7 +367,7 @@ function getStageStatus(
 // Helper function to get approval details from approval records
 function getApprovalDetails(level: number, approvals: any[], designatedApprover?: string) {
   const approval = approvals?.find((a) => a.approval_level === level);
-  
+
   if (!approval) {
     // No approval yet, show designated approver
     return {
@@ -371,7 +376,7 @@ function getApprovalDetails(level: number, approvals: any[], designatedApprover?
   }
 
   return {
-    approverName: approval.profiles?.full_name || designatedApprover || 'Unknown',
+    approverName: approval.profiles?.full_name || designatedApprover || 'Admin/System',
     timestamp: approval.updated_at || approval.created_at,
     comments: approval.comments,
   };

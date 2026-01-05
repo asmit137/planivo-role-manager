@@ -725,7 +725,7 @@ const OrganizationManagement = () => {
                           </SelectItem>
                         ))
                       ) : (
-                        <SelectItem value="" disabled>No organization admins available</SelectItem>
+                        <SelectItem value="no-admins" disabled>No organization admins available</SelectItem>
                       )}
                     </SelectContent>
                   </Select>

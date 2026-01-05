@@ -13,6 +13,8 @@ import WorkspaceModuleManagement from '@/components/admin/WorkspaceModuleManagem
 import { VacationHub } from '@/modules/vacation';
 import TrainingHub from '@/components/training/TrainingHub';
 import TaskManager from '@/components/tasks/TaskManager';
+import StaffTaskView from '@/components/tasks/StaffTaskView';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SchedulingHub } from '@/components/scheduling';
 import { UnifiedUserHub } from '@/components/users';
 import { MessagingHub } from '@/modules/messaging';
@@ -113,186 +115,197 @@ const GeneralAdminDashboard = () => {
       }
     >
       <>
-      {activeTab === 'facilities' && (
-        <PageHeader 
-          title={userRole.workspaces?.name || 'Workspace Management'}
-          description="Manage workspace facilities and organizational structure"
-        />
-      )}
-      {!activeTab && (
-        <PageHeader 
-          title={userRole.workspaces?.name || 'Workspace Management'}
-          description="Overview of workspace statistics and management"
-        />
-      )}
-      {activeTab === 'categories' && (
-        <PageHeader 
-          title="Categories & Departments" 
-          description="Manage organizational categories and department templates"
-        />
-      )}
-      {activeTab === 'users' && (
-        <PageHeader 
-          title="User Management" 
-          description="Manage workspace users and their roles"
-        />
-      )}
-      {activeTab === 'modules' && (
-        <PageHeader 
-          title="Module Configuration" 
-          description="Configure module access for this workspace"
-        />
-      )}
-      {activeTab === 'vacation' && (
-        <PageHeader 
-          title="Vacation Management" 
-          description="Manage vacation plans and approvals for this workspace"
-        />
-      )}
-      {activeTab === 'training' && (
-        <PageHeader 
-          title="Meeting & Training" 
-          description="Create and manage meetings and training sessions"
-        />
-      )}
-      {activeTab === 'tasks' && (
-        <PageHeader 
-          title="Task Management" 
-          description="Manage tasks across the workspace"
-        />
-      )}
-      {activeTab === 'scheduling' && (
-        <PageHeader 
-          title="Scheduling" 
-          description="View and manage schedules across the workspace"
-        />
-      )}
-      {activeTab === 'staff' && (
-        <PageHeader 
-          title="Staff Management" 
-          description="Manage staff members in this workspace"
-        />
-      )}
-      {activeTab === 'messaging' && (
-        <PageHeader 
-          title="Messaging" 
-          description="Communicate with workspace members"
-        />
-      )}
-      {activeTab === 'notifications' && (
-        <PageHeader 
-          title="Notifications" 
-          description="View important updates"
-        />
-      )}
-      
-      <div className="space-y-6">
-        {/* Stats Grid - Show in overview or on tabs */}
-        {stats && !activeTab && (
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-            <StatsCard
-              title="Facilities"
-              value={stats.facilities}
-              icon={Building2}
-            />
-            <StatsCard
-              title="Departments"
-              value={stats.departments}
-              icon={FolderTree}
-            />
-            <StatsCard
-              title="Users"
-              value={stats.users}
-              icon={Users}
-            />
-            <StatsCard
-              title="Pending Vacations"
-              value={stats.pendingVacations}
-              icon={Calendar}
-            />
-            <StatsCard
-              title="Active Tasks"
-              value={stats.activeTasks}
-              icon={ClipboardList}
-            />
-            <StatsCard
-              title="Schedules"
-              value={stats.publishedSchedules}
-              icon={CalendarClock}
-            />
-          </div>
+        {activeTab === 'facilities' && (
+          <PageHeader
+            title={userRole.workspaces?.name || 'Workspace Management'}
+            description="Manage workspace facilities and organizational structure"
+          />
+        )}
+        {!activeTab && (
+          <PageHeader
+            title={userRole.workspaces?.name || 'Workspace Management'}
+            description="Overview of workspace statistics and management"
+          />
+        )}
+        {activeTab === 'categories' && (
+          <PageHeader
+            title="Categories & Departments"
+            description="Manage organizational categories and department templates"
+          />
+        )}
+        {activeTab === 'users' && (
+          <PageHeader
+            title="User Management"
+            description="Manage workspace users and their roles"
+          />
+        )}
+        {activeTab === 'modules' && (
+          <PageHeader
+            title="Module Configuration"
+            description="Configure module access for this workspace"
+          />
+        )}
+        {activeTab === 'vacation' && (
+          <PageHeader
+            title="Vacation Management"
+            description="Manage vacation plans and approvals for this workspace"
+          />
+        )}
+        {activeTab === 'training' && (
+          <PageHeader
+            title="Meeting & Training"
+            description="Create and manage meetings and training sessions"
+          />
+        )}
+        {activeTab === 'tasks' && (
+          <PageHeader
+            title="Task Management"
+            description="Manage tasks across the workspace"
+          />
+        )}
+        {activeTab === 'scheduling' && (
+          <PageHeader
+            title="Scheduling"
+            description="View and manage schedules across the workspace"
+          />
+        )}
+        {activeTab === 'staff' && (
+          <PageHeader
+            title="Staff Management"
+            description="Manage staff members in this workspace"
+          />
+        )}
+        {activeTab === 'messaging' && (
+          <PageHeader
+            title="Messaging"
+            description="Communicate with workspace members"
+          />
+        )}
+        {activeTab === 'notifications' && (
+          <PageHeader
+            title="Notifications"
+            description="View important updates"
+          />
         )}
 
-        {/* Management Sections */}
-        <div className="space-y-4">
-          {activeTab === 'facilities' && hasAccess('organization') && (
-            <ModuleGuard moduleKey="organization">
-              <WorkspaceManagement />
-            </ModuleGuard>
+        <div className="space-y-6">
+          {/* Stats Grid - Show in overview or on tabs */}
+          {stats && !activeTab && (
+            <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+              <StatsCard
+                title="Facilities"
+                value={stats.facilities}
+                icon={Building2}
+              />
+              <StatsCard
+                title="Departments"
+                value={stats.departments}
+                icon={FolderTree}
+              />
+              <StatsCard
+                title="Users"
+                value={stats.users}
+                icon={Users}
+              />
+              <StatsCard
+                title="Pending Vacations"
+                value={stats.pendingVacations}
+                icon={Calendar}
+              />
+              <StatsCard
+                title="Active Tasks"
+                value={stats.activeTasks}
+                icon={ClipboardList}
+              />
+              <StatsCard
+                title="Schedules"
+                value={stats.publishedSchedules}
+                icon={CalendarClock}
+              />
+            </div>
           )}
 
-          {activeTab === 'categories' && hasAccess('organization') && (
-            <ModuleGuard moduleKey="organization">
-              <CategoryDepartmentManagement />
-            </ModuleGuard>
-          )}
+          {/* Management Sections */}
+          <div className="space-y-4">
+            {activeTab === 'facilities' && hasAccess('organization') && (
+              <ModuleGuard moduleKey="organization">
+                <WorkspaceManagement />
+              </ModuleGuard>
+            )}
 
-          {activeTab === 'users' && hasAccess('user_management') && (
-            <ModuleGuard moduleKey="user_management">
-              <FacilityUserManagement />
-            </ModuleGuard>
-          )}
+            {activeTab === 'categories' && hasAccess('organization') && (
+              <ModuleGuard moduleKey="organization">
+                <CategoryDepartmentManagement />
+              </ModuleGuard>
+            )}
 
-          {activeTab === 'modules' && (
-            <ModuleGuard moduleKey="organization">
-              <WorkspaceModuleManagement />
-            </ModuleGuard>
-          )}
+            {activeTab === 'users' && hasAccess('user_management') && (
+              <ModuleGuard moduleKey="user_management">
+                <FacilityUserManagement />
+              </ModuleGuard>
+            )}
 
-          {activeTab === 'vacation' && hasAccess('vacation_planning') && (
-            <ModuleGuard moduleKey="vacation_planning">
-              <VacationHub />
-            </ModuleGuard>
-          )}
+            {activeTab === 'modules' && (
+              <ModuleGuard moduleKey="organization">
+                <WorkspaceModuleManagement />
+              </ModuleGuard>
+            )}
 
-          {activeTab === 'training' && hasAccess('training') && (
-            <ModuleGuard moduleKey="training">
-              <TrainingHub />
-            </ModuleGuard>
-          )}
+            {activeTab === 'vacation' && hasAccess('vacation_planning') && (
+              <ModuleGuard moduleKey="vacation_planning">
+                <VacationHub />
+              </ModuleGuard>
+            )}
 
-          {activeTab === 'tasks' && hasAccess('task_management') && (
-            <ModuleGuard moduleKey="task_management">
-              <TaskManager scopeType="workspace" scopeId={userRole.workspace_id} />
-            </ModuleGuard>
-          )}
+            {activeTab === 'training' && hasAccess('training') && (
+              <ModuleGuard moduleKey="training">
+                <TrainingHub />
+              </ModuleGuard>
+            )}
 
-          {activeTab === 'scheduling' && hasAccess('scheduling') && (
-            <ModuleGuard moduleKey="scheduling">
-              <SchedulingHub />
-            </ModuleGuard>
-          )}
+            {activeTab === 'tasks' && hasAccess('task_management') && (
+              <ModuleGuard moduleKey="task_management">
+                <Tabs defaultValue="manage" className="w-full">
+                  <TabsList className="mb-4">
+                    <TabsTrigger value="manage">Manage Workspace Tasks</TabsTrigger>
+                    <TabsTrigger value="my-tasks">My Assigned Tasks</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="manage">
+                    <TaskManager scopeType="workspace" scopeId={userRole.workspace_id} />
+                  </TabsContent>
+                  <TabsContent value="my-tasks">
+                    <StaffTaskView />
+                  </TabsContent>
+                </Tabs>
+              </ModuleGuard>
+            )}
 
-          {activeTab === 'staff' && hasAccess('staff_management') && (
-            <ModuleGuard moduleKey="staff_management">
-              <UnifiedUserHub scope="workspace" scopeId={userRole.workspace_id} />
-            </ModuleGuard>
-          )}
+            {activeTab === 'scheduling' && hasAccess('scheduling') && (
+              <ModuleGuard moduleKey="scheduling">
+                <SchedulingHub />
+              </ModuleGuard>
+            )}
 
-          {activeTab === 'messaging' && hasAccess('messaging') && (
-            <ModuleGuard moduleKey="messaging">
-              <MessagingHub />
-            </ModuleGuard>
-          )}
+            {activeTab === 'staff' && hasAccess('staff_management') && (
+              <ModuleGuard moduleKey="staff_management">
+                <UnifiedUserHub scope="workspace" scopeId={userRole.workspace_id} />
+              </ModuleGuard>
+            )}
 
-          {activeTab === 'notifications' && hasAccess('notifications') && (
-            <ModuleGuard moduleKey="notifications">
-              <NotificationHub />
-            </ModuleGuard>
-          )}
+            {activeTab === 'messaging' && hasAccess('messaging') && (
+              <ModuleGuard moduleKey="messaging">
+                <MessagingHub />
+              </ModuleGuard>
+            )}
+
+            {activeTab === 'notifications' && hasAccess('notifications') && (
+              <ModuleGuard moduleKey="notifications">
+                <NotificationHub />
+              </ModuleGuard>
+            )}
+          </div>
         </div>
-      </div>
-    </>
+      </>
     </ErrorBoundary>
   );
 };

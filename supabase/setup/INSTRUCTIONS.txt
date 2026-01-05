@@ -1,0 +1,20 @@
+SUPABASE STEP-BY-STEP SETUP INSTRUCTIONS
+
+To ensure your database is correctly configured without large-script errors, please run these files in the order listed below in your Supabase SQL Editor:
+
+1.  00_enums.sql
+2.  01_core_tables.sql
+3.  02_functions_triggers.sql
+4.  03_rls_policies.sql
+5.  04_modules_core.sql
+6.  05_organizations.sql
+7.  06_training_module.sql
+8.  07_chat_realtime.sql
+9.  08_seeds_final.sql
+
+---
+Tips:
+- If a step shows an "already exists" notice, it is fine; I have added safety checks.
+- If you encounter a hard ERROR, please note which file and which step it occurred in.
+- These files are located at: supabase/setup/
+---

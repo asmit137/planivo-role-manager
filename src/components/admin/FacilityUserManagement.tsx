@@ -19,12 +19,7 @@ const facilitySchema = z.object({
   workspace_id: z.string().uuid('Invalid workspace'),
 });
 
-const userSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  full_name: z.string().min(2, 'Name must be at least 2 characters'),
-  role: z.enum(['general_admin', 'facility_supervisor', 'department_head', 'staff']),
-});
+// User schema no longer needed here if we remove the creation dialog
 
 interface FacilityUserManagementProps {
   maxFacilities?: number | null;
@@ -34,14 +29,8 @@ interface FacilityUserManagementProps {
 const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: FacilityUserManagementProps) => {
   const facilityAtLimit = maxFacilities !== null && maxFacilities !== undefined && (currentFacilityCount || 0) >= maxFacilities;
   const [facilityDialogOpen, setFacilityDialogOpen] = useState(false);
-  const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState('');
-  const [selectedFacility, setSelectedFacility] = useState('');
   const [facilityName, setFacilityName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState<string>('staff');
   const queryClient = useQueryClient();
 
   // Real-time subscriptions for live updates
@@ -67,7 +56,7 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
         .from('workspaces')
         .select('*')
         .order('name');
-      
+
       if (workspacesError) throw workspacesError;
 
       // Fetch facilities for each workspace
@@ -78,7 +67,7 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
             .select('*')
             .eq('workspace_id', workspace.id)
             .order('name');
-          
+
           if (facilitiesError) throw facilitiesError;
 
           // Fetch users for each facility
@@ -88,7 +77,7 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
                 .from('user_roles')
                 .select('*')
                 .eq('facility_id', facility.id);
-              
+
               if (rolesError) throw rolesError;
 
               // Fetch user profiles separately
@@ -97,7 +86,7 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
                 .from('profiles')
                 .select('id, full_name, email')
                 .in('id', userIds);
-              
+
               if (profilesError) throw profilesError;
 
               return {
@@ -129,7 +118,7 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
   const createFacilityMutation = useMutation({
     mutationFn: async (data: { name: string; workspace_id: string }) => {
       const validated = facilitySchema.parse(data);
-      
+
       const { data: facility, error } = await supabase
         .from('facilities')
         .insert({
@@ -154,37 +143,6 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
     },
   });
 
-  const createUserMutation = useMutation({
-    mutationFn: async (userData: any) => {
-      const validated = userSchema.parse(userData);
-      
-      const { data, error } = await supabase.functions.invoke('create-user', {
-        body: {
-          email: validated.email,
-          password: validated.password,
-          full_name: validated.full_name,
-          role: validated.role,
-          facility_id: selectedFacility,
-        },
-      });
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspaces-with-facilities'] });
-      toast.success('User created successfully');
-      setEmail('');
-      setPassword('');
-      setFullName('');
-      setRole('staff');
-      setSelectedFacility('');
-      setUserDialogOpen(false);
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to create user');
-    },
-  });
 
   const handleCreateFacility = (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,19 +156,6 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
     });
   };
 
-  const handleCreateUser = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedFacility) {
-      toast.error('Please select a facility');
-      return;
-    }
-    createUserMutation.mutate({
-      email,
-      password,
-      full_name: fullName,
-      role,
-    });
-  };
 
   return (
     <div className="space-y-6">
@@ -225,8 +170,8 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
             <div className="flex gap-2">
               <Dialog open={facilityDialogOpen} onOpenChange={setFacilityDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     disabled={facilityAtLimit}
                     title={facilityAtLimit ? 'Facility limit reached' : undefined}
                   >
@@ -272,88 +217,6 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
                 </DialogContent>
               </Dialog>
 
-              <Dialog open={userDialogOpen} onOpenChange={setUserDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-gradient-primary">
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Add User to Facility
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add User to Facility</DialogTitle>
-                    <DialogDescription>Create a new user and assign to a facility</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleCreateUser} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Select Facility</Label>
-                      <Select value={selectedFacility} onValueChange={setSelectedFacility}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select facility" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {workspaces?.flatMap((workspace) =>
-                            workspace.facilities.map((facility: any) => (
-                              <SelectItem key={facility.id} value={facility.id}>
-                                {workspace.name} - {facility.name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="user-name">Full Name</Label>
-                      <Input
-                        id="user-name"
-                        placeholder="John Doe"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="user-email">Email</Label>
-                      <Input
-                        id="user-email"
-                        type="email"
-                        placeholder="user@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="user-password">Password</Label>
-                      <Input
-                        id="user-password"
-                        type="password"
-                        placeholder="Minimum 6 characters"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="user-role">Role</Label>
-                      <Select value={role} onValueChange={setRole}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="general_admin">General Admin</SelectItem>
-                          <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
-                          <SelectItem value="department_head">Department Head</SelectItem>
-                          <SelectItem value="staff">Staff</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button type="submit" className="w-full" disabled={createUserMutation.isPending}>
-                      {createUserMutation.isPending ? 'Creating...' : 'Create User'}
-                    </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
             </div>
           </div>
         </CardHeader>

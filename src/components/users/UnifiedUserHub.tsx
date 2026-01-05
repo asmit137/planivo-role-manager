@@ -38,16 +38,16 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
   const [editingUser, setEditingUser] = useState<any>(null);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
-  
+
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
   const { data: userRoles } = useUserRole();
   const { canEdit, canDelete, canAdmin } = useModuleContext();
 
   // Auto-detect scope from user's role if not provided
-  const detectedScope: 'system' | 'workspace' | 'facility' | 'department' = 
-    scope || (userRoles?.[0]?.role === 'super_admin' ? 'system' : 
-              userRoles?.[0]?.role === 'department_head' ? 'department' : 'system');
+  const detectedScope: 'system' | 'workspace' | 'facility' | 'department' =
+    scope || (userRoles?.[0]?.role === 'super_admin' ? 'system' :
+      userRoles?.[0]?.role === 'department_head' ? 'department' : 'system');
   const detectedScopeId = scopeId || userRoles?.[0]?.department_id || userRoles?.[0]?.facility_id || userRoles?.[0]?.workspace_id;
 
   // Check permissions for user management module
@@ -102,12 +102,12 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
 
       // Filter profiles based on scope
       let filteredProfiles = profiles || [];
-      
+
       if (detectedScope === 'department' && detectedScopeId) {
         // Department Heads see staff in their department
         const departmentRoles = allUserRoles?.filter(
-          (ur) => ur.department_id === detectedScopeId && 
-                  (ur.role === 'staff' || ur.role === 'department_head')
+          (ur) => ur.department_id === detectedScopeId &&
+            (ur.role === 'staff' || ur.role === 'department_head')
         );
         const userIds = departmentRoles?.map((ur) => ur.user_id) || [];
         filteredProfiles = profiles?.filter((p) => userIds.includes(p.id)) || [];
@@ -161,11 +161,30 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
 
       if (error) throw error;
     },
+    onMutate: async ({ userId, isActive }) => {
+      await queryClient.cancelQueries({ queryKey: ['unified-users'] });
+
+      const previousUsers = queryClient.getQueryData(['unified-users', detectedScope, detectedScopeId, filterWorkspace]);
+
+      queryClient.setQueryData(
+        ['unified-users', detectedScope, detectedScopeId, filterWorkspace],
+        (old: any) => old?.map((u: any) => u.id === userId ? { ...u, is_active: isActive } : u)
+      );
+
+      return { previousUsers };
+    },
     onSuccess: (_, variables) => {
       toast.success(`User ${variables.isActive ? 'activated' : 'deactivated'}`);
+      // Refresh to ensure sync with server
       queryClient.invalidateQueries({ queryKey: ['unified-users'] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _, context: any) => {
+      if (context?.previousUsers) {
+        queryClient.setQueryData(
+          ['unified-users', detectedScope, detectedScopeId, filterWorkspace],
+          context.previousUsers
+        );
+      }
       toast.error(`Failed to update status: ${error.message}`);
     },
   });
@@ -177,7 +196,7 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
         .from('user_roles')
         .delete()
         .eq('user_id', userId);
-      
+
       if (rolesError) throw rolesError;
     },
     onSuccess: () => {
@@ -272,7 +291,7 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
         if (!departmentRole?.specialty_id) {
           return <span className="text-xs text-muted-foreground">Not assigned</span>;
         }
-        
+
         const specialty = allDepartments?.find((d) => d.id === departmentRole.specialty_id);
         return specialty ? (
           <Badge variant="outline">{specialty.name}</Badge>
@@ -339,7 +358,7 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
   });
 
   const scopeTitle = detectedScope === 'department' ? 'Staff Management' : 'User Management';
-  const scopeDescription = detectedScope === 'department' 
+  const scopeDescription = detectedScope === 'department'
     ? 'Manage staff members in your department'
     : 'Create and manage user accounts';
 
@@ -357,81 +376,125 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
       }
     >
       <>
-      <UnifiedUserCreation open={unifiedCreateOpen} onOpenChange={setUnifiedCreateOpen} />
-      <UserEditDialog 
-        open={editOpen} 
-        onOpenChange={setEditOpen} 
-        user={editingUser}
-        onUserUpdate={handleUserUpdate}
-        mode={detectedScope === 'department' ? 'scoped' : 'full'}
-      />
-      
-      <AlertDialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove User</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove this user from the department? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground">
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      
-      <Card className="border-2">
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-lg sm:text-xl">{scopeTitle}</CardTitle>
-              <CardDescription className="text-xs sm:text-sm">
-                {scopeDescription}
-                {maxUsers !== null && maxUsers !== undefined && (
-                  <span className="ml-2 text-muted-foreground">
-                    ({currentUserCount || 0} / {maxUsers} users)
-                  </span>
+        <UnifiedUserCreation open={unifiedCreateOpen} onOpenChange={setUnifiedCreateOpen} />
+        <UserEditDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          user={editingUser}
+          onUserUpdate={handleUserUpdate}
+          mode={detectedScope === 'department' ? 'scoped' : 'full'}
+        />
+
+        <AlertDialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove User</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to remove this user from the department? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground">
+                Remove
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <Card className="border-2">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-lg sm:text-xl">{scopeTitle}</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  {scopeDescription}
+                  {maxUsers !== null && maxUsers !== undefined && (
+                    <span className="ml-2 text-muted-foreground">
+                      ({currentUserCount || 0} / {maxUsers} users)
+                    </span>
+                  )}
+                </CardDescription>
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                {hasEditPermission && (
+                  <ActionButton
+                    onClick={() => setUnifiedCreateOpen(true)}
+                    className="bg-gradient-primary w-full sm:w-auto min-h-[44px]"
+                    disabled={isAtUserLimit}
+                    title={isAtUserLimit ? 'User limit reached' : undefined}
+                  >
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    <span className="sm:inline">{detectedScope === 'department' ? 'Add Staff' : 'Create User'}</span>
+                  </ActionButton>
                 )}
-              </CardDescription>
+              </div>
             </div>
-            <div className="flex gap-2 w-full sm:w-auto">
-              {hasEditPermission && (
-                <ActionButton 
-                  onClick={() => setUnifiedCreateOpen(true)} 
-                  className="bg-gradient-primary w-full sm:w-auto min-h-[44px]"
-                  disabled={isAtUserLimit}
-                  title={isAtUserLimit ? 'User limit reached' : undefined}
-                >
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  <span className="sm:inline">{detectedScope === 'department' ? 'Add Staff' : 'Create User'}</span>
-                </ActionButton>
-              )}
-            </div>
-          </div>
-          {isAtUserLimit && (
-            <div className="mt-2 p-2 bg-destructive/10 border border-destructive/20 rounded text-sm text-destructive">
-              User limit reached. Contact your administrator to increase the limit.
-            </div>
-          )}
-        </CardHeader>
-        <CardContent>
-          {hasBulkUpload && detectedScope === 'system' ? (
-            <Tabs defaultValue="list" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="list">
-                  <Filter className="h-4 w-4 mr-2" />
-                  User List
-                </TabsTrigger>
-                <TabsTrigger value="bulk">
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  Bulk Upload
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="list" className="space-y-4">
+            {isAtUserLimit && (
+              <div className="mt-2 p-2 bg-destructive/10 border border-destructive/20 rounded text-sm text-destructive">
+                User limit reached. Contact your administrator to increase the limit.
+              </div>
+            )}
+          </CardHeader>
+          <CardContent>
+            {hasBulkUpload && detectedScope === 'system' ? (
+              <Tabs defaultValue="list" className="space-y-4">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="list">
+                    <Filter className="h-4 w-4 mr-2" />
+                    User List
+                  </TabsTrigger>
+                  <TabsTrigger value="bulk">
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Bulk Upload
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="list" className="space-y-4">
+                  {detectedScope === 'system' && (
+                    <div className="flex items-center gap-2">
+                      <Filter className="h-4 w-4 text-muted-foreground" />
+                      <Label className="text-sm">Filter by Workspace:</Label>
+                      <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
+                        <SelectTrigger className="w-64">
+                          <SelectValue placeholder="Select workspace" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Workspaces</SelectItem>
+                          {workspaces?.map((workspace) => (
+                            <SelectItem key={workspace.id} value={workspace.id}>
+                              {workspace.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <DataTable
+                    data={users}
+                    columns={columns}
+                    isLoading={usersLoading}
+                    error={usersError as Error}
+                    emptyState={{
+                      title: 'No users found',
+                      description: (detectedScope as string) === 'department'
+                        ? 'Add staff members to your department to get started.'
+                        : 'Create your first user to get started.',
+                      action: hasEditPermission ? {
+                        label: (detectedScope as string) === 'department' ? 'Add Staff' : 'Create User',
+                        onClick: () => setUnifiedCreateOpen(true),
+                      } : undefined,
+                    }}
+                  />
+                </TabsContent>
+
+                <TabsContent value="bulk">
+                  <BulkUserUpload />
+                </TabsContent>
+              </Tabs>
+            ) : (
+              <div className="space-y-4">
                 {detectedScope === 'system' && (
                   <div className="flex items-center gap-2">
                     <Filter className="h-4 w-4 text-muted-foreground" />
@@ -459,64 +522,20 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
                   error={usersError as Error}
                   emptyState={{
                     title: 'No users found',
-                    description: (detectedScope as string) === 'department' 
+                    description: detectedScope === 'department'
                       ? 'Add staff members to your department to get started.'
                       : 'Create your first user to get started.',
                     action: hasEditPermission ? {
-                      label: (detectedScope as string) === 'department' ? 'Add Staff' : 'Create User',
+                      label: detectedScope === 'department' ? 'Add Staff' : 'Create User',
                       onClick: () => setUnifiedCreateOpen(true),
                     } : undefined,
                   }}
                 />
-              </TabsContent>
-              
-              <TabsContent value="bulk">
-                <BulkUserUpload />
-              </TabsContent>
-            </Tabs>
-          ) : (
-            <div className="space-y-4">
-              {detectedScope === 'system' && (
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <Label className="text-sm">Filter by Workspace:</Label>
-                  <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
-                    <SelectTrigger className="w-64">
-                      <SelectValue placeholder="Select workspace" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Workspaces</SelectItem>
-                      {workspaces?.map((workspace) => (
-                        <SelectItem key={workspace.id} value={workspace.id}>
-                          {workspace.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <DataTable
-                data={users}
-                columns={columns}
-                isLoading={usersLoading}
-                error={usersError as Error}
-                emptyState={{
-                  title: 'No users found',
-                  description: detectedScope === 'department' 
-                    ? 'Add staff members to your department to get started.'
-                    : 'Create your first user to get started.',
-                  action: hasEditPermission ? {
-                    label: detectedScope === 'department' ? 'Add Staff' : 'Create User',
-                    onClick: () => setUnifiedCreateOpen(true),
-                  } : undefined,
-                }}
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </>
     </ErrorBoundary>
   );
 };

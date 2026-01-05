@@ -44,15 +44,15 @@ const SuperAdminDashboard = () => {
   useRealtimeSubscription({ table: 'vacation_plans', invalidateQueries: ['vacation-stats', 'recent-activity'] });
   useRealtimeSubscription({ table: 'tasks', invalidateQueries: ['task-stats', 'recent-activity'] });
   useRealtimeSubscription({ table: 'organizations', invalidateQueries: ['organizations'] });
-  
+
   const { data: workspaces, isLoading: workspacesLoading } = useQuery({
     queryKey: ['workspaces'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('workspaces')
         .select('*')
-        .order('created_at', { ascending: false});
-      
+        .order('created_at', { ascending: false });
+
       if (error) throw error;
       return data;
     },
@@ -75,7 +75,7 @@ const SuperAdminDashboard = () => {
       const { count, error } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true });
-      
+
       if (error) throw error;
       return count || 0;
     },
@@ -169,8 +169,8 @@ const SuperAdminDashboard = () => {
     queryKey: ['task-stats'],
     queryFn: async () => {
       const [active, completed] = await Promise.all([
-        supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-        supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
+        supabase.from('task_assignments').select('*', { count: 'exact', head: true }).in('status', ['pending', 'in_progress']),
+        supabase.from('task_assignments').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
       ]);
       return {
         active: active.count || 0,
@@ -221,302 +221,302 @@ const SuperAdminDashboard = () => {
   return (
     <>
       {activeTab === 'dashboard' && (
-        <PageHeader 
-          title="System Overview" 
+        <PageHeader
+          title="System Overview"
           description="Manage your entire system from one centralized dashboard"
         />
       )}
       {activeTab === 'modules' && (
-        <PageHeader 
-          title="Module Management" 
+        <PageHeader
+          title="Module Management"
           description="Control system-wide module access and permissions"
         />
       )}
       {activeTab === 'validator' && (
-        <PageHeader 
-          title="System Validator" 
+        <PageHeader
+          title="System Validator"
           description="Validate module system configuration and integrity"
         />
       )}
       {activeTab === 'organization' && (
-        <PageHeader 
-          title="Organization Management" 
+        <PageHeader
+          title="Organization Management"
           description="Manage workspaces, facilities, and departments"
         />
       )}
       {activeTab === 'users' && (
-        <PageHeader 
-          title="User Management" 
+        <PageHeader
+          title="User Management"
           description="Manage system users, roles, and permissions"
         />
       )}
       {activeTab === 'vacation' && (
-        <PageHeader 
-          title="Vacation Management" 
+        <PageHeader
+          title="Vacation Management"
           description="Manage vacation types, plans, and approvals"
         />
       )}
       {activeTab === 'tasks' && (
-        <PageHeader 
-          title="Task Management" 
+        <PageHeader
+          title="Task Management"
           description="Create, assign, and track tasks across the system"
         />
       )}
       {activeTab === 'staff' && (
-        <PageHeader 
-          title="Staff Management" 
+        <PageHeader
+          title="Staff Management"
           description="Manage staff across all departments and facilities"
         />
       )}
       {activeTab === 'messaging' && (
-        <PageHeader 
-          title="Messaging" 
+        <PageHeader
+          title="Messaging"
           description="Communicate with colleagues across your workspaces"
         />
       )}
       {activeTab === 'notifications' && (
-        <PageHeader 
-          title="Notifications" 
+        <PageHeader
+          title="Notifications"
           description="View and manage system notifications"
         />
       )}
       {activeTab === 'source-code' && (
-        <PageHeader 
-          title="Source Code" 
+        <PageHeader
+          title="Source Code"
           description="View project structure and access source code"
         />
       )}
       {activeTab === 'scheduling' && (
-        <PageHeader 
-          title="Scheduling" 
+        <PageHeader
+          title="Scheduling"
           description="Manage schedules and shift assignments across facilities"
         />
       )}
       {activeTab === 'training' && (
-        <PageHeader 
-          title="Meeting & Training" 
+        <PageHeader
+          title="Meeting & Training"
           description="Create and manage meetings and training sessions"
         />
       )}
       {activeTab === 'audit' && (
-        <PageHeader 
-          title="Audit Logs" 
+        <PageHeader
+          title="Audit Logs"
           description="View and analyze all system changes and activities"
         />
       )}
       {activeTab === 'security' && (
-        <PageHeader 
-          title="Security Dashboard" 
+        <PageHeader
+          title="Security Dashboard"
           description="Monitor security events, rate limits, and role distribution"
         />
       )}
       {activeTab === 'analytics' && (
-        <PageHeader 
-          title="Analytics" 
+        <PageHeader
+          title="Analytics"
           description="System-wide analytics and usage statistics"
         />
       )}
       {activeTab === 'settings' && (
-        <PageHeader 
-          title="System Settings" 
+        <PageHeader
+          title="System Settings"
           description="Configure global system settings and integrations"
         />
       )}
       {activeTab === 'emails' && (
-        <PageHeader 
-          title="Email & Broadcasts" 
+        <PageHeader
+          title="Email & Broadcasts"
           description="Manage notifications and send system announcements"
         />
       )}
       {activeTab === 'activity' && (
-        <PageHeader 
-          title="Live Activity Monitor" 
+        <PageHeader
+          title="Live Activity Monitor"
           description="Real-time view of all system events as they happen"
         />
       )}
-      {!['dashboard','modules','validator','organization','users','vacation','tasks','staff','messaging','notifications','source-code','scheduling','training','audit','security','analytics','settings','emails','activity'].includes(activeTab) && (
-        <PageHeader 
-          title="System Overview" 
+      {!['dashboard', 'modules', 'validator', 'organization', 'users', 'vacation', 'tasks', 'staff', 'messaging', 'notifications', 'source-code', 'scheduling', 'training', 'audit', 'security', 'analytics', 'settings', 'emails', 'activity'].includes(activeTab) && (
+        <PageHeader
+          title="System Overview"
           description="Manage your entire system from one centralized dashboard"
         />
       )}
-      
+
       <div className="space-y-6">
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
-          {/* Main Stats Grid */}
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
-            <StatsCard
-              title="Organizations"
-              value={organizations || 0}
-              icon={Building}
-            />
-            <StatsCard
-              title="Workspaces"
-              value={workspaces?.length || 0}
-              icon={Building2}
-              isLoading={workspacesLoading}
-            />
-            <StatsCard
-              title="Total Users"
-              value={totalUsers || 0}
-              icon={Users}
-            />
-            <StatsCard
-              title="Facilities"
-              value={facilities || 0}
-              icon={LayoutDashboard}
-            />
-            <StatsCard
-              title="Total Meetings"
-              value={meetingStats?.totalMeetings || 0}
-              icon={Video}
-            />
-            <StatsCard
-              title="Meeting Attendance"
-              value={meetingStats?.totalAttendance || 0}
-              icon={GraduationCap}
-            />
-            <StatsCard
-              title="Total Messages"
-              value={messageStats || 0}
-              icon={MessageSquare}
-            />
-            <StatsCard
-              title="Published Schedules"
-              value={scheduleStats?.published || 0}
-              icon={CalendarClock}
-            />
-          </div>
+            {/* Main Stats Grid */}
+            <div className="grid gap-3 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
+              <StatsCard
+                title="Organizations"
+                value={organizations || 0}
+                icon={Building}
+              />
+              <StatsCard
+                title="Workspaces"
+                value={workspaces?.length || 0}
+                icon={Building2}
+                isLoading={workspacesLoading}
+              />
+              <StatsCard
+                title="Total Users"
+                value={totalUsers || 0}
+                icon={Users}
+              />
+              <StatsCard
+                title="Facilities"
+                value={facilities || 0}
+                icon={LayoutDashboard}
+              />
+              <StatsCard
+                title="Total Meetings"
+                value={meetingStats?.totalMeetings || 0}
+                icon={Video}
+              />
+              <StatsCard
+                title="Meeting Attendance"
+                value={meetingStats?.totalAttendance || 0}
+                icon={GraduationCap}
+              />
+              <StatsCard
+                title="Total Messages"
+                value={messageStats || 0}
+                icon={MessageSquare}
+              />
+              <StatsCard
+                title="Published Schedules"
+                value={scheduleStats?.published || 0}
+                icon={CalendarClock}
+              />
+            </div>
 
-          {/* Vacation & Task Stats */}
-          <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Vacation Plans Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">Pending Approval</span>
-                    </div>
-                    <span className="text-2xl font-bold">{vacationStats?.pending || 0}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      <span className="text-sm font-medium">Approved</span>
-                    </div>
-                    <span className="text-2xl font-bold text-success">{vacationStats?.approved || 0}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <XCircle className="h-4 w-4 text-destructive" />
-                      <span className="text-sm font-medium">Rejected</span>
-                    </div>
-                    <span className="text-2xl font-bold text-destructive">{vacationStats?.rejected || 0}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ClipboardList className="h-5 w-5" />
-                  Tasks Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">Active Tasks</span>
-                    </div>
-                    <span className="text-2xl font-bold">{taskStats?.active || 0}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      <span className="text-sm font-medium">Completed</span>
-                    </div>
-                    <span className="text-2xl font-bold text-success">{taskStats?.completed || 0}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Completion Rate</span>
-                    <span className="text-2xl font-bold">
-                      {taskStats?.total
-                        ? Math.round((taskStats.completed / taskStats.total) * 100)
-                        : 0}%
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Recent Activity */}
-          <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Vacation Plans</CardTitle>
-                <CardDescription>Latest 5 vacation plan submissions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {recentActivity?.vacationPlans.map((plan: any) => (
-                    <div key={plan.id} className="flex items-center justify-between p-3 bg-accent rounded-lg">
-                      <div>
-                        <p className="text-sm font-medium">{plan.vacation_types?.name || 'Unknown Type'}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {plan.total_days} days • {format(new Date(plan.created_at), 'MMM d, yyyy')}
-                        </p>
+            {/* Vacation & Task Stats */}
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Vacation Plans Overview
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">Pending Approval</span>
                       </div>
-                      {getStatusBadge(plan.status)}
+                      <span className="text-2xl font-bold">{vacationStats?.pending || 0}</span>
                     </div>
-                  ))}
-                  {recentActivity?.vacationPlans.length === 0 && (
-                    <p className="text-center text-muted-foreground py-4">No recent vacation plans</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Tasks</CardTitle>
-                <CardDescription>Latest 5 tasks created</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {recentActivity?.tasks.map((task: any) => (
-                    <div key={task.id} className="flex items-center justify-between p-3 bg-accent rounded-lg">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{task.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {task.priority} priority • {format(new Date(task.created_at), 'MMM d, yyyy')}
-                        </p>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        <span className="text-sm font-medium">Approved</span>
                       </div>
-                      {getStatusBadge(task.status)}
+                      <span className="text-2xl font-bold text-success">{vacationStats?.approved || 0}</span>
                     </div>
-                  ))}
-                  {recentActivity?.tasks.length === 0 && (
-                    <p className="text-center text-muted-foreground py-4">No recent tasks</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <XCircle className="h-4 w-4 text-destructive" />
+                        <span className="text-sm font-medium">Rejected</span>
+                      </div>
+                      <span className="text-2xl font-bold text-destructive">{vacationStats?.rejected || 0}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5" />
+                    Tasks Overview
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">Active Tasks</span>
+                      </div>
+                      <span className="text-2xl font-bold">{taskStats?.active || 0}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        <span className="text-sm font-medium">Completed</span>
+                      </div>
+                      <span className="text-2xl font-bold text-success">{taskStats?.completed || 0}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Completion Rate</span>
+                      <span className="text-2xl font-bold">
+                        {taskStats?.total
+                          ? Math.round((taskStats.completed / taskStats.total) * 100)
+                          : 0}%
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Recent Activity */}
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Vacation Plans</CardTitle>
+                  <CardDescription>Latest 5 vacation plan submissions</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {recentActivity?.vacationPlans.map((plan: any) => (
+                      <div key={plan.id} className="flex items-center justify-between p-3 bg-accent rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium">{plan.vacation_types?.name || 'Unknown Type'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {plan.total_days} days • {format(new Date(plan.created_at), 'MMM d, yyyy')}
+                          </p>
+                        </div>
+                        {getStatusBadge(plan.status)}
+                      </div>
+                    ))}
+                    {recentActivity?.vacationPlans.length === 0 && (
+                      <p className="text-center text-muted-foreground py-4">No recent vacation plans</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Tasks</CardTitle>
+                  <CardDescription>Latest 5 tasks created</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {recentActivity?.tasks.map((task: any) => (
+                      <div key={task.id} className="flex items-center justify-between p-3 bg-accent rounded-lg">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{task.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {task.priority} priority • {format(new Date(task.created_at), 'MMM d, yyyy')}
+                          </p>
+                        </div>
+                        {getStatusBadge(task.status)}
+                      </div>
+                    ))}
+                    {recentActivity?.tasks.length === 0 && (
+                      <p className="text-center text-muted-foreground py-4">No recent tasks</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         )}
 
@@ -571,7 +571,7 @@ const SuperAdminDashboard = () => {
                   <p className="text-muted-foreground mb-4">
                     As Super Admin, you can manage all users including staff members through the User Management tab.
                   </p>
-                  <Button 
+                  <Button
                     onClick={() => window.location.href = '/dashboard?tab=users'}
                     className="bg-gradient-primary"
                   >

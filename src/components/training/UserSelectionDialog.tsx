@@ -61,16 +61,18 @@ const UserSelectionDialog = ({
   // Determine user's scope
   const userScope = useMemo(() => {
     if (!roles?.length) return null;
-    
+
     const isSuperAdmin = roles.some(r => r.role === 'super_admin');
     const generalAdmin = roles.find(r => r.role === 'general_admin');
     const workplaceSupervisor = roles.find(r => r.role === 'workplace_supervisor');
     const facilitySupervisor = roles.find(r => r.role === 'facility_supervisor');
+    const departmentHead = roles.find(r => r.role === 'department_head');
 
     if (isSuperAdmin) return { type: 'all' as const };
     if (generalAdmin) return { type: 'workspace' as const, workspaceId: generalAdmin.workspace_id };
     if (workplaceSupervisor) return { type: 'workspace' as const, workspaceId: workplaceSupervisor.workspace_id };
     if (facilitySupervisor) return { type: 'facility' as const, facilityId: facilitySupervisor.facility_id };
+    if (departmentHead) return { type: 'department' as const, departmentId: departmentHead.department_id, facilityId: departmentHead.facility_id, workspaceId: departmentHead.workspace_id };
     return null;
   }, [roles]);
 
@@ -88,13 +90,13 @@ const UserSelectionDialog = ({
           .from('workspaces')
           .select('id')
           .eq('organization_id', organizationId);
-        
+
         if (workspaces?.length) {
           const { data: roleData } = await supabase
             .from('user_roles')
             .select('user_id, workspace_id, facility_id, department_id, departments(name), facilities:facility_id(name)')
             .in('workspace_id', workspaces.map(w => w.id));
-          
+
           userIds = [...new Set(roleData?.map(r => r.user_id) || [])];
         }
       } else if (userScope.type === 'workspace' && userScope.workspaceId) {
@@ -109,6 +111,21 @@ const UserSelectionDialog = ({
           .select('user_id')
           .eq('facility_id', userScope.facilityId);
         userIds = [...new Set(roleData?.map(r => r.user_id) || [])];
+      } else if (userScope.type === 'department' && (userScope as any).departmentId) {
+        const fid = (userScope as any).facilityId;
+        if (fid) {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('user_id')
+            .eq('facility_id', fid);
+          userIds = [...new Set(roleData?.map(r => r.user_id) || [])];
+        } else {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('user_id')
+            .eq('department_id', (userScope as any).departmentId);
+          userIds = [...new Set(roleData?.map(r => r.user_id) || [])];
+        }
       }
 
       if (!userIds.length) return [];
@@ -158,9 +175,9 @@ const UserSelectionDialog = ({
           user_group_members (id)
         `)
         .order('name');
-      
+
       if (error) throw error;
-      
+
       return data?.map(g => ({
         id: g.id,
         name: g.name,
@@ -176,7 +193,7 @@ const UserSelectionDialog = ({
     queryKey: ['departments-for-selection', organizationId],
     queryFn: async () => {
       if (!organizationId) return [];
-      
+
       const { data: workspaces } = await supabase
         .from('workspaces')
         .select('id')
@@ -212,7 +229,7 @@ const UserSelectionDialog = ({
   const filteredUsers = useMemo(() => {
     if (!users) return [];
     if (!searchTerm) return users;
-    
+
     const term = searchTerm.toLowerCase();
     return users.filter(u =>
       u.full_name.toLowerCase().includes(term) ||
@@ -234,7 +251,7 @@ const UserSelectionDialog = ({
       .from('user_group_members')
       .select('user_id')
       .eq('group_id', groupId);
-    
+
     if (members?.length) {
       const newIds = members.map(m => m.user_id).filter(id => !selectedUserIds.includes(id));
       onSelectionChange([...selectedUserIds, ...newIds]);
@@ -246,7 +263,7 @@ const UserSelectionDialog = ({
       .from('user_roles')
       .select('user_id')
       .eq('department_id', departmentId);
-    
+
     if (roles?.length) {
       const newIds = roles.map(r => r.user_id).filter(id => !selectedUserIds.includes(id));
       onSelectionChange([...selectedUserIds, ...newIds]);
@@ -281,7 +298,7 @@ const UserSelectionDialog = ({
             {selectedUsers.slice(0, 10).map(user => (
               <Badge key={user.id} variant="secondary" className="gap-1">
                 {user.full_name}
-                <button 
+                <button
                   onClick={() => toggleUser(user.id)}
                   className="hover:bg-destructive/20 rounded-full p-0.5"
                 >

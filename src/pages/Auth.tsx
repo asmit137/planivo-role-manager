@@ -33,7 +33,7 @@ const Auth = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       const validated = loginSchema.parse({ email, password });
       setLoading(true);
@@ -65,7 +65,7 @@ const Auth = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       if (!fullName.trim()) {
         toast.error('Please enter your full name');
@@ -124,7 +124,7 @@ const Auth = () => {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email.trim()) {
       toast.error('Please enter your email address');
       return;
@@ -158,13 +158,13 @@ const Auth = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-accent/20" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(var(--primary)/0.15),transparent_50%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,hsl(var(--accent)/0.15),transparent_50%)]" />
-      
+
       {/* Animated Grid Pattern */}
       <div className="absolute inset-0 bg-grid-white/[0.03] bg-[size:50px_50px]" />
-      
+
       <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/20 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-accent/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-      
+
       <Card className="w-full max-w-md shadow-2xl border-2 backdrop-blur-xl bg-card/90 relative z-10 hover:shadow-primary/10 transition-all duration-300">
         <CardHeader className="space-y-1 text-center pb-8 pt-8">
           <div className="mb-8 flex justify-center">
@@ -179,11 +179,11 @@ const Auth = () => {
             {mode === 'login' ? 'Welcome Back' : mode === 'signup' ? 'Create Account' : 'Reset Password'}
           </CardTitle>
           <CardDescription className="text-base pt-2">
-            {mode === 'login' 
+            {mode === 'login'
               ? 'Enterprise Workforce Management System'
               : mode === 'signup'
                 ? 'Join our workforce management platform'
-                : resetSent 
+                : resetSent
                   ? 'Check your email for the reset link'
                   : 'Enter your email to receive a reset link'
             }
@@ -233,7 +233,7 @@ const Auth = () => {
                     className="border-2 h-11"
                   />
                 </div>
-                
+
                 {mode === 'login' && (
                   <div className="text-right">
                     <Button
@@ -368,12 +368,8 @@ const Auth = () => {
           )}
         </CardContent>
       </Card>
-      
-      <div className="absolute bottom-6 left-0 right-0 text-center z-10">
-        <p className="text-xs text-muted-foreground/60">
-          Powered By <span className="font-semibold text-foreground/80">INMATION.AI</span>
-        </p>
-      </div>
+
+
     </div>
   );
 };

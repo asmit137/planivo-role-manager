@@ -26,34 +26,42 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
   if (isLoading) {
     return <LoadingState message="Loading vacation planning..." />;
   }
-  
+
   // Find approver role and determine level (supports 3-level approval workflow)
-  const approverRole = roles?.find(r => 
+  const approverRole = roles?.find(r =>
     ['department_head', 'facility_supervisor', 'workplace_supervisor'].includes(r.role)
   );
-  
-  const isApprover = !!approverRole;
+
+  const isApprover = !!approverRole || isSuperAdmin;
 
   const getApprovalInfo = () => {
+    if (isSuperAdmin) {
+      return {
+        approvalLevel: 3 as const,
+        scopeType: 'workspace' as const,
+        scopeId: 'all'
+      };
+    }
+
     if (!approverRole) return null;
-    
+
     if (approverRole.role === 'department_head') {
-      return { 
-        approvalLevel: 1 as const, 
-        scopeType: 'department' as const, 
-        scopeId: approverRole.department_id! 
+      return {
+        approvalLevel: 1 as const,
+        scopeType: 'department' as const,
+        scopeId: approverRole.department_id!
       };
     } else if (approverRole.role === 'facility_supervisor') {
-      return { 
-        approvalLevel: 2 as const, 
-        scopeType: 'facility' as const, 
-        scopeId: approverRole.facility_id! 
+      return {
+        approvalLevel: 2 as const,
+        scopeType: 'facility' as const,
+        scopeId: approverRole.facility_id!
       };
     } else if (approverRole.role === 'workplace_supervisor') {
-      return { 
-        approvalLevel: 3 as const, 
-        scopeType: 'workspace' as const, 
-        scopeId: approverRole.workspace_id! 
+      return {
+        approvalLevel: 3 as const,
+        scopeType: 'workspace' as const,
+        scopeId: approverRole.workspace_id!
       };
     }
     return null;
@@ -72,104 +80,105 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
       }
     >
       <div className="space-y-6">
-      <Tabs defaultValue="calendar" className="space-y-4">
-        <ResponsiveTabsList>
-          <TabsTrigger value="calendar" className="min-h-[44px] px-3 text-sm">
-            <CalendarDays className="h-4 w-4 mr-1.5 sm:mr-2" />
-            <span className="hidden xs:inline">Calendar</span>
-            <span className="xs:hidden">Cal</span>
-          </TabsTrigger>
-          <TabsTrigger value="planner" className="min-h-[44px] px-3 text-sm">
-            <Calendar className="h-4 w-4 mr-1.5 sm:mr-2" />
-            <span className="hidden xs:inline">Plan Vacation</span>
-            <span className="xs:hidden">Plan</span>
-          </TabsTrigger>
-          <TabsTrigger value="plans" className="min-h-[44px] px-3 text-sm">
-            <List className="h-4 w-4 mr-1.5 sm:mr-2" />
-            <span className="hidden xs:inline">My Plans</span>
-            <span className="xs:hidden">Mine</span>
-          </TabsTrigger>
-          {isDepartmentHead && (
-            <TabsTrigger value="department-plans" className="min-h-[44px] px-3 text-sm">
+        <Tabs defaultValue="calendar" className="space-y-4">
+          <ResponsiveTabsList>
+            <TabsTrigger value="calendar" className="min-h-[44px] px-3 text-sm">
+              <CalendarDays className="h-4 w-4 mr-1.5 sm:mr-2" />
+              <span className="hidden xs:inline">Calendar</span>
+              <span className="xs:hidden">Cal</span>
+            </TabsTrigger>
+            <TabsTrigger value="planner" className="min-h-[44px] px-3 text-sm">
+              <Calendar className="h-4 w-4 mr-1.5 sm:mr-2" />
+              <span className="hidden xs:inline">Plan Vacation</span>
+              <span className="xs:hidden">Plan</span>
+            </TabsTrigger>
+            <TabsTrigger value="plans" className="min-h-[44px] px-3 text-sm">
               <List className="h-4 w-4 mr-1.5 sm:mr-2" />
-              <span className="hidden xs:inline">Department</span>
-              <span className="xs:hidden">Dept</span>
+              <span className="hidden xs:inline">My Plans</span>
+              <span className="xs:hidden">Mine</span>
             </TabsTrigger>
+            {isDepartmentHead && (
+              <TabsTrigger value="department-plans" className="min-h-[44px] px-3 text-sm">
+                <List className="h-4 w-4 mr-1.5 sm:mr-2" />
+                <span className="hidden xs:inline">Department</span>
+                <span className="xs:hidden">Dept</span>
+              </TabsTrigger>
+            )}
+            {isApprover && (
+              <TabsTrigger value="approvals" className="min-h-[44px] px-3 text-sm">
+                <CheckSquare className="h-4 w-4 mr-1.5 sm:mr-2" />
+                <span className="hidden sm:inline">Approvals</span>
+                <span className="sm:hidden">OK</span>
+              </TabsTrigger>
+            )}
+            {isApprover && (
+              <TabsTrigger value="conflicts" className="min-h-[44px] px-3 text-sm">
+                <AlertTriangle className="h-4 w-4 mr-1.5 sm:mr-2" />
+                <span className="hidden sm:inline">Conflicts</span>
+                <span className="sm:hidden">!</span>
+              </TabsTrigger>
+            )}
+            {isSuperAdmin && (
+              <>
+                <TabsTrigger value="types" className="min-h-[44px] px-3 text-sm">
+                  <Settings className="h-4 w-4 mr-1.5 sm:mr-2" />
+                  <span className="hidden sm:inline">Types</span>
+                </TabsTrigger>
+                <TabsTrigger value="rules" className="min-h-[44px] px-3 text-sm">
+                  <Settings className="h-4 w-4 mr-1.5 sm:mr-2" />
+                  <span className="hidden sm:inline">Rules</span>
+                </TabsTrigger>
+              </>
+            )}
+          </ResponsiveTabsList>
+
+          <TabsContent value="calendar">
+            <VacationCalendarView departmentId={departmentId} />
+          </TabsContent>
+
+          <TabsContent value="planner">
+            <VacationPlanner departmentId={departmentId} staffOnly={isStaff} />
+          </TabsContent>
+
+          <TabsContent value="plans">
+            <VacationPlansList staffView={true} />
+          </TabsContent>
+
+
+          {isApprover && approvalInfo && (
+            <TabsContent value="approvals">
+              <VacationApprovalWorkflow
+                approvalLevel={approvalInfo.approvalLevel}
+                scopeType={approvalInfo.scopeType}
+                scopeId={approvalInfo.scopeId}
+              />
+            </TabsContent>
           )}
+
+          {isDepartmentHead && (
+            <TabsContent value="department-plans">
+              <VacationPlansList departmentId={departmentId || approvalInfo?.scopeId} />
+            </TabsContent>
+          )}
+
           {isApprover && (
-            <TabsTrigger value="approvals" className="min-h-[44px] px-3 text-sm">
-              <CheckSquare className="h-4 w-4 mr-1.5 sm:mr-2" />
-              <span className="hidden sm:inline">Approvals</span>
-              <span className="sm:hidden">OK</span>
-            </TabsTrigger>
+            <TabsContent value="conflicts">
+              <VacationConflictDashboard />
+            </TabsContent>
           )}
-          {isApprover && (
-            <TabsTrigger value="conflicts" className="min-h-[44px] px-3 text-sm">
-              <AlertTriangle className="h-4 w-4 mr-1.5 sm:mr-2" />
-              <span className="hidden sm:inline">Conflicts</span>
-              <span className="sm:hidden">!</span>
-            </TabsTrigger>
-          )}
+
           {isSuperAdmin && (
             <>
-              <TabsTrigger value="types" className="min-h-[44px] px-3 text-sm">
-                <Settings className="h-4 w-4 mr-1.5 sm:mr-2" />
-                <span className="hidden sm:inline">Types</span>
-              </TabsTrigger>
-              <TabsTrigger value="rules" className="min-h-[44px] px-3 text-sm">
-                <Settings className="h-4 w-4 mr-1.5 sm:mr-2" />
-                <span className="hidden sm:inline">Rules</span>
-              </TabsTrigger>
+              <TabsContent value="types">
+                <VacationTypeManagement />
+              </TabsContent>
+              <TabsContent value="rules">
+                <VacationRulesManagement />
+              </TabsContent>
             </>
           )}
-        </ResponsiveTabsList>
-
-        <TabsContent value="calendar">
-          <VacationCalendarView departmentId={departmentId} />
-        </TabsContent>
-
-        <TabsContent value="planner">
-          <VacationPlanner departmentId={departmentId} staffOnly={isStaff} />
-        </TabsContent>
-
-        <TabsContent value="plans">
-          <VacationPlansList staffView={true} />
-        </TabsContent>
-
-        {isApprover && approvalInfo && (
-          <TabsContent value="approvals">
-            <VacationApprovalWorkflow 
-              approvalLevel={approvalInfo.approvalLevel}
-              scopeType={approvalInfo.scopeType}
-              scopeId={approvalInfo.scopeId}
-            />
-          </TabsContent>
-        )}
-
-        {isDepartmentHead && (
-          <TabsContent value="department-plans">
-            <VacationPlansList departmentId={departmentId || approvalInfo?.scopeId} />
-          </TabsContent>
-        )}
-
-        {isApprover && (
-          <TabsContent value="conflicts">
-            <VacationConflictDashboard />
-          </TabsContent>
-        )}
-
-        {isSuperAdmin && (
-          <>
-            <TabsContent value="types">
-              <VacationTypeManagement />
-            </TabsContent>
-            <TabsContent value="rules">
-              <VacationRulesManagement />
-            </TabsContent>
-          </>
-        )}
-      </Tabs>
-    </div>
+        </Tabs>
+      </div>
     </ErrorBoundary>
   );
 };

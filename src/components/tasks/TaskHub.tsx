@@ -1,5 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ListTodo, CheckCircle2 } from 'lucide-react';
+import { ListTodo, CheckCircle2, CheckSquare } from 'lucide-react';
 import TaskManager from './TaskManager';
 import StaffTaskView from './StaffTaskView';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -9,10 +9,10 @@ import { LoadingState } from '@/components/layout/LoadingState';
 
 const TaskHub = () => {
   const { data: roles, isLoading } = useUserRole();
-  
+
   // Determine user's scope for task management
-  const managerRole = roles?.find(r => 
-    ['workplace_supervisor', 'facility_supervisor', 'department_head'].includes(r.role)
+  const managerRole = roles?.find(r =>
+    ['super_admin', 'organization_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head'].includes(r.role)
   );
 
   const canManageTasks = !!managerRole;
@@ -20,12 +20,16 @@ const TaskHub = () => {
   if (isLoading) {
     return <LoadingState message="Loading tasks..." />;
   }
-  
+
   const getScopeInfo = () => {
     if (!managerRole) return null;
-    
-    if (managerRole.role === 'workplace_supervisor') {
-      return { scopeType: 'workspace' as const, scopeId: managerRole.workspace_id! };
+
+    if (managerRole.role === 'super_admin') {
+      return { scopeType: 'organization' as const, scopeId: 'global' };
+    }
+
+    if (['organization_admin', 'general_admin', 'workplace_supervisor'].includes(managerRole.role)) {
+      return managerRole.workspace_id ? { scopeType: 'workspace' as const, scopeId: managerRole.workspace_id } : null;
     } else if (managerRole.role === 'facility_supervisor') {
       return { scopeType: 'facility' as const, scopeId: managerRole.facility_id! };
     } else if (managerRole.role === 'department_head') {
@@ -47,31 +51,31 @@ const TaskHub = () => {
       }
     >
       <div className="space-y-4">
-      <Tabs defaultValue={canManageTasks ? "manage" : "my-tasks"} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
-          {canManageTasks && (
-            <TabsTrigger value="manage">
-              <ListTodo className="h-4 w-4 mr-2" />
-              Manage Tasks
+        <Tabs defaultValue={canManageTasks ? "manage" : "my-tasks"} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2">
+            {canManageTasks && (
+              <TabsTrigger value="manage">
+                <ListTodo className="h-4 w-4 mr-2" />
+                Manage Tasks
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="my-tasks">
+              <CheckSquare className="h-4 w-4 mr-2" />
+              {roles?.some(r => r.role === 'super_admin') ? 'Global Task Progress' : 'My Tasks'}
             </TabsTrigger>
+          </TabsList>
+
+          {canManageTasks && scopeInfo && (
+            <TabsContent value="manage">
+              <TaskManager scopeType={scopeInfo.scopeType} scopeId={scopeInfo.scopeId} />
+            </TabsContent>
           )}
-          <TabsTrigger value="my-tasks">
-            <CheckCircle2 className="h-4 w-4 mr-2" />
-            My Tasks
-          </TabsTrigger>
-        </TabsList>
 
-        {canManageTasks && scopeInfo && (
-          <TabsContent value="manage">
-            <TaskManager scopeType={scopeInfo.scopeType} scopeId={scopeInfo.scopeId} />
+          <TabsContent value="my-tasks">
+            <StaffTaskView />
           </TabsContent>
-        )}
-
-        <TabsContent value="my-tasks">
-          <StaffTaskView />
-        </TabsContent>
-      </Tabs>
-    </div>
+        </Tabs>
+      </div>
     </ErrorBoundary>
   );
 };

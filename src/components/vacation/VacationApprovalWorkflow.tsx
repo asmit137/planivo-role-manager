@@ -62,103 +62,60 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
           )
         `);
 
-      if (approvalLevel === 1) {
-        // Department Head: Plans pending department approval
-        query = query.eq('status', 'department_pending').eq('department_id', scopeId);
-        const { data: plans, error } = await query;
-        if (error) throw error;
+      // Fetch all plans in scope that are awaiting approval
+      query = query.in('status', ['department_pending', 'facility_pending', 'workspace_pending']);
 
-        // Fetch staff and creator info
-        const enrichedPlans = await Promise.all(
-          (plans || []).map(async (plan) => {
-            const [staffProfile, creatorProfile] = await Promise.all([
-              supabase.from('profiles').select('full_name, email').eq('id', plan.staff_id).single(),
-              supabase.from('profiles').select('full_name').eq('id', plan.created_by).single(),
-            ]);
-            return {
-              ...plan,
-              staff_profile: staffProfile.data,
-              creator_profile: creatorProfile.data,
-            };
-          })
-        );
+      const { data: plans, error } = await query;
+      if (error) throw error;
 
-        return enrichedPlans;
+      // Filter by scope
+      let filtered = plans || [];
+
+      if (scopeId === 'all') {
+        // Super Admin: View all plans globally
+      } else if (approvalLevel === 1) {
+        // Department scope
+        filtered = filtered.filter(p => p.department_id === scopeId);
       } else if (approvalLevel === 2) {
-        // Facility Supervisor: Plans approved by Dept Head, pending facility approval
-        query = query.eq('status', 'facility_pending');
-        const { data: plans, error } = await query;
-        if (error) throw error;
-
-        // Filter by facility
-        const filtered = plans?.filter((plan: any) => {
-          return plan.departments?.facility_id === scopeId;
-        });
-
-        // Fetch staff and creator info
-        const enrichedPlans = await Promise.all(
-          (filtered || []).map(async (plan) => {
-            const [staffProfile, creatorProfile] = await Promise.all([
-              supabase.from('profiles').select('full_name, email').eq('id', plan.staff_id).single(),
-              supabase.from('profiles').select('full_name').eq('id', plan.created_by).single(),
-            ]);
-            return {
-              ...plan,
-              staff_profile: staffProfile.data,
-              creator_profile: creatorProfile.data,
-            };
-          })
-        );
-
-        return enrichedPlans;
-      } else {
-        // Workplace Supervisor: Plans approved at level 2, pending workspace approval
-        query = query.eq('status', 'workspace_pending');
-        const { data: plans, error } = await query;
-        if (error) throw error;
-
-        // Filter by workspace
+        // Facility scope
+        filtered = filtered.filter(p => p.departments?.facility_id === scopeId);
+      } else if (approvalLevel === 3) {
+        // Workspace scope
         const { data: facilities } = await supabase
           .from('facilities')
           .select('id')
           .eq('workspace_id', scopeId);
-        
-        const facilityIds = facilities?.map((f) => f.id) || [];
-        
-        const filtered = plans?.filter((plan: any) => {
-          return facilityIds.includes(plan.departments?.facility_id);
-        });
-
-        // Fetch staff and creator info
-        const enrichedPlans = await Promise.all(
-          (filtered || []).map(async (plan) => {
-            const [staffProfile, creatorProfile] = await Promise.all([
-              supabase.from('profiles').select('full_name, email').eq('id', plan.staff_id).single(),
-              supabase.from('profiles').select('full_name').eq('id', plan.created_by).single(),
-            ]);
-            return {
-              ...plan,
-              staff_profile: staffProfile.data,
-              creator_profile: creatorProfile.data,
-            };
-          })
-        );
-
-        return enrichedPlans;
+        const facilityIds = facilities?.map(f => f.id) || [];
+        filtered = filtered.filter(p => facilityIds.includes(p.departments?.facility_id));
       }
+
+      // Fetch staff and creator info
+      return await Promise.all(
+        filtered.map(async (plan) => {
+          const [staffProfile, creatorProfile] = await Promise.all([
+            supabase.from('profiles').select('full_name, email').eq('id', plan.staff_id).single(),
+            supabase.from('profiles').select('full_name').eq('id', plan.created_by).single(),
+          ]);
+          return {
+            ...plan,
+            staff_profile: staffProfile.data,
+            creator_profile: creatorProfile.data,
+          };
+        })
+      );
     },
     enabled: !!user && !!scopeId,
   });
 
   const approvalMutation = useMutation({
-    mutationFn: async ({ 
-      planId, 
-      action, 
-      comments, 
-      hasConflict = false, 
-      conflictReason = '', 
+    mutationFn: async ({
+      planId,
+      action,
+      comments,
+      hasConflict = false,
+      conflictReason = '',
       conflictingPlans = [],
-      selectedSplitIds = [] 
+      selectedSplitIds = []
     }: any) => {
       // Check for conflicts before approval (only for Department Head level)
       if (action === 'approve' && approvalLevel === 1 && !hasConflict) {
@@ -260,11 +217,8 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         if (!hasApprovedSplits) {
           newStatus = 'rejected';
         } else {
-          // Progress to next approval level
-          newStatus = 
-            approvalLevel === 1 ? 'facility_pending' :
-            approvalLevel === 2 ? 'workspace_pending' : 
-            'approved';
+          // Simplified: Any authorized approval makes it fully approved
+          newStatus = 'approved';
         }
       }
 
@@ -291,7 +245,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       if (error.message.startsWith('CONFLICTS_DETECTED:')) {
         const conflictsJson = error.message.replace('CONFLICTS_DETECTED:', '');
         const conflicts = JSON.parse(conflictsJson);
-        
+
         // Build split conflicts map
         const conflictsMap = new Map<string, any[]>();
         conflicts.forEach((item: any) => {
@@ -299,7 +253,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
             conflictsMap.set(item.split_id, item.conflicts);
           }
         });
-        
+
         setSplitConflicts(conflictsMap);
         setConflictData(conflicts);
         setShowApprovalDialog(false);
@@ -319,12 +273,12 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
   const handleApprovalAction = (plan: any, action: 'approve' | 'reject') => {
     setSelectedPlan(plan);
     setApprovalAction(action);
-    
+
     // Initialize selected splits with all splits
     const allSplitIds = new Set<string>(plan.vacation_splits.map((s: any) => s.id));
     setSelectedSplits(allSplitIds);
     setSplitConflicts(new Map());
-    
+
     setShowApprovalDialog(true);
   };
 
@@ -342,13 +296,13 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
 
   const confirmApproval = () => {
     if (!selectedPlan) return;
-    
+
     // Check if at least one split is selected
     if (selectedSplits.size === 0) {
       toast.error('Please select at least one vacation segment to approve');
       return;
     }
-    
+
     approvalMutation.mutate({
       planId: selectedPlan.id,
       action: approvalAction,
@@ -362,12 +316,12 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       toast.error('Please provide a reason for approving despite conflicts');
       return;
     }
-    
+
     if (selectedSplits.size === 0) {
       toast.error('Please select at least one vacation segment to approve');
       return;
     }
-    
+
     approvalMutation.mutate({
       planId: selectedPlan.id,
       action: 'approve',
@@ -554,13 +508,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
             </DialogTitle>
             <DialogDescription>
               {approvalAction === 'approve'
-                ? `You are about to approve this vacation plan for ${selectedPlan?.staff_profile?.full_name}. ${
-                    approvalLevel === 1
-                      ? 'This will move it to Level 2 (Facility Supervisor) for approval.'
-                      : approvalLevel === 2
-                      ? 'This will move it to Level 3 (Workspace Supervisor) for final approval.'
-                      : 'This will be the final approval and the vacation will be confirmed.'
-                  }`
+                ? `You are about to approve this vacation plan for ${selectedPlan?.staff_profile?.full_name}. This will be the final approval and the vacation will be confirmed.`
                 : `You are about to reject this vacation plan for ${selectedPlan?.staff_profile?.full_name}. Please provide a reason for rejection.`}
             </DialogDescription>
           </DialogHeader>
@@ -597,7 +545,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                 <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-3">
                   {selectedPlan.vacation_splits.map((split: any, index: number) => {
                     const isSelected = selectedSplits.has(split.id);
-                    
+
                     return (
                       <div
                         key={split.id}
@@ -703,12 +651,12 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
               <p className="text-xs text-muted-foreground">
                 Segments with conflicts show conflicting staff. You can approve non-conflicting segments or acknowledge conflicts for specific segments.
               </p>
-              
+
               {selectedPlan?.vacation_splits.map((split: any, index: number) => {
                 const isSelected = selectedSplits.has(split.id);
                 const hasConflict = splitConflicts.has(split.id);
                 const conflicts = hasConflict ? splitConflicts.get(split.id) : [];
-                
+
                 return (
                   <div
                     key={split.id}
@@ -758,7 +706,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                         <p className="text-sm text-muted-foreground mb-1">
                           {format(new Date(split.start_date), 'MMM dd, yyyy')} → {format(new Date(split.end_date), 'MMM dd, yyyy')} ({split.days} days)
                         </p>
-                        
+
                         {hasConflict && conflicts && conflicts.length > 0 && (
                           <div className="mt-2 p-3 bg-background rounded-md border border-warning/20">
                             <p className="text-xs font-medium text-warning mb-2">Conflicting Staff:</p>
@@ -849,7 +797,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                       {conflict.profiles?.full_name}
                     </span>
                   </div>
-                  
+
                   {conflict.conflicting_plans && Array.isArray(conflict.conflicting_plans) && (
                     <div className="mt-2 space-y-2">
                       <p className="text-sm font-medium text-muted-foreground">Conflicting Staff:</p>
@@ -863,7 +811,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                       ))}
                     </div>
                   )}
-                  
+
                   {conflict.conflict_reason && (
                     <div className="mt-2 p-2 bg-background rounded text-sm">
                       <span className="font-medium">Reason for approval: </span>
