@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Switch } from '@/components/ui/switch';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { toast } from 'sonner';
-import { Loader2, Calendar, MapPin, Link as LinkIcon, Users, Video, UserCheck, Target, X, AlertCircle } from 'lucide-react';
+import { Loader2, Calendar, MapPin, Link as LinkIcon, Users, Video, UserCheck, Target, X, AlertCircle, Building } from 'lucide-react';
 import UserSelectionDialog from './UserSelectionDialog';
 
 const eventSchema = z.object({
@@ -39,6 +39,14 @@ const eventSchema = z.object({
   allow_recording: z.boolean().optional(),
   require_lobby: z.boolean().optional(),
   max_video_participants: z.number().min(2).max(500).optional(),
+}).refine((data) => {
+  // Ensure end_datetime is after start_datetime
+  const start = new Date(data.start_datetime);
+  const end = new Date(data.end_datetime);
+  return end > start;
+}, {
+  message: 'End date/time must be after start date/time',
+  path: ['end_datetime'],
 });
 
 type EventFormData = z.infer<typeof eventSchema>;
@@ -54,6 +62,7 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
   const [showUserSelector, setShowUserSelector] = useState(false);
 
   const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
@@ -85,7 +94,7 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
         .not('workspace_id', 'is', null)
         .limit(1)
         .maybeSingle();
-      
+
       if (error) throw error;
       return data?.workspaces?.organizations;
     },
@@ -112,16 +121,34 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
   const { data: existingTargets } = useQuery({
     queryKey: ['training-event-targets', eventId],
     queryFn: async () => {
-      if (!eventId) return [];
+      if (!eventId) return { users: [], departments: [] };
       const { data, error } = await supabase
         .from('training_event_targets')
         .select('*')
         .eq('event_id', eventId);
       if (error) throw error;
-      
-      return data?.filter(t => t.target_type === 'user').map(t => t.user_id!) || [];
+
+      const userResults = data?.filter(t => t.target_type === 'user').map(t => t.user_id!) || [];
+      const deptResults = data?.filter(t => t.target_type === 'department').map(t => t.department_id!) || [];
+
+      return { users: userResults, departments: deptResults };
     },
     enabled: !!eventId,
+  });
+
+  // Fetch selected department profiles for display
+  const { data: selectedDepartmentProfiles } = useQuery({
+    queryKey: ['selected-dept-profiles', selectedDepartments],
+    queryFn: async () => {
+      if (!selectedDepartments.length) return [];
+      const { data, error } = await supabase
+        .from('departments')
+        .select('id, name')
+        .in('id', selectedDepartments);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: selectedDepartments.length > 0,
   });
 
   // Fetch selected user profiles for display
@@ -204,8 +231,13 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
 
   // Load existing targets when editing
   useEffect(() => {
-    if (existingTargets && Array.isArray(existingTargets)) {
-      setSelectedUsers(existingTargets);
+    if (existingTargets) {
+      if (Array.isArray(existingTargets.users)) {
+        setSelectedUsers(existingTargets.users);
+      }
+      if (Array.isArray(existingTargets.departments)) {
+        setSelectedDepartments(existingTargets.departments);
+      }
     }
   }, [existingTargets]);
 
@@ -217,7 +249,7 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
   const createEventMutation = useMutation({
     mutationFn: async (data: EventFormData) => {
       // Generate unique room name for video conferences
-      const jitsiRoomName = data.enable_video_conference 
+      const jitsiRoomName = data.enable_video_conference
         ? `planivo-${Date.now()}-${Math.random().toString(36).substring(7)}`
         : null;
 
@@ -264,7 +296,8 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
       }
 
       // Handle targets for mandatory/invite_only events
-      if (data.registration_type !== 'open' && createdEventId && selectedUsers.length > 0) {
+      // Handle targets for mandatory/invite_only events
+      if (data.registration_type !== 'open' && createdEventId && (selectedUsers.length > 0 || selectedDepartments.length > 0)) {
         // Delete existing targets first (for updates)
         if (eventId) {
           await supabase
@@ -273,14 +306,36 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
             .eq('event_id', eventId);
         }
 
-        // Insert user targets
-        const userTargets = selectedUsers.map(userId => ({
-          event_id: createdEventId!,
-          target_type: 'user' as const,
-          user_id: userId,
-          is_mandatory: data.registration_type === 'mandatory',
-        }));
-        await supabase.from('training_event_targets').insert(userTargets);
+        const targets = [];
+
+        // Add user targets
+        if (selectedUsers.length > 0) {
+          targets.push(...selectedUsers.map(userId => ({
+            event_id: createdEventId!,
+            target_type: 'user' as const,
+            user_id: userId,
+            department_id: null,
+            is_mandatory: data.registration_type === 'mandatory',
+          })));
+        }
+
+        // Add department targets
+        if (selectedDepartments.length > 0) {
+          targets.push(...selectedDepartments.map(deptId => ({
+            event_id: createdEventId!,
+            target_type: 'department' as const,
+            user_id: null,
+            department_id: deptId,
+            is_mandatory: data.registration_type === 'mandatory',
+          })));
+        }
+
+        if (targets.length > 0) {
+          const { error: targetError } = await supabase
+            .from('training_event_targets')
+            .insert(targets);
+          if (targetError) throw targetError;
+        }
       }
 
       // Create notifications
@@ -293,7 +348,7 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
             .from('user_roles')
             .select('user_id, workspaces!inner(organization_id)')
             .eq('workspaces.organization_id', data.organization_id);
-          
+
           targetUserIds = [...new Set(orgUsers?.map(u => u.user_id) || [])];
         } else {
           // Use directly selected users
@@ -305,7 +360,7 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
           const notifications = targetUserIds.map(userId => ({
             user_id: userId,
             title: isMandatory ? '🔴 Mandatory Training Event' : 'New Training Event',
-            message: isMandatory 
+            message: isMandatory
               ? `You are required to attend "${data.title}". Please register immediately.`
               : `A new training event "${data.title}" has been scheduled`,
             type: isMandatory ? 'urgent' : 'system',
@@ -322,6 +377,7 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
       queryClient.invalidateQueries({ queryKey: ['training-events-calendar'] });
       form.reset();
       setSelectedUsers([]);
+      setSelectedDepartments([]);
       onSuccess?.();
     },
     onError: (error: Error) => {
@@ -376,10 +432,10 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
                   <FormItem className="md:col-span-2">
                     <FormLabel>Description</FormLabel>
                     <FormControl>
-                      <Textarea 
-                        placeholder="Describe the event..." 
+                      <Textarea
+                        placeholder="Describe the event..."
                         className="min-h-[100px]"
-                        {...field} 
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -420,8 +476,8 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Organization *</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
+                    <Select
+                      onValueChange={field.onChange}
                       defaultValue={field.value}
                       disabled={!isSuperAdmin && !!userOrganization}
                     >
@@ -476,8 +532,8 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
                       Max Participants
                     </FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
+                      <Input
+                        type="number"
                         placeholder="Leave empty for unlimited"
                         {...field}
                         onChange={e => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
@@ -534,7 +590,7 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
                   <FormItem>
                     <FormLabel>Start Date & Time *</FormLabel>
                     <FormControl>
-                      <DateTimePicker 
+                      <DateTimePicker
                         value={field.value}
                         onChange={field.onChange}
                         placeholder="Select start date and time"
@@ -549,20 +605,28 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
               <FormField
                 control={form.control}
                 name="end_datetime"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>End Date & Time *</FormLabel>
-                    <FormControl>
-                      <DateTimePicker 
-                        value={field.value}
-                        onChange={field.onChange}
-                        placeholder="Select end date and time"
-                        minDate={new Date()}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const startDatetime = form.watch('start_datetime');
+                  const minEndDate = startDatetime ? new Date(startDatetime) : new Date();
+
+                  return (
+                    <FormItem>
+                      <FormLabel>End Date & Time *</FormLabel>
+                      <FormControl>
+                        <DateTimePicker
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Select end date and time"
+                          minDate={minEndDate}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs">
+                        Must be after start date/time
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
 
               <FormField
@@ -635,8 +699,8 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
                           <UserCheck className="h-4 w-4" />
                           Event Coordinator
                         </FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
+                        <Select
+                          onValueChange={field.onChange}
                           value={field.value || undefined}
                         >
                           <FormControl>
@@ -673,29 +737,45 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
                           Select specific users who {registrationType === 'mandatory' ? 'must attend' : 'can register'}
                         </p>
                       </div>
-                      <Button 
-                        type="button" 
+                      <Button
+                        type="button"
                         variant="outline"
                         onClick={() => setShowUserSelector(true)}
                       >
                         <Users className="h-4 w-4 mr-2" />
-                        Select Users ({selectedUsers.length})
+                        Select Attendees ({selectedUsers.length + selectedDepartments.length})
                       </Button>
                     </div>
 
-                    {registrationType === 'mandatory' && selectedUsers.length === 0 && (
+                    {registrationType === 'mandatory' && selectedUsers.length === 0 && selectedDepartments.length === 0 && (
                       <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
                         <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
                         <p className="text-sm text-amber-700 dark:text-amber-400">
-                          Select users who are required to attend this mandatory event
+                          Select users or departments who are required to attend this mandatory event
                         </p>
                       </div>
                     )}
 
-                    {/* Selected users display */}
-                    {selectedUserProfiles && selectedUserProfiles.length > 0 && (
+                    {/* Selected targets display */}
+                    {(selectedUserProfiles?.length || 0) + (selectedDepartmentProfiles?.length || 0) > 0 && (
                       <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg max-h-32 overflow-y-auto">
-                        {selectedUserProfiles.map(profile => (
+                        {/* Selected Departments */}
+                        {selectedDepartmentProfiles?.map(dept => (
+                          <Badge key={dept.id} variant="secondary" className="bg-primary/20 gap-1 border-primary/20">
+                            <Building className="h-3 w-3" />
+                            {dept.name}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedDepartments(prev => prev.filter(id => id !== dept.id))}
+                              className="hover:bg-destructive/20 rounded-full p-0.5"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+
+                        {/* Selected Users */}
+                        {selectedUserProfiles?.map(profile => (
                           <Badge key={profile.id} variant="secondary" className="gap-1">
                             {profile.full_name}
                             <button
@@ -720,6 +800,8 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
               onOpenChange={setShowUserSelector}
               selectedUserIds={selectedUsers}
               onSelectionChange={setSelectedUsers}
+              selectedDepartmentIds={selectedDepartments}
+              onDepartmentSelectionChange={setSelectedDepartments}
               organizationId={organizationId}
               title={registrationType === 'mandatory' ? 'Select Mandatory Attendees' : 'Select Invited Users'}
             />

@@ -46,7 +46,7 @@ export function SecurityDashboard() {
         .from('user_roles')
         .select('role');
       if (error) throw error;
-      
+
       const counts: Record<string, number> = {};
       data.forEach(r => {
         counts[r.role] = (counts[r.role] || 0) + 1;
@@ -63,12 +63,12 @@ export function SecurityDashboard() {
         .from('profiles')
         .select('id', { count: 'exact' })
         .eq('is_active', true);
-      
+
       const { data: inactiveUsers } = await supabase
         .from('profiles')
         .select('id', { count: 'exact' })
         .eq('is_active', false);
-      
+
       const { data: forcePasswordChange } = await supabase
         .from('profiles')
         .select('id', { count: 'exact' })
@@ -267,64 +267,6 @@ export function SecurityDashboard() {
         </Card>
       </div>
 
-      {/* Rate Limits Table */}
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Lock className="h-5 w-5" />
-            Rate Limit Activity
-          </CardTitle>
-          <CardDescription>Recent rate limiting events and blocked requests</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[300px]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Identifier</TableHead>
-                  <TableHead>Action Type</TableHead>
-                  <TableHead>Request Count</TableHead>
-                  <TableHead>Window Start</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rateLimits?.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      No rate limit events recorded
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rateLimits?.map(limit => (
-                    <TableRow key={limit.id}>
-                      <TableCell className="font-mono text-xs">{limit.identifier.slice(0, 20)}...</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{limit.action_type}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className={(limit.request_count || 0) >= 10 ? 'text-red-500 font-bold' : ''}>
-                          {limit.request_count}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {limit.window_start ? format(new Date(limit.window_start), 'MMM d, HH:mm:ss') : '-'}
-                      </TableCell>
-                      <TableCell>
-                        {(limit.request_count || 0) >= 10 ? (
-                          <Badge className="bg-red-500/20 text-red-400">Blocked</Badge>
-                        ) : (
-                          <Badge className="bg-green-500/20 text-green-400">Active</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </ScrollArea>
-        </CardContent>
-      </Card>
     </div>
   );
 }

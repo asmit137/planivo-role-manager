@@ -95,8 +95,9 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
                   const profile = userProfiles?.find(p => p.id === ur.user_id);
                   return {
                     id: profile?.id,
-                    full_name: profile?.full_name,
-                    email: profile?.email,
+                    role_id: ur.id,
+                    full_name: profile?.full_name || 'Unknown User',
+                    email: profile?.email || '',
                     role: ur.role,
                   };
                 }),
@@ -273,7 +274,7 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
                             {facility.users && facility.users.length > 0 && (
                               <div className="space-y-2">
                                 {facility.users.map((user: any) => (
-                                  <div key={user.id} className="flex items-center justify-between text-sm p-2 rounded bg-background">
+                                  <div key={user.role_id} className="flex items-center justify-between text-sm p-2 rounded bg-background">
                                     <div>
                                       <p className="font-medium">{user.full_name}</p>
                                       <p className="text-xs text-muted-foreground">{user.email}</p>

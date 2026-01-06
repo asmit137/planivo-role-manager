@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 
-export type AppRole = 'super_admin' | 'organization_admin' | 'general_admin' | 'workplace_supervisor' | 'facility_supervisor' | 'department_head' | 'staff';
+export type AppRole = 'super_admin' | 'organization_admin' | 'general_admin' | 'workplace_supervisor' | 'facility_supervisor' | 'department_head' | 'staff' | 'custom';
 
 export interface UserRole {
   id: string;
@@ -11,6 +11,11 @@ export interface UserRole {
   workspace_id: string | null;
   facility_id: string | null;
   department_id: string | null;
+  custom_role_id: string | null;
+  custom_role?: {
+    id: string;
+    name: string;
+  };
 }
 
 export const useUserRole = () => {
@@ -23,11 +28,14 @@ export const useUserRole = () => {
 
       const { data, error } = await supabase
         .from('user_roles')
-        .select('*')
+        .select(`
+          *,
+          custom_role:custom_roles(id, name)
+        `)
         .eq('user_id', user.id);
 
       if (error) throw error;
-      
+
       return data as UserRole[];
     },
     enabled: !!user,

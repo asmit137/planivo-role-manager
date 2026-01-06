@@ -6,6 +6,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -25,6 +26,8 @@ interface UserSelectionDialogProps {
   onOpenChange: (open: boolean) => void;
   selectedUserIds: string[];
   onSelectionChange: (userIds: string[]) => void;
+  selectedDepartmentIds?: string[];
+  onDepartmentSelectionChange?: (departmentIds: string[]) => void;
   organizationId?: string;
   title?: string;
 }
@@ -50,6 +53,8 @@ const UserSelectionDialog = ({
   onOpenChange,
   selectedUserIds,
   onSelectionChange,
+  selectedDepartmentIds = [],
+  onDepartmentSelectionChange,
   organizationId,
   title = 'Select Users',
 }: UserSelectionDialogProps) => {
@@ -84,143 +89,153 @@ const UserSelectionDialog = ({
 
       let userIds: string[] = [];
 
-      if (userScope.type === 'all' && organizationId) {
-        // Get all users in the organization
-        const { data: workspaces } = await supabase
-          .from('workspaces')
-          .select('id')
-          .eq('organization_id', organizationId);
-
-        if (workspaces?.length) {
-          const { data: roleData } = await supabase
+      try {
+        if (userScope.type === 'all' && organizationId) {
+          // Direct join to get all users in organization workspaces
+          const { data: roleData, error: roleError } = await supabase
             .from('user_roles')
-            .select('user_id, workspace_id, facility_id, department_id, departments(name), facilities:facility_id(name)')
-            .in('workspace_id', workspaces.map(w => w.id));
+            .select('user_id, workspaces!inner(organization_id)')
+            .eq('workspaces.organization_id', organizationId);
 
+          if (roleError) throw roleError;
           userIds = [...new Set(roleData?.map(r => r.user_id) || [])];
-        }
-      } else if (userScope.type === 'workspace' && userScope.workspaceId) {
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('user_id')
-          .eq('workspace_id', userScope.workspaceId);
-        userIds = [...new Set(roleData?.map(r => r.user_id) || [])];
-      } else if (userScope.type === 'facility' && userScope.facilityId) {
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('user_id')
-          .eq('facility_id', userScope.facilityId);
-        userIds = [...new Set(roleData?.map(r => r.user_id) || [])];
-      } else if (userScope.type === 'department' && (userScope as any).departmentId) {
-        const fid = (userScope as any).facilityId;
-        if (fid) {
-          const { data: roleData } = await supabase
+        } else if (userScope.type === 'workspace' && userScope.workspaceId) {
+          const { data: roleData, error: roleError } = await supabase
             .from('user_roles')
             .select('user_id')
-            .eq('facility_id', fid);
+            .eq('workspace_id', userScope.workspaceId);
+
+          if (roleError) throw roleError;
           userIds = [...new Set(roleData?.map(r => r.user_id) || [])];
-        } else {
-          const { data: roleData } = await supabase
+        } else if (userScope.type === 'facility' && userScope.facilityId) {
+          const { data: roleData, error: roleError } = await supabase
+            .from('user_roles')
+            .select('user_id')
+            .eq('facility_id', userScope.facilityId);
+
+          if (roleError) throw roleError;
+          userIds = [...new Set(roleData?.map(r => r.user_id) || [])];
+        } else if (userScope.type === 'department' && (userScope as any).departmentId) {
+          const { data: roleData, error: roleError } = await supabase
             .from('user_roles')
             .select('user_id')
             .eq('department_id', (userScope as any).departmentId);
+
+          if (roleError) throw roleError;
           userIds = [...new Set(roleData?.map(r => r.user_id) || [])];
         }
+
+        if (!userIds.length) return [];
+
+        // Fetch profiles
+        const { data: profiles, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, phone')
+          .in('id', userIds);
+
+        if (profileError) throw profileError;
+
+        // Fetch role details for display (department/facility names)
+        const { data: displayRoles, error: displayError } = await supabase
+          .from('user_roles')
+          .select(`
+            user_id,
+            departments:department_id(name),
+            facilities:facility_id(name)
+          `)
+          .in('user_id', userIds);
+
+        if (displayError) throw displayError;
+
+        return (profiles || []).map(p => {
+          const role = displayRoles?.find(r => r.user_id === p.id);
+          return {
+            id: p.id,
+            full_name: p.full_name || 'Unnamed User',
+            email: p.email || '',
+            phone: p.phone,
+            department_name: (role?.departments as any)?.name || 'No Department',
+            facility_name: (role?.facilities as any)?.name || 'No Facility',
+          };
+        }) as SelectableUser[];
+      } catch (err) {
+        console.error('Error fetching selectable users:', err);
+        return [];
       }
-
-      if (!userIds.length) return [];
-
-      // Get profiles with department info
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, phone')
-        .in('id', userIds)
-        .eq('is_active', true);
-
-      // Get department/facility info for each user
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select(`
-          user_id,
-          departments (name),
-          facilities:facility_id (name)
-        `)
-        .in('user_id', userIds);
-
-      return profiles?.map(p => {
-        const userRole = roleData?.find(r => r.user_id === p.id);
-        return {
-          id: p.id,
-          full_name: p.full_name,
-          email: p.email,
-          phone: p.phone,
-          department_name: (userRole?.departments as any)?.name || 'No Department',
-          facility_name: (userRole?.facilities as any)?.name || 'No Facility',
-        };
-      }) as SelectableUser[];
     },
     enabled: open && !!userScope,
   });
 
   // Fetch user groups
   const { data: groups, isLoading: groupsLoading } = useQuery({
-    queryKey: ['user-groups', user?.id],
+    queryKey: ['user-groups', organizationId, user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('user_groups')
-        .select(`
-          id,
-          name,
-          description,
-          user_group_members (id)
-        `)
-        .order('name');
+      try {
+        let query = supabase
+          .from('user_groups')
+          .select(`
+            id,
+            name,
+            description,
+            user_group_members(id)
+          `);
 
-      if (error) throw error;
+        if (organizationId) {
+          query = query.eq('organization_id', organizationId);
+        } else if (roles?.length) {
+          const wsIds = roles.map(r => r.workspace_id).filter(Boolean);
+          if (wsIds.length > 0) {
+            query = query.in('workspace_id', wsIds);
+          }
+        }
 
-      return data?.map(g => ({
-        id: g.id,
-        name: g.name,
-        description: g.description,
-        member_count: g.user_group_members?.length || 0,
-      })) as UserGroup[];
+        const { data, error } = await query.order('name');
+        if (error) throw error;
+
+        return (data || []).map(g => ({
+          id: g.id,
+          name: g.name,
+          description: g.description,
+          member_count: (g.user_group_members as any)?.length || 0,
+        })) as UserGroup[];
+      } catch (err) {
+        console.error('Error fetching groups:', err);
+        return [];
+      }
     },
-    enabled: open,
+    enabled: open && (!!organizationId || !!roles?.length),
   });
 
-  // Fetch departments for quick selection
+  // Fetch departments for selection
   const { data: departments } = useQuery({
     queryKey: ['departments-for-selection', organizationId],
     queryFn: async () => {
       if (!organizationId) return [];
 
-      const { data: workspaces } = await supabase
-        .from('workspaces')
-        .select('id')
-        .eq('organization_id', organizationId);
+      try {
+        const { data: depts, error } = await supabase
+          .from('departments')
+          .select(`
+            id,
+            name,
+            facilities!inner(
+              name,
+              workspaces!inner(organization_id)
+            )
+          `)
+          .eq('facilities.workspaces.organization_id', organizationId);
 
-      if (!workspaces?.length) return [];
+        if (error) throw error;
 
-      const { data: facilities } = await supabase
-        .from('facilities')
-        .select('id, name')
-        .in('workspace_id', workspaces.map(w => w.id));
-
-      if (!facilities?.length) return [];
-
-      const { data: depts } = await supabase
-        .from('departments')
-        .select('id, name, facility_id')
-        .in('facility_id', facilities.map(f => f.id))
-        .eq('is_template', false);
-
-      const facilityMap = Object.fromEntries(facilities.map(f => [f.id, f.name]));
-
-      return depts?.map(d => ({
-        id: d.id,
-        name: d.name,
-        facility_name: facilityMap[d.facility_id] || 'Unknown',
-      })) || [];
+        return (depts || []).map(d => ({
+          id: d.id,
+          name: d.name,
+          facility_name: (d.facilities as any)?.name || 'Unknown',
+        }));
+      } catch (err) {
+        console.error('Error fetching departments:', err);
+        return [];
+      }
     },
     enabled: open && !!organizationId,
   });
@@ -243,6 +258,16 @@ const UserSelectionDialog = ({
       onSelectionChange(selectedUserIds.filter(id => id !== userId));
     } else {
       onSelectionChange([...selectedUserIds, userId]);
+    }
+  };
+
+  const toggleDepartmentSelection = (deptId: string) => {
+    if (!onDepartmentSelectionChange) return;
+
+    if (selectedDepartmentIds.includes(deptId)) {
+      onDepartmentSelectionChange(selectedDepartmentIds.filter(id => id !== deptId));
+    } else {
+      onDepartmentSelectionChange([...selectedDepartmentIds, deptId]);
     }
   };
 
@@ -290,6 +315,9 @@ const UserSelectionDialog = ({
             <Users className="h-5 w-5" />
             {title}
           </DialogTitle>
+          <DialogDescription>
+            Search and select users, groups, or departments to invite to this event.
+          </DialogDescription>
         </DialogHeader>
 
         {/* Selected users preview */}
@@ -306,8 +334,20 @@ const UserSelectionDialog = ({
                 </button>
               </Badge>
             ))}
-            {selectedUserIds.length > 10 && (
-              <Badge variant="outline">+{selectedUserIds.length - 10} more</Badge>
+            {departments?.filter(d => selectedDepartmentIds.includes(d.id)).map(dept => (
+              <Badge key={dept.id} variant="secondary" className="bg-primary/20 gap-1">
+                <Building className="h-3 w-3" />
+                {dept.name}
+                <button
+                  onClick={() => toggleDepartmentSelection(dept.id)}
+                  className="hover:bg-destructive/20 rounded-full p-0.5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+            {(selectedUserIds.length + selectedDepartmentIds.length) > 10 && (
+              <Badge variant="outline">+{(selectedUserIds.length + selectedDepartmentIds.length) - 10} more</Badge>
             )}
           </div>
         )}
@@ -339,6 +379,9 @@ const UserSelectionDialog = ({
             <TabsTrigger value="departments" className="gap-2">
               <Building className="h-4 w-4" />
               Departments
+              {selectedDepartmentIds.length > 0 && (
+                <Badge variant="secondary" className="ml-1">{selectedDepartmentIds.length}</Badge>
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -349,9 +392,13 @@ const UserSelectionDialog = ({
               <ScrollArea className="h-[300px] border rounded-md">
                 <div className="p-2 space-y-1">
                   {filteredUsers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      No users found
-                    </p>
+                    <div className="text-sm text-muted-foreground text-center py-8">
+                      {!organizationId && userScope?.type === 'all' ? (
+                        <p>Please select an organization in the form first</p>
+                      ) : (
+                        <p>No users found</p>
+                      )}
+                    </div>
                   ) : (
                     filteredUsers.map(user => (
                       <label
@@ -437,26 +484,43 @@ const UserSelectionDialog = ({
             <ScrollArea className="h-[300px] border rounded-md">
               <div className="p-2 space-y-1">
                 {!departments?.length ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    No departments found
-                  </p>
+                  <div className="text-sm text-muted-foreground text-center py-8">
+                    {!organizationId ? (
+                      <p>Please select an organization in the form first</p>
+                    ) : (
+                      <p>No departments found</p>
+                    )}
+                  </div>
                 ) : (
                   departments.map(dept => (
                     <div
                       key={dept.id}
-                      className="flex items-center justify-between p-3 rounded-lg hover:bg-muted"
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-lg hover:bg-muted cursor-pointer",
+                        selectedDepartmentIds.includes(dept.id) && "bg-primary/10"
+                      )}
                     >
-                      <div>
-                        <p className="font-medium">{dept.name}</p>
-                        <p className="text-xs text-muted-foreground">{dept.facility_name}</p>
+                      <div className="flex items-center gap-3 flex-1 min-w-0" onClick={() => toggleDepartmentSelection(dept.id)}>
+                        <Checkbox
+                          checked={selectedDepartmentIds.includes(dept.id)}
+                          onCheckedChange={() => toggleDepartmentSelection(dept.id)}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{dept.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{dept.facility_name}</p>
+                        </div>
                       </div>
                       <Button
                         size="sm"
-                        variant="outline"
-                        onClick={() => addDepartmentMembers(dept.id)}
+                        variant="link"
+                        className="text-primary hover:no-underline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addDepartmentMembers(dept.id);
+                        }}
                       >
                         <UserPlus className="h-4 w-4 mr-1" />
-                        Add All
+                        Add All Users
                       </Button>
                     </div>
                   ))

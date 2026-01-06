@@ -24,11 +24,23 @@ interface UserEditDialogProps {
 const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' }: UserEditDialogProps) => {
   const [fullName, setFullName] = useState('');
   const [isActive, setIsActive] = useState(true);
-  const [newRole, setNewRole] = useState('general_admin');
+  const [newRole, setNewRole] = useState('staff');
   const [newWorkspaceId, setNewWorkspaceId] = useState('');
   const [newFacilityId, setNewFacilityId] = useState('');
   const [newDepartmentId, setNewDepartmentId] = useState('');
   const [newSpecialtyId, setNewSpecialtyId] = useState('');
+  const [newCustomRoleId, setNewCustomRoleId] = useState('');
+
+  const handleNewRoleChange = (value: string) => {
+    const isCustom = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+    if (isCustom) {
+      setNewRole('custom');
+      setNewCustomRoleId(value);
+    } else {
+      setNewRole(value);
+      setNewCustomRoleId('');
+    }
+  };
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [editRoleDepartmentId, setEditRoleDepartmentId] = useState('');
   const [editRoleSpecialtyId, setEditRoleSpecialtyId] = useState('');
@@ -70,20 +82,49 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
     },
   });
 
+  // Fetch custom roles
+  const { data: customRoles } = useQuery({
+    queryKey: ['custom-roles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('custom_roles')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Fetch role module access for user's roles
   const { data: userModuleAccess } = useQuery({
     queryKey: ['user-module-access', user?.id],
     queryFn: async () => {
       if (!user?.roles || user.roles.length === 0) return [];
 
-      const roles = user.roles.map((r: any) => r.role);
-      const { data, error } = await supabase
-        .from('role_module_access')
-        .select('*, module_definitions(*)')
-        .in('role', roles);
+      const enumRoles = user.roles.filter((r: any) => r.role !== 'custom').map((r: any) => r.role);
+      const customRoleIds = user.roles.filter((r: any) => r.role === 'custom').map((r: any) => r.custom_role_id);
 
-      if (error) throw error;
-      return data;
+      let combinedData: any[] = [];
+
+      if (enumRoles.length > 0) {
+        const { data: enumData, error: enumError } = await supabase
+          .from('role_module_access')
+          .select('*, module_definitions(*)')
+          .in('role', enumRoles);
+        if (enumError) throw enumError;
+        combinedData = [...combinedData, ...enumData];
+      }
+
+      if (customRoleIds.length > 0) {
+        const { data: customData, error: customError } = await supabase
+          .from('custom_role_module_access')
+          .select('*, module_definitions(*)')
+          .in('role_id', customRoleIds);
+        if (customError) throw customError;
+        combinedData = [...combinedData, ...customData];
+      }
+
+      return combinedData;
     },
     enabled: !!user && user.roles?.length > 0,
   });
@@ -141,7 +182,6 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
         .is('parent_department_id', null)
         .order('name');
       if (error) throw error;
-      if (error) throw error;
       return data;
     },
   });
@@ -158,7 +198,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
   });
 
   const { data: specialties } = useQuery({
-    queryKey: ['specialties', newDepartmentId],
+    queryKey: ['specialties-creation', newDepartmentId],
     queryFn: async () => {
       if (!newDepartmentId) return [];
       const { data, error } = await supabase
@@ -267,6 +307,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
           facility_id: newFacilityId || null,
           department_id: newDepartmentId || null,
           specialty_id: newSpecialtyId || null,
+          custom_role_id: newCustomRoleId || null,
         });
 
       if (error) throw error;
@@ -286,11 +327,12 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
       }
 
       toast.success('Role added successfully');
-      setNewRole('general_admin');
+      setNewRole('staff');
       setNewWorkspaceId('');
       setNewFacilityId('');
       setNewDepartmentId('');
       setNewSpecialtyId('');
+      setNewCustomRoleId('');
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to add role');
@@ -625,7 +667,11 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                         return (
                           <div key={roleData.id} className="p-3 border rounded-lg space-y-3">
                             <div className="flex items-center justify-between">
-                              <Badge variant="outline">{roleData.role.replace(/_/g, ' ')}</Badge>
+                              <Badge variant="outline">
+                                {roleData.role === 'custom' && roleData.custom_role?.name
+                                  ? roleData.custom_role.name
+                                  : roleData.role.replace(/_/g, ' ')}
+                              </Badge>
                               <div className="flex gap-2">
                                 {!isEditing ? (
                                   <>
@@ -772,9 +818,9 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
 
                   <div className="space-y-2">
                     <Label>Role</Label>
-                    <Select value={newRole} onValueChange={setNewRole}>
+                    <Select value={newCustomRoleId || newRole} onValueChange={handleNewRoleChange}>
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Select a role" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="super_admin">Super Admin</SelectItem>
@@ -783,9 +829,16 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                         <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
                         <SelectItem value="department_head">Department Head</SelectItem>
                         <SelectItem value="staff">Staff</SelectItem>
+                        {customRoles?.map((cr) => (
+                          <SelectItem key={cr.id} value={cr.id}>
+                            {cr.name} (Custom)
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* Removed separate custom role selector as it's now integrated */}
 
                   {newRole !== 'super_admin' && (
                     <>

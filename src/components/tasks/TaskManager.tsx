@@ -294,6 +294,7 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
                       mode="single"
                       selected={dueDate}
                       onSelect={setDueDate}
+                      disabled={{ before: new Date() }}
                     />
                   </PopoverContent>
                 </Popover>

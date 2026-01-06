@@ -8,10 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -45,8 +47,10 @@ interface UserGroup {
 const GroupManagement = () => {
   const { user } = useAuth();
   const { data: roles } = useUserRole();
+  const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
   const queryClient = useQueryClient();
-  
+
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -56,14 +60,43 @@ const GroupManagement = () => {
   const [groupDescription, setGroupDescription] = useState('');
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
 
-  // Determine user's organization
-  const organizationId = roles?.find(r => r.workspace_id)?.workspace_id;
+  // Determine user's organization id
+  const { data: userOrgId } = useQuery({
+    queryKey: ['user-org-id', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data } = await supabase
+        .from('user_roles')
+        .select('workspaces(organization_id)')
+        .eq('user_id', user.id)
+        .not('workspace_id', 'is', null)
+        .limit(1)
+        .maybeSingle();
+      return (data?.workspaces as any)?.organization_id || null;
+    },
+  });
+
+  const organizationId = isSuperAdmin ? selectedOrgId : userOrgId;
+
+  // Fetch all organizations for super admin
+  const { data: organizations } = useQuery({
+    queryKey: ['organizations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+    enabled: isSuperAdmin,
+  });
 
   // Fetch groups
   const { data: groups, isLoading } = useQuery({
-    queryKey: ['user-groups-management', user?.id],
+    queryKey: ['user-groups-management', user?.id, organizationId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('user_groups')
         .select(`
           id,
@@ -75,11 +108,21 @@ const GroupManagement = () => {
             user_id,
             profiles:user_id (full_name, email)
           )
-        `)
-        .order('name');
-      
+        `);
+
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      } else if (!isSuperAdmin && roles?.length) {
+        const wsIds = roles.map(r => r.workspace_id).filter(Boolean);
+        if (wsIds.length > 0) {
+          query = query.in('workspace_id', wsIds);
+        }
+      }
+
+      const { data, error } = await query.order('name');
+
       if (error) throw error;
-      
+
       return data?.map(g => ({
         ...g,
         member_count: g.user_group_members?.length || 0,
@@ -91,17 +134,16 @@ const GroupManagement = () => {
   // Get scope info based on user role
   const getScopeInfo = () => {
     if (!roles?.length) return { type: 'workspace', id: null };
-    
-    const isSuperAdmin = roles.some(r => r.role === 'super_admin');
+
     const generalAdmin = roles.find(r => r.role === 'general_admin');
     const workplaceSupervisor = roles.find(r => r.role === 'workplace_supervisor');
     const facilitySupervisor = roles.find(r => r.role === 'facility_supervisor');
 
     if (isSuperAdmin || generalAdmin) {
-      return { 
-        type: 'organization' as const, 
-        organizationId: null, // Super admin can select
-        workspaceId: generalAdmin?.workspace_id 
+      return {
+        type: 'organization' as const,
+        organizationId: null,
+        workspaceId: generalAdmin?.workspace_id || null
       };
     }
     if (workplaceSupervisor) {
@@ -117,7 +159,7 @@ const GroupManagement = () => {
   const createGroupMutation = useMutation({
     mutationFn: async () => {
       const scope = getScopeInfo();
-      
+
       const { data: group, error: groupError } = await supabase
         .from('user_groups')
         .insert({
@@ -125,8 +167,9 @@ const GroupManagement = () => {
           description: groupDescription || null,
           created_by: user?.id,
           scope_type: scope.type,
-          workspace_id: scope.type === 'workspace' ? scope.workspaceId : null,
-          facility_id: scope.type === 'facility' ? scope.facilityId : null,
+          organization_id: organizationId,
+          workspace_id: scope.type === 'workspace' ? (scope as any).workspaceId : null,
+          facility_id: scope.type === 'facility' ? (scope as any).facilityId : null,
         })
         .select()
         .single();
@@ -209,12 +252,12 @@ const GroupManagement = () => {
   const deleteGroupMutation = useMutation({
     mutationFn: async () => {
       if (!selectedGroup) return;
-      
+
       const { error } = await supabase
         .from('user_groups')
         .delete()
         .eq('id', selectedGroup.id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -256,7 +299,7 @@ const GroupManagement = () => {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <CardTitle className="flex items-center gap-2">
               <UsersRound className="h-5 w-5" />
@@ -266,10 +309,25 @@ const GroupManagement = () => {
               Create reusable groups for quick user selection
             </CardDescription>
           </div>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Group
-          </Button>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            {isSuperAdmin && (
+              <Select value={selectedOrgId || ''} onValueChange={setSelectedOrgId}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select Organization" />
+                </SelectTrigger>
+                <SelectContent>
+                  {organizations?.map(org => (
+                    <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Button onClick={() => setShowCreateDialog(true)} disabled={isSuperAdmin && !selectedOrgId}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Group
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -331,6 +389,9 @@ const GroupManagement = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Group</DialogTitle>
+            <DialogDescription>
+              Enter a name and description for your new user group.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -369,7 +430,7 @@ const GroupManagement = () => {
             <Button variant="outline" onClick={() => { resetForm(); setShowCreateDialog(false); }}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={() => createGroupMutation.mutate()}
               disabled={!groupName.trim() || createGroupMutation.isPending}
             >
@@ -384,6 +445,9 @@ const GroupManagement = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Group</DialogTitle>
+            <DialogDescription>
+              Update the details and members of this group.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -420,7 +484,7 @@ const GroupManagement = () => {
             <Button variant="outline" onClick={() => { resetForm(); setShowEditDialog(false); }}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={() => updateGroupMutation.mutate()}
               disabled={!groupName.trim() || updateGroupMutation.isPending}
             >
@@ -457,6 +521,7 @@ const GroupManagement = () => {
         onOpenChange={setShowMemberDialog}
         selectedUserIds={selectedMemberIds}
         onSelectionChange={setSelectedMemberIds}
+        organizationId={organizationId || undefined}
         title="Select Group Members"
       />
     </Card>

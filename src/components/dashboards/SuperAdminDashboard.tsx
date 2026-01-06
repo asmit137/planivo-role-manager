@@ -29,6 +29,7 @@ import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
 import { SystemSettingsHub } from '@/components/admin/SystemSettingsHub';
 import { EmailManagement } from '@/components/admin/EmailManagement';
 import { RealTimeActivityMonitor } from '@/components/admin/RealTimeActivityMonitor';
+import { StaffManagementPage } from '@/components/staff';
 
 const SuperAdminDashboard = () => {
   const { modules, hasAccess } = useModuleContext();
@@ -271,7 +272,6 @@ const SuperAdminDashboard = () => {
       {activeTab === 'messaging' && (
         <PageHeader
           title="Messaging"
-          description="Communicate with colleagues across your workspaces"
         />
       )}
       {activeTab === 'notifications' && (
@@ -558,28 +558,7 @@ const SuperAdminDashboard = () => {
 
         {activeTab === 'staff' && hasAccess('staff_management') && (
           <ModuleGuard moduleKey="staff_management">
-            <Card className="border-2">
-              <CardHeader>
-                <CardTitle>Staff Management</CardTitle>
-                <CardDescription>
-                  Staff management is handled through the User Management section
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground mb-4">
-                    As Super Admin, you can manage all users including staff members through the User Management tab.
-                  </p>
-                  <Button
-                    onClick={() => window.location.href = '/dashboard?tab=users'}
-                    className="bg-gradient-primary"
-                  >
-                    Go to User Management
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <StaffManagementPage />
           </ModuleGuard>
         )}
 

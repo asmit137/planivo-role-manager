@@ -450,7 +450,14 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
                               id="startDate"
                               type="date"
                               value={startDate}
-                              onChange={(e) => setStartDate(e.target.value)}
+                              onChange={(e) => {
+                                setStartDate(e.target.value);
+                                // If end date is now before start date, update it
+                                if (endDate && e.target.value > endDate) {
+                                  setEndDate(e.target.value);
+                                }
+                              }}
+                              min={new Date().toISOString().split('T')[0]}
                             />
                           </div>
                           <div className="space-y-2">
@@ -460,6 +467,7 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
                               type="date"
                               value={endDate}
                               onChange={(e) => setEndDate(e.target.value)}
+                              min={startDate || new Date().toISOString().split('T')[0]}
                             />
                           </div>
                         </div>

@@ -4,7 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { UserPlus, Filter, Pencil, Trash2, FileSpreadsheet } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { UserPlus, Filter, Pencil, Trash2, FileSpreadsheet, Lock } from 'lucide-react';
+import { format } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -34,6 +37,7 @@ interface UnifiedUserHubProps {
 const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, currentUserCount }: UnifiedUserHubProps) => {
   const [unifiedCreateOpen, setUnifiedCreateOpen] = useState(false);
   const [filterWorkspace, setFilterWorkspace] = useState<string>('all');
+  const [filterDepartment, setFilterDepartment] = useState<string>('all');
   const [editOpen, setEditOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
@@ -43,6 +47,9 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
   const { user: currentUser } = useAuth();
   const { data: userRoles } = useUserRole();
   const { canEdit, canDelete, canAdmin } = useModuleContext();
+
+  // Check if current user is super admin
+  const isSuperAdmin = userRoles?.some(r => r.role === 'super_admin');
 
   // Auto-detect scope from user's role if not provided
   const detectedScope: 'system' | 'workspace' | 'facility' | 'department' =
@@ -84,7 +91,7 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
   });
 
   const { data: users, isLoading: usersLoading, error: usersError } = useQuery({
-    queryKey: ['unified-users', detectedScope, detectedScopeId, filterWorkspace],
+    queryKey: ['unified-users', detectedScope, detectedScopeId, filterWorkspace, filterDepartment],
     queryFn: async () => {
       let query = supabase
         .from('profiles')
@@ -94,10 +101,10 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
       const { data: profiles, error: profilesError } = await query;
       if (profilesError) throw profilesError;
 
-      // Fetch all user roles
+      // Fetch all user roles including custom role names
       const { data: allUserRoles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('*');
+        .select('*, custom_role:custom_roles(id, name)');
       if (rolesError) throw rolesError;
 
       // Filter profiles based on scope
@@ -130,6 +137,13 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
         filteredProfiles = filteredProfiles?.filter((p) => userIds.includes(p.id)) || [];
       }
 
+      // Apply department filter if selected (super admin only)
+      if (filterDepartment && filterDepartment !== 'all') {
+        const departmentRoles = allUserRoles?.filter((ur) => ur.department_id === filterDepartment);
+        const userIds = departmentRoles?.map((ur) => ur.user_id) || [];
+        filteredProfiles = filteredProfiles?.filter((p) => userIds.includes(p.id)) || [];
+      }
+
       // Combine profiles with their roles
       const usersWithRoles = filteredProfiles?.map((profile) => {
         const roles = allUserRoles?.filter((ur) => ur.user_id === profile.id) || [];
@@ -141,6 +155,21 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
 
       return usersWithRoles;
     },
+  });
+
+  // Fetch rate limits for super admin
+  const { data: rateLimits } = useQuery({
+    queryKey: ['rate-limits'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('rate_limits')
+        .select('*')
+        .order('window_start', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data;
+    },
+    enabled: isSuperAdmin && detectedScope === 'system',
   });
 
   const handleEdit = (user: any) => {
@@ -270,7 +299,9 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
         <div className="flex flex-wrap gap-1 min-w-[150px]">
           {row.roles.map((roleData: any, idx: number) => (
             <Badge key={idx} variant="outline">
-              {roleData.role.replace(/_/g, ' ')}
+              {roleData.role === 'custom' && roleData.custom_role?.name
+                ? roleData.custom_role.name
+                : roleData.role.replace(/_/g, ' ')}
             </Badge>
           ))}
           {row.roles.length === 0 && (
@@ -452,22 +483,44 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
 
                 <TabsContent value="list" className="space-y-4">
                   {detectedScope === 'system' && (
-                    <div className="flex items-center gap-2">
-                      <Filter className="h-4 w-4 text-muted-foreground" />
-                      <Label className="text-sm">Filter by Workspace:</Label>
-                      <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
-                        <SelectTrigger className="w-64">
-                          <SelectValue placeholder="Select workspace" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Workspaces</SelectItem>
-                          {workspaces?.map((workspace) => (
-                            <SelectItem key={workspace.id} value={workspace.id}>
-                              {workspace.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Filter className="h-4 w-4 text-muted-foreground" />
+                        <Label className="text-sm">Filter by Workspace:</Label>
+                        <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
+                          <SelectTrigger className="w-64">
+                            <SelectValue placeholder="Select workspace" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Workspaces</SelectItem>
+                            {workspaces?.map((workspace) => (
+                              <SelectItem key={workspace.id} value={workspace.id}>
+                                {workspace.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {isSuperAdmin && (
+                        <div className="flex items-center gap-2">
+                          <Filter className="h-4 w-4 text-muted-foreground" />
+                          <Label className="text-sm">Filter by Department:</Label>
+                          <Select value={filterDepartment} onValueChange={setFilterDepartment}>
+                            <SelectTrigger className="w-64">
+                              <SelectValue placeholder="Select department" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Departments</SelectItem>
+                              {allDepartments?.map((department) => (
+                                <SelectItem key={department.id} value={department.id}>
+                                  {department.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -496,22 +549,44 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
             ) : (
               <div className="space-y-4">
                 {detectedScope === 'system' && (
-                  <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-muted-foreground" />
-                    <Label className="text-sm">Filter by Workspace:</Label>
-                    <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
-                      <SelectTrigger className="w-64">
-                        <SelectValue placeholder="Select workspace" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Workspaces</SelectItem>
-                        {workspaces?.map((workspace) => (
-                          <SelectItem key={workspace.id} value={workspace.id}>
-                            {workspace.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Filter className="h-4 w-4 text-muted-foreground" />
+                      <Label className="text-sm">Filter by Workspace:</Label>
+                      <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
+                        <SelectTrigger className="w-64">
+                          <SelectValue placeholder="Select workspace" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Workspaces</SelectItem>
+                          {workspaces?.map((workspace) => (
+                            <SelectItem key={workspace.id} value={workspace.id}>
+                              {workspace.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {isSuperAdmin && (
+                      <div className="flex items-center gap-2">
+                        <Filter className="h-4 w-4 text-muted-foreground" />
+                        <Label className="text-sm">Filter by Department:</Label>
+                        <Select value={filterDepartment} onValueChange={setFilterDepartment}>
+                          <SelectTrigger className="w-64">
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Departments</SelectItem>
+                            {allDepartments?.map((department) => (
+                              <SelectItem key={department.id} value={department.id}>
+                                {department.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -535,6 +610,67 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
             )}
           </CardContent>
         </Card>
+
+        {/* Rate Limit Activity - Super Admin Only */}
+        {isSuperAdmin && detectedScope === 'system' && (
+          <Card className="border-2 mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5" />
+                Rate Limit Activity
+              </CardTitle>
+              <CardDescription>Recent rate limiting events and blocked requests</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[300px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Identifier</TableHead>
+                      <TableHead>Action Type</TableHead>
+                      <TableHead>Request Count</TableHead>
+                      <TableHead>Window Start</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rateLimits?.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                          No rate limit events recorded
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      rateLimits?.map(limit => (
+                        <TableRow key={limit.id}>
+                          <TableCell className="font-mono text-xs">{limit.identifier.slice(0, 20)}...</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{limit.action_type}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className={(limit.request_count || 0) >= 10 ? 'text-red-500 font-bold' : ''}>
+                              {limit.request_count}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {limit.window_start ? format(new Date(limit.window_start), 'MMM d, HH:mm:ss') : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {(limit.request_count || 0) >= 10 ? (
+                              <Badge className="bg-red-500/20 text-red-400">Blocked</Badge>
+                            ) : (
+                              <Badge className="bg-green-500/20 text-green-400">Active</Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        )}
       </>
     </ErrorBoundary>
   );

@@ -1,12 +1,12 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Building2, 
-  UserCog, 
-  Calendar, 
-  CheckSquare, 
-  MessageSquare, 
+import {
+  LayoutDashboard,
+  Users,
+  Building2,
+  UserCog,
+  Calendar,
+  CheckSquare,
+  MessageSquare,
   Bell,
   Settings,
   LogOut,
@@ -19,7 +19,10 @@ import {
   BarChart3,
   Cog,
   Mail,
-  Activity
+  Activity,
+  ChevronRight,
+  Archive,
+  Menu
 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
@@ -27,6 +30,11 @@ import NotificationBell from '@/components/notifications/NotificationBell';
 import MessagingPanel from '@/components/messaging/MessagingPanel';
 import UserProfile from '@/components/UserProfile';
 import { ThemeToggleSimple } from '@/components/ThemeToggle';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
   Sidebar,
   SidebarContent,
@@ -36,6 +44,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarFooter,
   SidebarTrigger,
   useSidebar,
@@ -61,15 +72,15 @@ const moduleConfig = [
 ];
 
 // Inner content component that uses sidebar context (must be rendered inside Sidebar)
-function SidebarInnerContent({ 
-  hasAccess, 
-  signOut, 
-  roleLabel, 
-  primaryRole, 
-  visibleModules, 
-  currentTab, 
-  handleNavigation, 
-  isActive 
+function SidebarInnerContent({
+  hasAccess,
+  signOut,
+  roleLabel,
+  primaryRole,
+  visibleModules,
+  currentTab,
+  handleNavigation,
+  isActive
 }: {
   hasAccess: (moduleKey: string) => boolean;
   signOut: () => void;
@@ -133,16 +144,6 @@ function SidebarInnerContent({
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    onClick={() => handleNavigation('/dashboard?tab=activity')}
-                    isActive={currentTab === 'activity'}
-                    className="w-full"
-                  >
-                    <Activity className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
-                    {!collapsed && <span>Live Activity</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
                     onClick={() => handleNavigation('/dashboard?tab=analytics')}
                     isActive={currentTab === 'analytics'}
                     className="w-full"
@@ -159,16 +160,6 @@ function SidebarInnerContent({
                   >
                     <FileText className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
                     {!collapsed && <span>Audit Logs</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => handleNavigation('/dashboard?tab=security')}
-                    isActive={currentTab === 'security'}
-                    className="w-full"
-                  >
-                    <Shield className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
-                    {!collapsed && <span>Security</span>}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
@@ -201,26 +192,63 @@ function SidebarInnerContent({
                     {!collapsed && <span>Module Access</span>}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => handleNavigation('/dashboard?tab=validator')}
-                    isActive={currentTab === 'validator'}
-                    className="w-full"
-                  >
-                    <ShieldCheck className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
-                    {!collapsed && <span>System Validator</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => handleNavigation('/dashboard?tab=source-code')}
-                    isActive={currentTab === 'source-code'}
-                    className="w-full"
-                  >
-                    <Code className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
-                    {!collapsed && <span>Source Code</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+
+                {/* Inactive Tabs Dropdown */}
+                <Collapsible className="group/collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton tooltip="Inactive Tabs">
+                        <Archive className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
+                        {!collapsed && (
+                          <>
+                            <span>Inactive Tabs</span>
+                            <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                          </>
+                        )}
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            onClick={() => handleNavigation('/dashboard?tab=activity')}
+                            isActive={currentTab === 'activity'}
+                          >
+                            <Activity size={16} />
+                            <span>Live Activity</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            onClick={() => handleNavigation('/dashboard?tab=security')}
+                            isActive={currentTab === 'security'}
+                          >
+                            <Shield size={16} />
+                            <span>Security</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            onClick={() => handleNavigation('/dashboard?tab=validator')}
+                            isActive={currentTab === 'validator'}
+                          >
+                            <ShieldCheck size={16} />
+                            <span>System Validator</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            onClick={() => handleNavigation('/dashboard?tab=source-code')}
+                            isActive={currentTab === 'source-code'}
+                          >
+                            <Code size={16} />
+                            <span>Source Code</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -283,13 +311,13 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
   // Format role label
   const getRoleLabel = () => {
     if (!primaryRole) return '';
-    return primaryRole.split('_').map(word => 
+    return primaryRole.split('_').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
   };
 
   // Filter modules based on permissions
-  const visibleModules = moduleConfig.filter(module => 
+  const visibleModules = moduleConfig.filter(module =>
     module.alwaysShow || hasAccess(module.key)
   );
 

@@ -426,6 +426,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                             mode="single"
                             selected={split.start_date}
                             onSelect={(date) => date && updateSplit(index, 'start_date', date)}
+                            disabled={{ before: new Date() }}
                             initialFocus
                             className="pointer-events-auto"
                           />
@@ -455,6 +456,10 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                             mode="single"
                             selected={split.end_date}
                             onSelect={(date) => date && updateSplit(index, 'end_date', date)}
+                            disabled={[
+                              { before: new Date() },
+                              { before: split.start_date }
+                            ]}
                             initialFocus
                             className="pointer-events-auto"
                           />

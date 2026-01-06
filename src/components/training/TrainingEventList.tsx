@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/layout/EmptyState';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Search, Calendar, Filter } from 'lucide-react';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
@@ -53,7 +53,7 @@ const TrainingEventList = ({
         .not('workspace_id', 'is', null)
         .limit(1)
         .maybeSingle();
-      
+
       if (error) throw error;
       return data?.workspaces?.organization_id;
     },
@@ -88,7 +88,7 @@ const TrainingEventList = ({
           .select('event_id')
           .eq('user_id', user.id)
           .eq('status', 'registered');
-        
+
         const registeredEventIds = registrations?.map(r => r.event_id) || [];
         return data.filter(event => registeredEventIds.includes(event.id));
       }
@@ -114,7 +114,7 @@ const TrainingEventList = ({
 
   // Apply filters
   const filteredEvents = events?.filter(event => {
-    const matchesSearch = 
+    const matchesSearch =
       event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       event.description?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = eventTypeFilter === 'all' || event.event_type === eventTypeFilter;
@@ -175,7 +175,7 @@ const TrainingEventList = ({
           icon={Calendar}
           title={showOnlyRegistered ? "No Registrations" : "No Events Found"}
           description={
-            showOnlyRegistered 
+            showOnlyRegistered
               ? "You haven't registered for any events yet. Browse upcoming events to register."
               : searchQuery || eventTypeFilter !== 'all'
                 ? "No events match your current filters."
@@ -201,10 +201,13 @@ const TrainingEventList = ({
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Event</DialogTitle>
+            <DialogDescription>
+              Modify the details of the existing training event.
+            </DialogDescription>
           </DialogHeader>
           {editingEventId && (
-            <TrainingEventForm 
-              eventId={editingEventId} 
+            <TrainingEventForm
+              eventId={editingEventId}
               onSuccess={() => setEditingEventId(null)}
             />
           )}

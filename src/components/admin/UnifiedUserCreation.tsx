@@ -20,7 +20,8 @@ const userSchema = z.object({
   department_id: z.string().uuid('Invalid department').optional().nullable(),
   specialty_id: z.string().uuid().optional().nullable(),
   organization_id: z.string().uuid().optional().nullable(),
-  role: z.enum(['staff', 'department_head', 'facility_supervisor', 'workplace_supervisor', 'general_admin', 'organization_admin']),
+  role: z.enum(['staff', 'department_head', 'facility_supervisor', 'workplace_supervisor', 'general_admin', 'organization_admin', 'custom']),
+  custom_role_id: z.string().uuid().optional().nullable(),
 });
 
 interface UnifiedUserCreationProps {
@@ -30,12 +31,14 @@ interface UnifiedUserCreationProps {
 
 const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) => {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [facilityId, setFacilityId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [specialtyId, setSpecialtyId] = useState('');
   const [organizationId, setOrganizationId] = useState('');
-  const [role, setRole] = useState<'staff' | 'department_head' | 'facility_supervisor' | 'workplace_supervisor' | 'general_admin' | 'organization_admin'>('staff');
+  const [customRoleId, setCustomRoleId] = useState('');
+  const [role, setRole] = useState<'staff' | 'department_head' | 'facility_supervisor' | 'workplace_supervisor' | 'general_admin' | 'organization_admin' | 'custom'>('staff');
   const queryClient = useQueryClient();
 
   // Get current user's roles to determine permissions
@@ -70,7 +73,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
   const getAvailableRoles = (): AppRole[] => {
     switch (highestRole) {
       case 'super_admin':
-        return ['organization_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'];
+        return ['organization_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'custom'];
       case 'organization_admin':
       case 'general_admin':
         return ['workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'];
@@ -145,6 +148,20 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       return data;
     },
     enabled: role === 'organization_admin',
+  });
+
+  // Fetch custom roles
+  const { data: customRoles } = useQuery({
+    queryKey: ['custom-roles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('custom_roles')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+    enabled: true,
   });
 
   // Fetch facilities
@@ -223,15 +240,17 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
 
   const createUserMutation = useMutation({
     mutationFn: async (userData: z.infer<typeof userSchema>) => {
-      // Validate base schema
-      try {
-        userSchema.parse(userData);
-      } catch (validationError) {
-        if (validationError instanceof z.ZodError) {
-          const firstError = validationError.errors[0];
-          throw new Error(firstError.message);
-        }
-        throw validationError;
+      // Get the current user to ensure we have a valid auth token and session
+      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !currentUser) {
+        throw new Error('Authentication failed. Please log in again.');
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log("Diagnostic: Session token found:", !!session?.access_token);
+      if (session?.access_token) {
+        console.log("Diagnostic: Token length:", session.access_token.length);
       }
 
       // Role-specific validation
@@ -249,7 +268,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
         const { data, error } = await supabase.functions.invoke('create-user', {
           body: {
             email: userData.email,
-            password: '123456',
+            password: password,
             full_name: userData.full_name,
             role: 'organization_admin',
             organization_id: userData.organization_id,
@@ -280,13 +299,14 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       const { data, error } = await supabase.functions.invoke('create-user', {
         body: {
           email: userData.email,
-          password: '123456', // Default password - user must change on first login
+          password: password,
           full_name: userData.full_name,
           role: userData.role,
           workspace_id: workspaceId,
           facility_id: userData.facility_id || null,
           department_id: userData.department_id || null,
           specialty_id: userData.specialty_id || null,
+          custom_role_id: userData.custom_role_id || null,
           force_password_change: true,
         },
       });
@@ -295,7 +315,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       return data;
     },
     onSuccess: () => {
-      toast.success('User created successfully! Default password: 123456');
+      toast.success(`User created successfully! Password: ${password}`);
       queryClient.invalidateQueries({ queryKey: ['unified-users'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
@@ -307,14 +327,19 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       let errorMessage = 'Failed to create user';
 
       // Try to extract detailed error from Edge Function response
-      if (error.context && error.context.error) {
-        errorMessage = error.context.error;
+      if (error.context && (error.context.error || error.context.details)) {
+        errorMessage = error.context.error || 'Database Error';
+        if (error.context.details) errorMessage += `: ${error.context.details}`;
+        if (error.context.diagnostic) console.log("Diagnostic Info:", error.context.diagnostic);
       } else if (error instanceof Error) {
         // Try to parse structured validation errors (e.g. Zod arrays) from message
         try {
           const parsed = JSON.parse(error.message);
           if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.message) {
             errorMessage = parsed.map((e: { message: string }) => e.message).join(', ');
+          } else if (parsed.error) {
+            errorMessage = parsed.error;
+            if (parsed.details) errorMessage += `: ${parsed.details}`;
           } else {
             errorMessage = error.message;
           }
@@ -350,17 +375,20 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       department_id: departmentId || null,
       specialty_id: specialtyId || null,
       organization_id: organizationId || null,
+      custom_role_id: customRoleId || null,
       role,
     });
   };
 
   const handleReset = () => {
     setEmail('');
+    setPassword('');
     setFullName('');
     setFacilityId('');
     setDepartmentId('');
     setSpecialtyId('');
     setOrganizationId('');
+    setCustomRoleId('');
     setRole('staff');
   };
 
@@ -375,8 +403,16 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     setSpecialtyId('');
   };
 
-  const handleRoleChange = (value: 'staff' | 'department_head' | 'facility_supervisor' | 'workplace_supervisor' | 'general_admin' | 'organization_admin') => {
-    setRole(value);
+  const handleRoleChange = (value: string) => {
+    const isCustom = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+
+    if (isCustom) {
+      setRole('custom');
+      setCustomRoleId(value);
+    } else {
+      setRole(value as any);
+      setCustomRoleId('');
+    }
     // Clear fields based on role requirements
     if (['workplace_supervisor', 'facility_supervisor', 'general_admin', 'organization_admin'].includes(value)) {
       setDepartmentId('');
@@ -387,6 +423,9 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     }
     if (value !== 'organization_admin') {
       setOrganizationId('');
+    }
+    if (value !== 'custom') {
+      setCustomRoleId('');
     }
   };
 
@@ -437,6 +476,24 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                 />
               </div>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Initial Password *</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Minimum 6 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                maxLength={128}
+                autoComplete="new-password"
+              />
+              <p className="text-xs text-muted-foreground">
+                User will be required to change this password on first login
+              </p>
+            </div>
           </div>
 
           {/* Role Assignment - Moved BEFORE Organization Assignment */}
@@ -471,6 +528,11 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                   {availableRoles.includes('staff') && (
                     <SelectItem value="staff">Staff</SelectItem>
                   )}
+                  {availableRoles.includes('custom') && customRoles?.map((cr) => (
+                    <SelectItem key={cr.id} value={cr.id}>
+                      {cr.name} (Custom)
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
@@ -480,8 +542,11 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                 {role === 'facility_supervisor' && 'Facility-level access - department not required'}
                 {role === 'department_head' && 'Department-level access - requires facility and department'}
                 {role === 'staff' && 'Staff member - requires facility and department'}
+                {role === 'custom' && 'Dynamic role with custom module permissions'}
               </p>
             </div>
+
+            {/* Removed separate custom role selector as it's now integrated */}
           </div>
 
           {/* Organization Selector - Shows only for organization_admin role */}
@@ -637,7 +702,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
             <AlertDescription>
               User will receive email: <strong>{email || 'user@example.com'}</strong>
               <br />
-              Default password: <strong>123456</strong> (must change on first login)
+              Initial password: <strong>{password || '(not set)'}</strong> (must change on first login)
             </AlertDescription>
           </Alert>
 

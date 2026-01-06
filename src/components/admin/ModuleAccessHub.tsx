@@ -1,7 +1,8 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, Shield, Building2 } from 'lucide-react';
+import { Settings, Shield, Building2, UserCog } from 'lucide-react';
 import ModuleManagement from './ModuleManagement';
 import WorkspaceModuleManagement from './WorkspaceModuleManagement';
+import CustomRoleManagement from './CustomRoleManagement';
 
 const ModuleAccessHub = () => {
   return (
@@ -9,15 +10,19 @@ const ModuleAccessHub = () => {
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Module Access Control</h2>
         <p className="text-muted-foreground">
-          Configure system-wide and workspace-level module access
+          Configure system-wide, workspace-level, and custom role module access
         </p>
       </div>
 
       <Tabs defaultValue="system" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="system">
             <Shield className="h-4 w-4 mr-2" />
             System Modules
+          </TabsTrigger>
+          <TabsTrigger value="custom-roles">
+            <UserCog className="h-4 w-4 mr-2" />
+            Custom Roles
           </TabsTrigger>
           <TabsTrigger value="workspaces">
             <Building2 className="h-4 w-4 mr-2" />
@@ -27,6 +32,10 @@ const ModuleAccessHub = () => {
 
         <TabsContent value="system">
           <ModuleManagement />
+        </TabsContent>
+
+        <TabsContent value="custom-roles">
+          <CustomRoleManagement />
         </TabsContent>
 
         <TabsContent value="workspaces">

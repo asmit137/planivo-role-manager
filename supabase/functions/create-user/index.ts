@@ -1,6 +1,12 @@
+// @ts-ignore
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+// @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+// @ts-ignore
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+
+// Global declaration to silence IDE errors for Deno
+declare const Deno: any;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,7 +22,7 @@ const emailSchema = z
   .min(1, 'Email is required')
   .email('Invalid email format')
   .max(255, 'Email must be less than 255 characters')
-  .transform((email) => email.toLowerCase().trim());
+  .transform((email: string) => email.toLowerCase().trim());
 
 const passwordSchema = z
   .string()
@@ -27,7 +33,7 @@ const fullNameSchema = z
   .string()
   .min(2, 'Name must be at least 2 characters')
   .max(100, 'Name must be less than 100 characters')
-  .transform((name) => name.trim());
+  .transform((name: string) => name.trim());
 
 const uuidSchema = z.string().uuid('Invalid UUID format').optional().nullable();
 
@@ -39,6 +45,7 @@ const appRoleSchema = z.enum([
   'facility_supervisor',
   'department_head',
   'staff',
+  'custom',
 ]);
 
 const createUserSchema = z.object({
@@ -46,6 +53,7 @@ const createUserSchema = z.object({
   password: passwordSchema,
   full_name: fullNameSchema,
   role: appRoleSchema,
+  custom_role_id: uuidSchema,
   workspace_id: uuidSchema,
   facility_id: uuidSchema,
   department_id: uuidSchema,
@@ -84,41 +92,66 @@ async function checkRateLimit(
   }
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("Missing environment variables");
+      return new Response(
+        JSON.stringify({ error: "Configuration Error: Missing ENV vars" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
 
     // Verify the requesting user is authenticated
-    const authHeader = req.headers.get("Authorization")!;
-    const token = authHeader?.replace("Bearer ", "");
-    
-    if (!token) {
+    const authHeader = req.headers.get("Authorization");
+    console.log(`Diagnostic: Authorization header exists: ${!!authHeader}, length: ${authHeader?.length || 0}`);
+
+    if (!authHeader) {
+      console.error("No Authorization header provided");
       return new Response(
-        JSON.stringify({ error: "No authorization token provided" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Missing Authorization header", diagnostic: "No 'Authorization' header found in request headers." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+    const token = tokenMatch ? tokenMatch[1] : null;
+
+    if (!token) {
+      console.error("Invalid Authorization format. Expected 'Bearer <token>'");
+      return new Response(
+        JSON.stringify({ error: "Invalid token format", diagnostic: "Expected 'Bearer <token>' format." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const { data: { user: requestingUser }, error: authError } = await supabaseClient.auth.getUser(token);
 
     if (authError || !requestingUser) {
-      console.error("Authentication error:", authError);
+      console.error("Authentication error details:", authError);
+      // NOTE: Using 400 instead of 401 for debugging to ensure the browser doesn't mask the response body
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          error: "Unauthorized (DIAGNOSTIC)",
+          details: authError?.message || "User not found for token",
+          code: authError?.status || 401,
+          diagnostic: "Token was received but supabase.auth.getUser(token) failed."
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -144,7 +177,7 @@ serve(async (req) => {
     const validationResult = createUserSchema.safeParse(rawBody);
 
     if (!validationResult.success) {
-      const errors = validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`);
+      const errors = validationResult.error.errors.map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`);
       console.error("Validation error:", errors);
       return new Response(
         JSON.stringify({ error: "Validation failed", details: errors }),
@@ -152,7 +185,7 @@ serve(async (req) => {
       );
     }
 
-    const { email, password, full_name, role, workspace_id, facility_id, department_id, specialty_id, organization_id, force_password_change } = validationResult.data;
+    const { email, password, full_name, role, custom_role_id, workspace_id, facility_id, department_id, specialty_id, organization_id, force_password_change } = validationResult.data;
 
     // Check if requesting user has permission
     const { data: roles, error: roleError } = await supabaseClient
@@ -170,13 +203,13 @@ serve(async (req) => {
     }
 
     // Scope validation based on creator's role
-    const isDepartmentHead = roles.some(r => r.role === "department_head");
-    const isFacilitySupervisor = roles.some(r => r.role === "facility_supervisor");
-    const isWorkplaceSupervisor = roles.some(r => r.role === "workplace_supervisor");
+    const isDepartmentHead = roles.some((r: any) => r.role === "department_head");
+    const isFacilitySupervisor = roles.some((r: any) => r.role === "facility_supervisor");
+    const isWorkplaceSupervisor = roles.some((r: any) => r.role === "workplace_supervisor");
 
     // Department heads can only create staff in their department
-    if (isDepartmentHead && !roles.some(r => r.role === 'super_admin')) {
-      const departmentHeadRole = roles.find(r => r.role === "department_head");
+    if (isDepartmentHead && !roles.some((r: any) => r.role === 'super_admin')) {
+      const departmentHeadRole = roles.find((r: any) => r.role === "department_head");
       if (department_id && department_id !== departmentHeadRole?.department_id) {
         return new Response(
           JSON.stringify({ error: "Forbidden: Can only add users to your own department" }),
@@ -186,8 +219,8 @@ serve(async (req) => {
     }
 
     // Facility supervisors can only create within their facility
-    if (isFacilitySupervisor && !roles.some(r => r.role === 'super_admin')) {
-      const facilitySupervisorRole = roles.find(r => r.role === "facility_supervisor");
+    if (isFacilitySupervisor && !roles.some((r: any) => r.role === 'super_admin')) {
+      const facilitySupervisorRole = roles.find((r: any) => r.role === "facility_supervisor");
       if (facility_id && facility_id !== facilitySupervisorRole?.facility_id) {
         return new Response(
           JSON.stringify({ error: "Forbidden: Can only add users to your own facility" }),
@@ -197,8 +230,8 @@ serve(async (req) => {
     }
 
     // Workplace supervisors can only create within their workspace
-    if (isWorkplaceSupervisor && !roles.some(r => r.role === 'super_admin')) {
-      const workplaceSupervisorRole = roles.find(r => r.role === "workplace_supervisor");
+    if (isWorkplaceSupervisor && !roles.some((r: any) => r.role === 'super_admin')) {
+      const workplaceSupervisorRole = roles.find((r: any) => r.role === "workplace_supervisor");
       if (workspace_id && workspace_id !== workplaceSupervisorRole?.workspace_id) {
         return new Response(
           JSON.stringify({ error: "Forbidden: Can only add users to your own workspace" }),
@@ -217,7 +250,7 @@ serve(async (req) => {
 
     if (createError) {
       console.error("User creation error:", createError);
-      const errorMessage = createError.message.includes('already been registered') 
+      const errorMessage = createError.message.includes('already been registered')
         ? `Email ${email} is already registered. Please use a different email address.`
         : createError.message;
       return new Response(
@@ -247,10 +280,15 @@ serve(async (req) => {
       ]);
 
     if (profileError) {
-      console.error("Profile creation error:", profileError);
+      console.error("Profile creation error details:", profileError);
       await supabaseClient.auth.admin.deleteUser(newUser.user.id);
       return new Response(
-        JSON.stringify({ error: "Failed to create profile" }),
+        JSON.stringify({
+          error: "Failed to create profile",
+          details: profileError.message,
+          hint: profileError.hint,
+          code: profileError.code
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -262,6 +300,7 @@ serve(async (req) => {
         {
           user_id: newUser.user.id,
           role,
+          custom_role_id: custom_role_id || null,
           workspace_id: workspace_id || null,
           facility_id: facility_id || null,
           department_id: department_id || null,
@@ -271,10 +310,15 @@ serve(async (req) => {
       ]);
 
     if (roleInsertError) {
-      console.error("Role creation error:", roleInsertError);
+      console.error("Role creation error details:", roleInsertError);
       await supabaseClient.auth.admin.deleteUser(newUser.user.id);
       return new Response(
-        JSON.stringify({ error: "Failed to create role" }),
+        JSON.stringify({
+          error: "Failed to create role",
+          details: roleInsertError.message,
+          hint: roleInsertError.hint,
+          code: roleInsertError.code
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -285,7 +329,7 @@ serve(async (req) => {
         .from('organizations')
         .update({ owner_id: newUser.user.id })
         .eq('id', organization_id);
-      
+
       if (orgUpdateError) {
         console.error("Organization owner update error:", orgUpdateError);
       } else {
@@ -296,14 +340,14 @@ serve(async (req) => {
     console.log(`Successfully created user: ${email} with role: ${role}`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        user: { 
-          id: newUser.user.id, 
-          email, 
-          full_name, 
-          role 
-        } 
+      JSON.stringify({
+        success: true,
+        user: {
+          id: newUser.user.id,
+          email,
+          full_name,
+          role
+        }
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
