@@ -14,6 +14,8 @@ import { toast } from 'sonner';
 import { useUserRole } from '@/hooks/useUserRole';
 import { CreateChannelModal } from './CreateChannelModal';
 import { CreateDMModal } from './CreateDMModal';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { ThemeToggleSimple } from '@/components/ThemeToggle';
 
 interface SidebarProps {
     selectedChannelId: string | null;
@@ -26,26 +28,76 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
     const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false);
     const [isCreateDMOpen, setIsCreateDMOpen] = useState(false);
 
+    // Real-time subscriptions for live updates
+    useRealtimeSubscription({
+        table: 'messages',
+        invalidateQueries: ['discord-channels', 'discord-dms'],
+    });
+
+    useRealtimeSubscription({
+        table: 'conversations',
+        invalidateQueries: ['discord-channels', 'discord-dms'],
+    });
+
+    useRealtimeSubscription({
+        table: 'conversation_participants',
+        invalidateQueries: ['discord-channels', 'discord-dms'],
+    });
+
     const isAdmin = roles?.some(r =>
         ['super_admin', 'department_head', 'workplace_supervisor', 'facility_supervisor'].includes(r.role)
     );
 
     // Fetch Channels (Public in Workspace)
     const { data: channels = [] } = useQuery({
-        queryKey: ['discord-channels', roles],
+        queryKey: ['discord-channels', roles, user?.id],
         queryFn: async () => {
+            if (!user) return [];
 
-            const { data, error } = await supabase
-                .from('conversations')
+            let query: any = supabase
+                .from('conversations');
+
+            const { data, error } = await query
                 .select('*')
                 .eq('type', 'channel')
-                .order('title')
-                .limit(100) as any;
+                .order('updated_at', { ascending: false })
+                .limit(100);
 
             if (error) throw error;
-            return data;
+
+            // Fetch last_read_at for each channel
+            const channelsWithUnread = await Promise.all(
+                data.map(async (channel: any) => {
+                    const { data: participant } = await supabase
+                        .from('conversation_participants')
+                        .select('last_read_at')
+                        .eq('conversation_id', channel.id)
+                        .eq('user_id', user.id)
+                        .maybeSingle();
+
+                    const { data: lastMessage } = await supabase
+                        .from('messages')
+                        .select('created_at')
+                        .eq('conversation_id', channel.id)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+
+                    const lastRead = participant?.last_read_at ? new Date(participant.last_read_at) : new Date(0);
+                    const lastMsgTime = lastMessage?.created_at ? new Date(lastMessage.created_at) : new Date(0);
+                    const isUnread = lastMsgTime > lastRead;
+
+                    return { ...channel, isUnread };
+                })
+            );
+
+            return channelsWithUnread.sort((a, b) => {
+                if (a.isUnread && !b.isUnread) return -1;
+                if (!a.isUnread && b.isUnread) return 1;
+                return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+            });
         },
-        enabled: !!roles
+        enabled: !!roles && !!user
     });
 
     // Fetch DMs (My conversations)
@@ -58,7 +110,7 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
 
             const { data, error } = await supabase
                 .from('conversation_participants')
-                .select('conversation_id, conversations(*)')
+                .select('conversation_id, last_read_at, conversations(*)')
                 .eq('user_id', user.id);
 
             if (error) {
@@ -66,13 +118,22 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
                 throw error;
             }
 
-            console.log('Raw conversation data:', data);
-
             const conversations = await Promise.all(
                 data
-                    .map((p: any) => p.conversations)
-                    .filter((c: any) => c && c.type !== 'channel') // Include NULL types (legacy conversations)
-                    .map(async (convo: any) => {
+                    .map((p: any) => ({ convo: p.conversations, last_read_at: p.last_read_at }))
+                    .filter((item: any) => item.convo && item.convo.type !== 'channel')
+                    .map(async (item: any) => {
+                        const convo = item.convo;
+
+                        // Get last message time for unread calculation
+                        const { data: lastMessage } = await supabase
+                            .from('messages')
+                            .select('created_at')
+                            .eq('conversation_id', convo.id)
+                            .order('created_at', { ascending: false })
+                            .limit(1)
+                            .maybeSingle();
+
                         // Get all participants for this conversation
                         const { data: participants } = await supabase
                             .from('conversation_participants')
@@ -85,73 +146,54 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
                             .select('id, full_name, email')
                             .in('id', userIds);
 
-                        // Generate title for DMs and Untitled Groups
+                        // Generate title
                         let displayTitle = convo.title;
                         if (!displayTitle) {
                             const others = profiles?.filter(p => p.id !== user.id) || [];
-                            if (others.length === 0) {
-                                displayTitle = 'Note to Self';
-                            } else {
-                                // For groups, join names. For DMs, it's just one name.
-                                displayTitle = others.map(p => p.full_name || p.email || 'Unknown User').join(', ');
-                            }
+                            if (others.length === 0) displayTitle = 'Note to Self';
+                            else displayTitle = others.map(p => p.full_name || p.email || 'Unknown User').join(', ');
                         }
+
+                        const lastRead = item.last_read_at ? new Date(item.last_read_at) : new Date(0);
+                        const lastMsgTime = lastMessage?.created_at ? new Date(lastMessage.created_at) : new Date(0);
+                        const isUnread = lastMsgTime > lastRead;
 
                         return {
                             ...convo,
                             displayTitle,
-                            participants: profiles
+                            participants: profiles,
+                            isUnread
                         };
                     })
             );
 
-            // First sort by most recent to keep the latest one when deduplicating
-            const sortedByDate = conversations.sort((a, b) =>
-                new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-            );
+            // Deduplicate and sort
+            const sortedByPriority = conversations.sort((a, b) => {
+                if (a.isUnread && !b.isUnread) return -1;
+                if (!a.isUnread && b.isUnread) return 1;
+                return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+            });
 
-            // Deduplicate:
-            // 1. For groups: unique by ID
-            // 2. For DMs: unique by 'other user'
-            const uniqueConversations = sortedByDate.reduce((acc: any[], current) => {
-                // If it's a group, just check ID
+            const uniqueConversations = sortedByPriority.reduce((acc: any[], current) => {
                 if (current.is_group) {
-                    const exists = acc.find(conv => conv.id === current.id);
-                    if (!exists) acc.push(current);
+                    if (!acc.find(conv => conv.id === current.id)) acc.push(current);
                     return acc;
                 }
-
-                // If it's a DM, check if we already have a DM with this person
                 const otherUser = current.participants?.find((p: any) => p.id !== user.id);
-                const otherUserId = otherUser?.id;
-
-                // If we can't identify the other user (e.g. self-DM or data error), fall back to ID check
-                if (!otherUserId) {
-                    const exists = acc.find(conv => conv.id === current.id);
-                    if (!exists) acc.push(current);
+                if (!otherUser?.id) {
+                    if (!acc.find(conv => conv.id === current.id)) acc.push(current);
                     return acc;
                 }
-
-                // Check if we already have a DM with this user
-                // (Since we sorted by date first, the first one we see is the most recent)
                 const exists = acc.find(conv => {
                     if (conv.is_group) return false;
                     const convOther = conv.participants?.find((p: any) => p.id !== user.id);
-                    return convOther?.id === otherUserId;
+                    return convOther?.id === otherUser.id;
                 });
-
-                if (!exists) {
-                    acc.push(current);
-                }
-
+                if (!exists) acc.push(current);
                 return acc;
             }, []);
 
-            const sorted = uniqueConversations;
-
-            console.log('Processed conversations:', sorted);
-
-            return sorted;
+            return uniqueConversations;
         },
         enabled: !!user,
     });
@@ -159,23 +201,23 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
     const getInitials = (name?: string) => name?.substring(0, 2).toUpperCase() || '??';
 
     return (
-        <div className="flex flex-col h-full bg-zinc-950 text-zinc-400">
+        <div className="flex flex-col h-full bg-muted/10 text-muted-foreground border-r">
 
             <ScrollArea className="flex-1 px-3">
                 <div className="space-y-6 py-4">
 
                     {/* Channels Section */}
-                    <div className="space-y-1">
-                        <div className="flex items-center justify-between px-2 group mb-1">
-                            <h2 className="text-xs font-bold uppercase hover:text-zinc-100 transition-colors cursor-pointer">
+                    <div className="space-y-2 mb-8">
+                        <div className="flex items-center justify-between px-4 group mb-2">
+                            <h2 className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground/60 transition-colors cursor-pointer hover:text-foreground">
                                 Text Channels
                             </h2>
                             {isAdmin && (
                                 <button
                                     onClick={() => setIsCreateChannelOpen(true)}
-                                    className="text-zinc-400 hover:text-zinc-100 transition-all"
+                                    className="text-muted-foreground/60 hover:text-foreground transition-all p-1 hover:bg-muted rounded-full"
                                 >
-                                    <Plus className="h-4 w-4" />
+                                    <Plus className="h-3.5 w-3.5" />
                                 </button>
                             )}
                         </div>
@@ -183,56 +225,73 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
                             <button
                                 key={channel.id}
                                 onClick={() => onSelectChannel(channel.id)}
-                                className={`w-full flex items-center px-2 py-1.5 rounded-md group transition-all text-sm mb-0.5 ${selectedChannelId === channel.id
-                                    ? 'bg-zinc-800 text-zinc-100 mb-1'
-                                    : 'hover:bg-zinc-900 hover:text-zinc-200'
+                                className={`group relative w-full flex items-center px-4 py-2 mx-0 transition-all text-sm font-medium
+                                    ${selectedChannelId === channel.id
+                                        ? 'bg-primary/10 text-primary'
+                                        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                                     }`}
                             >
-                                <Hash className="h-4 w-4 mr-1.5 text-zinc-500 group-hover:text-zinc-400" />
-                                <span className="truncate font-medium">{channel.slug || channel.title}</span>
+                                {selectedChannelId === channel.id && (
+                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full" />
+                                )}
+                                <div className="flex items-center flex-1 min-w-0">
+                                    <Hash className={`h-4 w-4 mr-3 flex-shrink-0 transition-colors ${selectedChannelId === channel.id ? 'text-primary' : 'text-muted-foreground/70 group-hover:text-muted-foreground'}`} />
+                                    <span className="truncate leading-none">
+                                        {channel.slug || channel.title}
+                                    </span>
+                                </div>
+                                {channel.isUnread && (
+                                    <div className="h-2 w-2 rounded-full bg-primary ml-2 shadow-[0_0_8px_rgba(var(--primary),0.5)] animate-pulse" />
+                                )}
                             </button>
                         ))}
                     </div>
 
-                    <Separator className="bg-zinc-800/50" />
+                    <Separator className="bg-border/50" />
 
                     {/* DMs Section */}
                     <div className="space-y-1">
-                        <div className="flex items-center justify-between px-2 mb-1">
-                            <h2 className="text-xs font-bold uppercase">Direct Messages</h2>
+                        <div className="flex items-center justify-between px-4 mb-2">
+                            <h2 className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground/60">Direct Messages</h2>
                             <button
                                 onClick={() => setIsCreateDMOpen(true)}
-                                className="text-zinc-400 hover:text-zinc-100"
+                                className="text-muted-foreground/60 hover:text-foreground p-1 hover:bg-muted rounded-full transition-all"
                             >
-                                <Plus className="h-4 w-4" />
+                                <Plus className="h-3.5 w-3.5" />
                             </button>
                         </div>
                         {dms.map((dm: any) => (
                             <button
                                 key={dm.id}
                                 onClick={() => onSelectChannel(dm.id)}
-                                className={`w-full flex items-center px-2 py-2 rounded-md group transition-all text-sm ${selectedChannelId === dm.id
-                                    ? 'bg-zinc-800 text-zinc-100'
-                                    : 'hover:bg-zinc-900 hover:text-zinc-200'
+                                className={`group relative w-full flex items-center px-4 py-2.5 mx-0 transition-all text-sm
+                                    ${selectedChannelId === dm.id
+                                        ? 'bg-primary/10 text-primary'
+                                        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                                     }`}
                             >
-                                <div className="relative mr-3">
-                                    <Avatar className="h-8 w-8 md:h-8 md:w-8">
-                                        <AvatarFallback className="bg-zinc-700 text-xs">
-                                            {dm.is_group ? <MessageSquare className="h-4 w-4" /> : getInitials(dm.title || 'U')}
+                                {selectedChannelId === dm.id && (
+                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full" />
+                                )}
+                                <div className="relative mr-3 flex-shrink-0">
+                                    <Avatar className="h-8 w-8 ring-2 ring-background ring-offset-2 ring-offset-transparent group-hover:ring-muted transition-all">
+                                        <AvatarFallback className={`text-[10px] font-bold ${selectedChannelId === dm.id ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                                            {dm.is_group ? <MessageSquare className="h-3.5 w-3.5" /> : getInitials(dm.title || 'U')}
                                         </AvatarFallback>
                                     </Avatar>
-                                    {/* Online Indicator Mockup */}
-                                    <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-green-500 border-2 border-zinc-950"></span>
+                                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-background"></span>
                                 </div>
                                 <div className="flex-1 truncate text-left">
-                                    <span className="block truncate font-medium text-zinc-300 group-hover:text-zinc-100">
+                                    <span className={`block truncate leading-tight ${dm.isUnread ? 'font-bold text-foreground' : 'font-medium'}`}>
                                         {dm.displayTitle || dm.title || (dm.is_group ? 'Group Chat' : 'User')}
                                     </span>
-                                    <span className="block truncate text-xs text-zinc-500">
+                                    <span className="block truncate text-[10px] text-muted-foreground/60 mt-0.5 font-medium">
                                         Active now
                                     </span>
                                 </div>
+                                {dm.isUnread && (
+                                    <div className="h-2 w-2 rounded-full bg-primary ml-2 shadow-[0_0_8px_rgba(var(--primary),0.5)] animate-pulse" />
+                                )}
                             </button>
                         ))}
                     </div>
@@ -240,22 +299,22 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
             </ScrollArea>
 
             {/* User Mini Profile */}
-            <div className="h-[52px] bg-zinc-900/50 flex items-center px-3 gap-2 border-t border-zinc-900">
+            <div className="h-[52px] bg-background/50 flex items-center px-3 gap-2 border-t border-border">
                 <Avatar className="h-8 w-8 hover:opacity-80 cursor-pointer transition-opacity">
                     <AvatarImage src={user?.user_metadata?.avatar_url} />
-                    <AvatarFallback className="bg-emerald-600 text-zinc-100 text-xs">
+                    <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                         {getInitials(user?.email)}
                     </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0 flex flex-col">
-                    <span className="text-sm font-semibold text-zinc-100 truncate">
+                    <span className="text-sm font-semibold text-foreground truncate">
                         {user?.email?.split('@')[0]}
                     </span>
-                    <span className="text-xs text-zinc-500 truncate">
+                    <span className="text-xs text-muted-foreground truncate">
                         #{user?.id?.substring(0, 4)}
                     </span>
                 </div>
-
+                <ThemeToggleSimple />
             </div>
 
             <CreateChannelModal open={isCreateChannelOpen} onOpenChange={setIsCreateChannelOpen} />

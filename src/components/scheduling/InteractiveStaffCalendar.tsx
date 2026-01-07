@@ -22,7 +22,7 @@ interface InteractiveStaffCalendarProps {
 export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> = ({ departmentId }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  
+
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>('');
   const [selectedShiftId, setSelectedShiftId] = useState<string>('');
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
@@ -109,6 +109,21 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
     enabled: !!selectedStaffId,
   });
 
+  // Fetch ALL assignments for this shift to check capacity
+  const { data: allShiftAssignments } = useQuery({
+    queryKey: ['all-shift-assignments', selectedShiftId],
+    queryFn: async () => {
+      if (!selectedShiftId) return [];
+      const { data, error } = await supabase
+        .from('shift_assignments')
+        .select('*')
+        .eq('shift_id', selectedShiftId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedShiftId,
+  });
+
   const selectedSchedule = schedules?.find((s: any) => s.id === selectedScheduleId);
   const selectedShift = selectedSchedule?.shifts?.find((s: any) => s.id === selectedShiftId);
 
@@ -157,14 +172,30 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
     return existingAssignments?.find((a: any) => a.assignment_date === dateStr);
   };
 
+  // Check if date has reached required staff limit
+  const isDateFull = (date: Date) => {
+    if (!selectedShift) return false;
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const dayAssignments = allShiftAssignments?.filter((a: any) => a.assignment_date === dateStr) || [];
+    return dayAssignments.length >= selectedShift.required_staff;
+  };
+
   // Toggle date selection
   const toggleDateSelection = (date: Date) => {
     if (!isDateInScheduleRange(date) || hasVacationOnDate(date)) return;
 
     const dateStr = format(date, 'yyyy-MM-dd');
+    const isFull = isDateFull(date);
+    const isSelected = selectedDates.has(dateStr);
+
+    if (!isSelected && isFull) {
+      toast.error('This shift has already reached its staffing requirement for this date');
+      return;
+    }
+
     const newSelected = new Set(selectedDates);
-    
-    if (newSelected.has(dateStr)) {
+
+    if (isSelected) {
       newSelected.delete(dateStr);
     } else {
       newSelected.add(dateStr);
@@ -177,10 +208,10 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
     if (!scheduleDateRange) return;
     const newSelected = new Set<string>();
     const days = eachDayOfInterval(scheduleDateRange);
-    
+
     days.forEach(day => {
       const dayOfWeek = day.getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6 && !hasVacationOnDate(day) && !isDateAssigned(day)) {
+      if (dayOfWeek !== 0 && dayOfWeek !== 6 && !hasVacationOnDate(day) && !isDateAssigned(day) && !isDateFull(day)) {
         newSelected.add(format(day, 'yyyy-MM-dd'));
       }
     });
@@ -191,9 +222,9 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
     if (!scheduleDateRange) return;
     const newSelected = new Set<string>();
     const days = eachDayOfInterval(scheduleDateRange);
-    
+
     days.forEach(day => {
-      if (!hasVacationOnDate(day) && !isDateAssigned(day)) {
+      if (!hasVacationOnDate(day) && !isDateAssigned(day) && !isDateFull(day)) {
         newSelected.add(format(day, 'yyyy-MM-dd'));
       }
     });
@@ -206,10 +237,34 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
 
   // Save assignments
   const saveAssignments = async () => {
-    if (!selectedStaffId || !selectedShiftId || selectedDates.size === 0) return;
+    if (!selectedStaffId || !selectedShiftId || selectedDates.size === 0 || !selectedShift) return;
 
     setIsSaving(true);
     try {
+      // Re-verify capacity for all selected dates before saving
+      const { data: currentAssignments, error: fetchError } = await supabase
+        .from('shift_assignments')
+        .select('assignment_date')
+        .eq('shift_id', selectedShiftId)
+        .in('assignment_date', Array.from(selectedDates));
+
+      if (fetchError) throw fetchError;
+
+      // Group by date to check counts
+      const dateCounts: Record<string, number> = {};
+      currentAssignments?.forEach(a => {
+        dateCounts[a.assignment_date] = (dateCounts[a.assignment_date] || 0) + 1;
+      });
+
+      const overCapacityDates = Array.from(selectedDates).filter(dateStr =>
+        (dateCounts[dateStr] || 0) >= selectedShift.required_staff
+      );
+
+      if (overCapacityDates.length > 0) {
+        toast.error(`Some dates have already reached their staffing requirement: ${overCapacityDates.join(', ')}`);
+        return;
+      }
+
       const assignments = Array.from(selectedDates).map(dateStr => ({
         shift_id: selectedShiftId,
         staff_id: selectedStaffId,
@@ -227,6 +282,7 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
       setSelectedDates(new Set());
       queryClient.invalidateQueries({ queryKey: ['staff-shift-assignments'] });
       queryClient.invalidateQueries({ queryKey: ['shift-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['all-shift-assignments'] });
     } catch (error: any) {
       toast.error(error.message || 'Failed to save assignments');
     } finally {
@@ -247,6 +303,7 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
       toast.success('Assignment removed');
       queryClient.invalidateQueries({ queryKey: ['staff-shift-assignments'] });
       queryClient.invalidateQueries({ queryKey: ['shift-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['all-shift-assignments'] });
     } catch (error: any) {
       toast.error(error.message || 'Failed to remove assignment');
     }
@@ -299,8 +356,8 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
 
             <div className="space-y-2">
               <Label className="text-sm">Shift</Label>
-              <Select 
-                value={selectedShiftId} 
+              <Select
+                value={selectedShiftId}
                 onValueChange={(v) => {
                   setSelectedShiftId(v);
                   setSelectedDates(new Set());
@@ -325,8 +382,8 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
 
             <div className="space-y-2 sm:col-span-2 lg:col-span-1">
               <Label className="text-sm">Staff Member</Label>
-              <Select 
-                value={selectedStaffId} 
+              <Select
+                value={selectedStaffId}
                 onValueChange={(v) => {
                   setSelectedStaffId(v);
                   setSelectedDates(new Set());
@@ -393,12 +450,13 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
                 <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
                   {calendarDays.map((day) => {
                     const dateStr = format(day, 'yyyy-MM-dd');
-                  const inScheduleRange = isDateInScheduleRange(day);
-                  const hasVacation = hasVacationOnDate(day);
-                  const isAssigned = isDateAssigned(day);
-                  const assignment = getAssignmentForDate(day);
-                  const isSelected = selectedDates.has(dateStr);
-                  const inCurrentMonth = isSameMonth(day, currentMonth);
+                    const inScheduleRange = isDateInScheduleRange(day);
+                    const hasVacation = hasVacationOnDate(day);
+                    const isAssigned = isDateAssigned(day);
+                    const isFull = isDateFull(day);
+                    const assignment = getAssignmentForDate(day);
+                    const isSelected = selectedDates.has(dateStr);
+                    const inCurrentMonth = isSameMonth(day, currentMonth);
 
                     return (
                       <div
@@ -408,7 +466,8 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
                           "relative h-11 sm:h-14 md:h-16 p-0.5 sm:p-1 border rounded-md flex flex-col items-center justify-center transition-all touch-manipulation",
                           !inCurrentMonth && "opacity-30",
                           !inScheduleRange && "bg-muted/30 cursor-not-allowed",
-                          inScheduleRange && !hasVacation && !isAssigned && "cursor-pointer hover:bg-accent active:bg-accent",
+                          inScheduleRange && !hasVacation && !isAssigned && !isFull && "cursor-pointer hover:bg-accent active:bg-accent",
+                          inScheduleRange && !hasVacation && !isAssigned && isFull && "bg-amber-100/50 cursor-pointer hover:bg-amber-100",
                           hasVacation && "bg-destructive/20 cursor-not-allowed",
                           isAssigned && "bg-primary/20",
                           isSelected && "bg-primary text-primary-foreground ring-2 ring-primary",
@@ -424,11 +483,11 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
                         {hasVacation && (
                           <AlertTriangle className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-destructive absolute top-0.5 right-0.5" />
                         )}
-                        
+
                         {isAssigned && !isSelected && (
                           <div className="flex items-center gap-0.5">
                             <Check className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-primary" />
-                            <button 
+                            <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (assignment) removeAssignment(assignment.id);
@@ -460,6 +519,10 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded bg-destructive/20" />
                   <span>On Vacation</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-amber-100/50 border border-amber-200" />
+                  <span>Requirement Met</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded bg-muted/30" />

@@ -1,34 +1,101 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend, AreaChart, Area } from "recharts";
-import { TrendingUp, Users, Building2, Calendar, Clock, Activity, Briefcase, GraduationCap } from "lucide-react";
-import { format, subDays, eachDayOfInterval, startOfDay } from "date-fns";
+import { TrendingUp, Users, Building2, Calendar as CalendarIcon, Clock, Activity, Briefcase, GraduationCap, Filter } from "lucide-react";
+import { format, subDays, eachDayOfInterval, startOfDay, endOfDay, subWeeks, subMonths } from "date-fns";
+import { DateRange } from "react-day-picker";
+import { cn } from "@/lib/utils";
+
+type DateFilterType = '1day' | '1week' | '1month' | 'custom';
 
 export function AnalyticsDashboard() {
+  const { data: roles } = useUserRole();
+  const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
+
+  // Filter State
+  const [dateFilter, setDateFilter] = useState<DateFilterType>('1month');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  });
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string>('all');
+
+  // Handle Date Filter Change
+  const handleDateFilterChange = (val: DateFilterType) => {
+    setDateFilter(val);
+    const today = new Date();
+    if (val === '1day') {
+      setDateRange({ from: subDays(today, 1), to: today });
+    } else if (val === '1week') {
+      setDateRange({ from: subDays(today, 7), to: today });
+    } else if (val === '1month') {
+      setDateRange({ from: subDays(today, 30), to: today });
+    }
+  };
+
+  // Fetch Facilities (Super Admin only)
+  const { data: facilities } = useQuery({
+    queryKey: ['admin-facilities-list'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('facilities').select('id, name').order('name');
+      if (error) throw error;
+      return data;
+    },
+    enabled: isSuperAdmin,
+  });
+
   // User growth data
   const { data: userGrowth } = useQuery({
-    queryKey: ['user-growth'],
+    queryKey: ['user-growth', dateRange?.from, dateRange?.to, selectedFacilityId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
+      let query: any = supabase
+        .from(selectedFacilityId === 'all' ? 'profiles' : 'user_roles')
         .select('created_at')
         .order('created_at', { ascending: true });
+
+      if (selectedFacilityId !== 'all') {
+        query = query.eq('facility_id', selectedFacilityId);
+      }
+
+      if (dateRange?.from) {
+        query = query.gte('created_at', startOfDay(dateRange.from).toISOString());
+      }
+      if (dateRange?.to) {
+        query = query.lte('created_at', endOfDay(dateRange.to).toISOString());
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
-      
+
       // Group by date
-      const last30Days = eachDayOfInterval({
-        start: subDays(new Date(), 30),
-        end: new Date(),
+      if (!dateRange?.from || !dateRange?.to) return [];
+
+      const interval = eachDayOfInterval({
+        start: dateRange.from,
+        end: dateRange.to,
       });
 
-      const dailyCounts = last30Days.map(date => {
+      const dailyCounts = interval.map(date => {
         const dayStart = startOfDay(date);
-        const count = data.filter(u => {
+        const count = data.filter((u: any) => {
           const userDate = startOfDay(new Date(u.created_at));
           return userDate <= dayStart;
         }).length;
+
         return {
           date: format(date, 'MMM d'),
           users: count,
@@ -37,17 +104,24 @@ export function AnalyticsDashboard() {
 
       return dailyCounts;
     },
+    enabled: !!dateRange?.from && !!dateRange?.to,
   });
 
   // Role distribution
   const { data: roleDistribution } = useQuery({
-    queryKey: ['role-distribution-chart'],
+    queryKey: ['role-distribution-chart', selectedFacilityId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('user_roles')
         .select('role');
+
+      if (selectedFacilityId !== 'all') {
+        query = query.eq('facility_id', selectedFacilityId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
-      
+
       const counts: Record<string, number> = {};
       data.forEach(r => {
         counts[r.role] = (counts[r.role] || 0) + 1;
@@ -116,7 +190,7 @@ export function AnalyticsDashboard() {
         { name: 'Facilities', count: facilities.count || 0, icon: Building2, color: 'hsl(199, 89%, 48%)' },
         { name: 'Departments', count: departments.count || 0, icon: Users, color: 'hsl(142, 71%, 45%)' },
         { name: 'Tasks', count: tasks.count || 0, icon: Activity, color: 'hsl(38, 92%, 50%)' },
-        { name: 'Schedules', count: schedules.count || 0, icon: Calendar, color: 'hsl(326, 100%, 74%)' },
+        { name: 'Schedules', count: schedules.count || 0, icon: CalendarIcon, color: 'hsl(326, 100%, 74%)' },
         { name: 'Vacation Plans', count: vacations.count || 0, icon: Clock, color: 'hsl(280, 67%, 51%)' },
         { name: 'Training Events', count: trainings.count || 0, icon: GraduationCap, color: 'hsl(173, 58%, 39%)' },
       ];
@@ -125,17 +199,27 @@ export function AnalyticsDashboard() {
 
   // Activity by day of week
   const { data: activityByDay } = useQuery({
-    queryKey: ['activity-by-day'],
+    queryKey: ['activity-by-day', dateRange?.from, dateRange?.to],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('audit_logs')
-        .select('performed_at')
-        .gte('performed_at', subDays(new Date(), 30).toISOString());
+        .select('performed_at');
+
+      if (dateRange?.from) {
+        query = query.gte('performed_at', startOfDay(dateRange.from).toISOString());
+      }
+      if (dateRange?.to) {
+        query = query.lte('performed_at', endOfDay(dateRange.to).toISOString());
+      } else {
+        query = query.gte('performed_at', subDays(new Date(), 30).toISOString());
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
 
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const counts = new Array(7).fill(0);
-      
+
       data.forEach(log => {
         if (log.performed_at) {
           const dayIndex = new Date(log.performed_at).getDay();
@@ -148,12 +232,116 @@ export function AnalyticsDashboard() {
         events: counts[i],
       }));
     },
+    enabled: !!dateRange?.from,
   });
 
   const COLORS = ['hsl(262, 83%, 58%)', 'hsl(199, 89%, 48%)', 'hsl(142, 71%, 45%)', 'hsl(38, 92%, 50%)', 'hsl(326, 100%, 74%)', 'hsl(280, 67%, 51%)', 'hsl(173, 58%, 39%)'];
 
   return (
     <div className="space-y-6">
+      {/* Controls */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between p-4 bg-card rounded-lg border border-border">
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <h3 className="font-medium">Analytics Filters</h3>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Facility Filter - Super Admin Only */}
+          {isSuperAdmin && (
+            <div className="min-w-[200px]">
+              <Select value={selectedFacilityId} onValueChange={setSelectedFacilityId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Facility" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Facilities</SelectItem>
+                  {facilities?.map((f: any) => (
+                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <Select value={dateFilter} onValueChange={handleDateFilterChange}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1day">Last 24 Hours</SelectItem>
+                <SelectItem value="1week">Last 7 Days</SelectItem>
+                <SelectItem value="1month">Last 30 Days</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {dateFilter === 'custom' && (
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="date-from"
+                      variant={"outline"}
+                      className={cn(
+                        "w-[160px] justify-start text-left font-normal",
+                        !dateRange?.from && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange?.from ? (
+                        format(dateRange.from, "LLL dd, y")
+                      ) : (
+                        <span>From Date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={dateRange?.from}
+                      onSelect={(date) => setDateRange(prev => ({ ...prev, from: date, to: prev?.to }))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <span className="text-muted-foreground">-</span>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="date-to"
+                      variant={"outline"}
+                      className={cn(
+                        "w-[160px] justify-start text-left font-normal",
+                        !dateRange?.to && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange?.to ? (
+                        format(dateRange.to, "LLL dd, y")
+                      ) : (
+                        <span>To Date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={dateRange?.to}
+                      onSelect={(date) => setDateRange(prev => ({ ...prev, from: prev?.from, to: date }))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Entity Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {entityCounts?.map((entity, index) => (
@@ -203,10 +391,10 @@ export function AnalyticsDashboard() {
                       borderRadius: '8px',
                     }}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="users" 
-                    stroke="hsl(var(--primary))" 
+                  <Area
+                    type="monotone"
+                    dataKey="users"
+                    stroke="hsl(var(--primary))"
                     fill="url(#userGradient)"
                     strokeWidth={2}
                   />
@@ -292,7 +480,7 @@ export function AnalyticsDashboard() {
         <Card className="bg-card border-border">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+              <CalendarIcon className="h-5 w-5" />
               Activity by Day of Week
             </CardTitle>
             <CardDescription>System events in the last 30 days</CardDescription>

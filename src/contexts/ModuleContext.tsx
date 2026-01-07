@@ -33,12 +33,20 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queryFn: async () => {
       if (!user) return [];
 
-      const { data, error } = await supabase.rpc('get_user_modules', {
-        _user_id: user.id,
-      });
+      try {
+        const { data, error } = await supabase.rpc('get_my_modules');
 
-      if (error) throw error;
-      return data as ModuleAccess[];
+        if (error) {
+          console.error('RPC Error:', error);
+          // Fallback to core module if RPC fails
+          return [{ module_key: 'core', can_view: true, can_edit: true, can_delete: true, can_admin: true }] as any;
+        }
+
+        return data as ModuleAccess[];
+      } catch (err) {
+        console.error('Module Fetch Error:', err);
+        return [{ module_key: 'core', can_view: true, can_edit: true, can_delete: true, can_admin: true }] as any;
+      }
     },
     enabled: !!user,
   });

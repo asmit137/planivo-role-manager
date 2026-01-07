@@ -63,6 +63,9 @@ const UserSelectionDialog = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'groups' | 'departments' | 'users'>('users');
 
+  // Force re-render check
+  console.log('Rendering UserSelectionDialog with updated UI fixes');
+
   // Determine user's scope
   const userScope = useMemo(() => {
     if (!roles?.length) return null;
@@ -309,8 +312,8 @@ const UserSelectionDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl max-h-[85vh] !flex !flex-col bg-background border shadow-2xl z-50 p-0 gap-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-2">
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
             {title}
@@ -320,217 +323,237 @@ const UserSelectionDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Selected users preview */}
-        {selectedUserIds.length > 0 && (
-          <div className="flex flex-wrap gap-1 p-2 bg-muted/50 rounded-lg max-h-20 overflow-y-auto">
-            {selectedUsers.slice(0, 10).map(user => (
-              <Badge key={user.id} variant="secondary" className="gap-1">
-                {user.full_name}
-                <button
-                  onClick={() => toggleUser(user.id)}
-                  className="hover:bg-destructive/20 rounded-full p-0.5"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            ))}
-            {departments?.filter(d => selectedDepartmentIds.includes(d.id)).map(dept => (
-              <Badge key={dept.id} variant="secondary" className="bg-primary/20 gap-1">
-                <Building className="h-3 w-3" />
-                {dept.name}
-                <button
-                  onClick={() => toggleDepartmentSelection(dept.id)}
-                  className="hover:bg-destructive/20 rounded-full p-0.5"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            ))}
-            {(selectedUserIds.length + selectedDepartmentIds.length) > 10 && (
-              <Badge variant="outline">+{(selectedUserIds.length + selectedDepartmentIds.length) - 10} more</Badge>
-            )}
+        <div className="flex-1 flex flex-col px-6 gap-4 overflow-hidden">
+
+          {/* Selected users preview */}
+          {selectedUserIds.length > 0 && (
+            <div className="flex flex-wrap gap-1 p-2 bg-muted/50 rounded-lg max-h-20 overflow-y-auto">
+              {selectedUsers.slice(0, 10).map(user => (
+                <Badge key={user.id} variant="secondary" className="gap-1">
+                  {user.full_name}
+                  <button
+                    onClick={() => toggleUser(user.id)}
+                    className="hover:bg-destructive/20 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+              {departments?.filter(d => selectedDepartmentIds.includes(d.id)).map(dept => (
+                <Badge key={dept.id} variant="secondary" className="bg-primary/20 gap-1">
+                  <Building className="h-3 w-3" />
+                  {dept.name}
+                  <button
+                    onClick={() => toggleDepartmentSelection(dept.id)}
+                    className="hover:bg-destructive/20 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+              {(selectedUserIds.length + selectedDepartmentIds.length) > 10 && (
+                <Badge variant="outline">+{(selectedUserIds.length + selectedDepartmentIds.length) - 10} more</Badge>
+              )}
+            </div>
+          )}
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, email, or phone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
           </div>
-        )}
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, email, or phone..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="users" className="gap-2">
+                <Users className="h-4 w-4" />
+                All Users
+              </TabsTrigger>
+              <TabsTrigger value="groups" className="gap-2">
+                <UsersRound className="h-4 w-4" />
+                Groups
+                {groups && groups.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">{groups.length}</Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="departments" className="gap-2">
+                <Building className="h-4 w-4" />
+                Departments
+                {selectedDepartmentIds.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">{selectedDepartmentIds.length}</Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="users" className="gap-2">
-              <Users className="h-4 w-4" />
-              All Users
-            </TabsTrigger>
-            <TabsTrigger value="groups" className="gap-2">
-              <UsersRound className="h-4 w-4" />
-              Groups
-              {groups && groups.length > 0 && (
-                <Badge variant="secondary" className="ml-1">{groups.length}</Badge>
+            <TabsContent value="users" className="flex-1 mt-4 flex flex-col min-h-0">
+              {usersLoading ? (
+                <LoadingState message="Loading users..." />
+              ) : (
+                <ScrollArea className="h-[400px] border rounded-md">
+                  <div className="p-2 space-y-1">
+                    {filteredUsers.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                        {!organizationId && userScope?.type === 'all' ? (
+                          <>
+                            <Building className="h-12 w-12 mb-4 opacity-20" />
+                            <h3 className="text-lg font-semibold text-foreground mb-1">Organization Required</h3>
+                            <p className="max-w-xs mx-auto">Please select an organization in the main form to view available users.</p>
+                          </>
+                        ) : (
+                          <>
+                            <Users className="h-12 w-12 mb-4 opacity-20" />
+                            <p className="text-lg font-medium">No users found</p>
+                            <p className="text-sm opacity-70">Try adjusting your search criteria</p>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      filteredUsers.map(user => (
+                        <label
+                          key={user.id}
+                          className={cn(
+                            "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors",
+                            selectedUserIds.includes(user.id) ? "bg-primary/10" : "hover:bg-muted"
+                          )}
+                        >
+                          <Checkbox
+                            checked={selectedUserIds.includes(user.id)}
+                            onCheckedChange={() => toggleUser(user.id)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{user.full_name}</p>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1 truncate">
+                                <Mail className="h-3 w-3" />
+                                {user.email}
+                              </span>
+                              {user.phone && (
+                                <span className="flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  {user.phone}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-xs shrink-0">
+                            {user.department_name}
+                          </Badge>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
               )}
-            </TabsTrigger>
-            <TabsTrigger value="departments" className="gap-2">
-              <Building className="h-4 w-4" />
-              Departments
-              {selectedDepartmentIds.length > 0 && (
-                <Badge variant="secondary" className="ml-1">{selectedDepartmentIds.length}</Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
+            </TabsContent>
 
-          <TabsContent value="users" className="flex-1 mt-4">
-            {usersLoading ? (
-              <LoadingState message="Loading users..." />
-            ) : (
-              <ScrollArea className="h-[300px] border rounded-md">
+            <TabsContent value="groups" className="flex-1 mt-4 flex flex-col min-h-0">
+              {groupsLoading ? (
+                <LoadingState message="Loading groups..." />
+              ) : (
+                <ScrollArea className="h-[400px] border rounded-md">
+                  <div className="p-2 space-y-1">
+                    {!groups?.length ? (
+                      <div className="text-center py-8">
+                        <UsersRound className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">No groups created yet</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Save selections as groups for quick reuse
+                        </p>
+                      </div>
+                    ) : (
+                      groups.map(group => (
+                        <div
+                          key={group.id}
+                          className="flex items-center justify-between p-3 rounded-lg hover:bg-muted"
+                        >
+                          <div>
+                            <p className="font-medium">{group.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {group.member_count} member{group.member_count !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => addGroupMembers(group.id)}
+                          >
+                            <UserPlus className="h-4 w-4 mr-1" />
+                            Add All
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+              )}
+            </TabsContent>
+
+            <TabsContent value="departments" className="flex-1 mt-4 flex flex-col min-h-0">
+              <ScrollArea className="h-[400px] border rounded-md">
                 <div className="p-2 space-y-1">
-                  {filteredUsers.length === 0 ? (
-                    <div className="text-sm text-muted-foreground text-center py-8">
-                      {!organizationId && userScope?.type === 'all' ? (
-                        <p>Please select an organization in the form first</p>
+                  {!departments?.length ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                      {!organizationId ? (
+                        <>
+                          <Building className="h-12 w-12 mb-4 opacity-20" />
+                          <h3 className="text-lg font-semibold text-foreground mb-1">Organization Required</h3>
+                          <p className="max-w-xs mx-auto">Please select an organization in the main form to view departments.</p>
+                        </>
                       ) : (
-                        <p>No users found</p>
+                        <>
+                          <Building className="h-12 w-12 mb-4 opacity-20" />
+                          <p className="text-lg font-medium">No departments found</p>
+                          <p className="text-sm opacity-70">There are no departments in this organization.</p>
+                        </>
                       )}
                     </div>
                   ) : (
-                    filteredUsers.map(user => (
-                      <label
-                        key={user.id}
+                    departments.map(dept => (
+                      <div
+                        key={dept.id}
                         className={cn(
-                          "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors",
-                          selectedUserIds.includes(user.id) ? "bg-primary/10" : "hover:bg-muted"
+                          "flex items-center justify-between p-3 rounded-lg hover:bg-muted cursor-pointer",
+                          selectedDepartmentIds.includes(dept.id) && "bg-primary/10"
                         )}
                       >
-                        <Checkbox
-                          checked={selectedUserIds.includes(user.id)}
-                          onCheckedChange={() => toggleUser(user.id)}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{user.full_name}</p>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1 truncate">
-                              <Mail className="h-3 w-3" />
-                              {user.email}
-                            </span>
-                            {user.phone && (
-                              <span className="flex items-center gap-1">
-                                <Phone className="h-3 w-3" />
-                                {user.phone}
-                              </span>
-                            )}
+                        <div className="flex items-center gap-3 flex-1 min-w-0" onClick={() => toggleDepartmentSelection(dept.id)}>
+                          <Checkbox
+                            checked={selectedDepartmentIds.includes(dept.id)}
+                            onCheckedChange={() => toggleDepartmentSelection(dept.id)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{dept.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{dept.facility_name}</p>
                           </div>
-                        </div>
-                        <Badge variant="outline" className="text-xs shrink-0">
-                          {user.department_name}
-                        </Badge>
-                      </label>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
-            )}
-          </TabsContent>
-
-          <TabsContent value="groups" className="flex-1 mt-4">
-            {groupsLoading ? (
-              <LoadingState message="Loading groups..." />
-            ) : (
-              <ScrollArea className="h-[300px] border rounded-md">
-                <div className="p-2 space-y-1">
-                  {!groups?.length ? (
-                    <div className="text-center py-8">
-                      <UsersRound className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-sm text-muted-foreground">No groups created yet</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Save selections as groups for quick reuse
-                      </p>
-                    </div>
-                  ) : (
-                    groups.map(group => (
-                      <div
-                        key={group.id}
-                        className="flex items-center justify-between p-3 rounded-lg hover:bg-muted"
-                      >
-                        <div>
-                          <p className="font-medium">{group.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {group.member_count} member{group.member_count !== 1 ? 's' : ''}
-                          </p>
                         </div>
                         <Button
                           size="sm"
-                          variant="outline"
-                          onClick={() => addGroupMembers(group.id)}
+                          variant="link"
+                          className="text-primary hover:no-underline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addDepartmentMembers(dept.id);
+                          }}
                         >
                           <UserPlus className="h-4 w-4 mr-1" />
-                          Add All
+                          Add All Users
                         </Button>
                       </div>
                     ))
                   )}
                 </div>
               </ScrollArea>
-            )}
-          </TabsContent>
+            </TabsContent>
+          </Tabs>
 
-          <TabsContent value="departments" className="flex-1 mt-4">
-            <ScrollArea className="h-[300px] border rounded-md">
-              <div className="p-2 space-y-1">
-                {!departments?.length ? (
-                  <div className="text-sm text-muted-foreground text-center py-8">
-                    {!organizationId ? (
-                      <p>Please select an organization in the form first</p>
-                    ) : (
-                      <p>No departments found</p>
-                    )}
-                  </div>
-                ) : (
-                  departments.map(dept => (
-                    <div
-                      key={dept.id}
-                      className={cn(
-                        "flex items-center justify-between p-3 rounded-lg hover:bg-muted cursor-pointer",
-                        selectedDepartmentIds.includes(dept.id) && "bg-primary/10"
-                      )}
-                    >
-                      <div className="flex items-center gap-3 flex-1 min-w-0" onClick={() => toggleDepartmentSelection(dept.id)}>
-                        <Checkbox
-                          checked={selectedDepartmentIds.includes(dept.id)}
-                          onCheckedChange={() => toggleDepartmentSelection(dept.id)}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{dept.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{dept.facility_name}</p>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="link"
-                        className="text-primary hover:no-underline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          addDepartmentMembers(dept.id);
-                        }}
-                      >
-                        <UserPlus className="h-4 w-4 mr-1" />
-                        Add All Users
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
+        </div>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2 sm:justify-between">
+        <DialogFooter className="p-4 flex-col sm:flex-row gap-2 sm:justify-between bg-muted/20 border-t mt-auto">
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={selectAll}>
               Select All

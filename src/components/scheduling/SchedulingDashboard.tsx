@@ -9,12 +9,14 @@ import { format, parseISO, isWithinInterval, startOfWeek, endOfWeek, addDays } f
 import { LoadingState } from '@/components/layout/LoadingState';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { StatsCard } from '@/components/shared/StatsCard';
+import { ShiftAssignmentDialog } from './ShiftAssignmentDialog';
 
 interface SchedulingDashboardProps {
   departmentId: string;
 }
 
 export const SchedulingDashboard: React.FC<SchedulingDashboardProps> = ({ departmentId }) => {
+  const [selectedGap, setSelectedGap] = React.useState<{ shift: any; date: Date } | null>(null);
   const today = new Date();
   const weekStart = startOfWeek(today);
   const weekEnd = endOfWeek(today);
@@ -63,7 +65,7 @@ export const SchedulingDashboard: React.FC<SchedulingDashboardProps> = ({ depart
   // Calculate statistics
   const activeSchedules = schedules?.filter((s: any) => s.status === 'published') || [];
   const draftSchedules = schedules?.filter((s: any) => s.status === 'draft') || [];
-  
+
   // Current week's schedules
   const currentWeekSchedules = activeSchedules.filter((s: any) => {
     const start = parseISO(s.start_date);
@@ -82,10 +84,10 @@ export const SchedulingDashboard: React.FC<SchedulingDashboardProps> = ({ depart
       for (let d = weekStart; d <= weekEnd; d = addDays(d, 1)) {
         if (d >= parseISO(schedule.start_date) && d <= parseISO(schedule.end_date)) {
           totalShifts++;
-          const dayAssignments = shift.shift_assignments?.filter((a: any) => 
+          const dayAssignments = shift.shift_assignments?.filter((a: any) =>
             format(parseISO(a.assignment_date), 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd')
           ) || [];
-          
+
           if (dayAssignments.length >= shift.required_staff) {
             filledShifts++;
           } else if (dayAssignments.length > 0) {
@@ -203,7 +205,8 @@ export const SchedulingDashboard: React.FC<SchedulingDashboardProps> = ({ depart
               {upcomingGaps.slice(0, 5).map((gap, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between p-3 border rounded-lg"
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 cursor-pointer transition-colors group"
+                  onClick={() => setSelectedGap({ shift: gap.shift, date: gap.date })}
                 >
                   <div className="flex items-center gap-3">
                     <div
@@ -211,15 +214,18 @@ export const SchedulingDashboard: React.FC<SchedulingDashboardProps> = ({ depart
                       style={{ backgroundColor: gap.shift.color }}
                     />
                     <div>
-                      <p className="font-medium">{gap.shift.name}</p>
+                      <p className="font-medium group-hover:text-primary transition-colors">{gap.shift.name}</p>
                       <p className="text-sm text-muted-foreground">
                         {format(gap.date, 'EEEE, MMM d')} • {gap.shift.start_time?.slice(0, 5)} - {gap.shift.end_time?.slice(0, 5)}
                       </p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="text-amber-600 border-amber-300">
-                    {gap.assigned}/{gap.required} staff
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-amber-600 border-amber-300">
+                      {gap.assigned}/{gap.required} staff
+                    </Badge>
+                    <Button variant="ghost" size="sm" className="h-8 px-2">Fill</Button>
+                  </div>
                 </div>
               ))}
               {upcomingGaps.length > 5 && (
@@ -270,6 +276,15 @@ export const SchedulingDashboard: React.FC<SchedulingDashboardProps> = ({ depart
           )}
         </CardContent>
       </Card>
+
+      {/* Shift Assignment Dialog */}
+      <ShiftAssignmentDialog
+        open={!!selectedGap}
+        onOpenChange={(open) => !open && setSelectedGap(null)}
+        shift={selectedGap?.shift}
+        date={selectedGap?.date || new Date()}
+        departmentId={departmentId}
+      />
     </div>
   );
 };

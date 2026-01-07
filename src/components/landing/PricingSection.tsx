@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, X, Sparkles } from "lucide-react";
+import { Check, X, Sparkles, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -133,51 +133,20 @@ export function PricingSection() {
             Pricing
           </span>
           <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground md:text-4xl lg:text-5xl">
-            Simple, Transparent Pricing
+            Custom Solutions for Your Business
           </h2>
           <p className="text-lg text-muted-foreground">
-            Choose the plan that fits your organization. Upgrade or downgrade anytime.
+            Get a tailored package that fits your organization's unique needs.
           </p>
         </div>
 
-        {/* Billing toggle */}
-        <div className="mb-12 flex items-center justify-center gap-4">
-          <Label htmlFor="billing" className={!isYearly ? "font-semibold" : "text-muted-foreground"}>
-            Monthly
-          </Label>
-          <Switch
-            id="billing"
-            checked={isYearly}
-            onCheckedChange={setIsYearly}
-          />
-          <Label htmlFor="billing" className={isYearly ? "font-semibold" : "text-muted-foreground"}>
-            Yearly
-            <Badge variant="secondary" className="ml-2 bg-success/10 text-success">
-              Save up to 17%
-            </Badge>
-          </Label>
-        </div>
-
         {/* Pricing cards */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {plans.map((plan) => (
+        <div className="flex justify-center mb-16">
+          {plans.filter(p => p.isEnterprise).map((plan) => (
             <Card
               key={plan.slug}
-              className={`relative flex flex-col transition-all ${
-                plan.isPopular
-                  ? "border-primary shadow-lg shadow-primary/10 ring-2 ring-primary"
-                  : "border-border/50 hover:border-primary/30 hover:shadow-md"
-              }`}
+              className="relative flex flex-col w-full max-w-md border-primary shadow-lg shadow-primary/10 ring-2 ring-primary"
             >
-              {plan.isPopular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="gap-1 bg-primary text-primary-foreground">
-                    <Sparkles className="h-3 w-3" />
-                    Most Popular
-                  </Badge>
-                </div>
-              )}
-
               <CardHeader className="pb-4">
                 <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
                 <p className="text-sm text-muted-foreground">{plan.description}</p>
@@ -186,12 +155,6 @@ export function PricingSection() {
               <CardContent className="flex-1 pb-6">
                 <div className="mb-6">
                   <span className="text-4xl font-bold text-foreground">{getPrice(plan)}</span>
-                  <span className="text-muted-foreground">{getPeriod(plan)}</span>
-                  {isYearly && getSavings(plan) && (
-                    <p className="mt-1 text-sm text-success">
-                      Save {getSavings(plan)}% with yearly billing
-                    </p>
-                  )}
                 </div>
 
                 <ul className="space-y-3">
@@ -205,34 +168,60 @@ export function PricingSection() {
               </CardContent>
 
               <CardFooter>
-                {plan.isEnterprise ? (
-                  <Button
-                    asChild
-                    className="w-full"
-                    variant="outline"
-                  >
-                    <a href="mailto:sales@planivo.com">Contact Sales</a>
-                  </Button>
-                ) : (
-                  <Button
-                    asChild
-                    className="w-full"
-                    variant={plan.isPopular ? "default" : "outline"}
-                  >
-                    <Link to="/auth">
-                      {plan.priceMonthly === 0 ? "Get Started Free" : "Start Free Trial"}
-                    </Link>
-                  </Button>
-                )}
+                <Button
+                  asChild
+                  className="w-full"
+                  size="lg"
+                >
+                  <a href="mailto:sales@planivo.com">Contact Sales</a>
+                </Button>
               </CardFooter>
             </Card>
           ))}
         </div>
 
-        {/* FAQ note */}
-        <p className="mt-12 text-center text-sm text-muted-foreground">
-          All paid plans include a 14-day free trial. No credit card required.
-        </p>
+        {/* Premium Contact Us Section */}
+        <div className="mt-24 relative overflow-hidden rounded-3xl bg-card border border-border p-6 md:p-12 shadow-2xl max-w-4xl mx-auto">
+          {/* Background Effects */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent pointer-events-none" />
+
+          <div className="relative z-10 mx-auto max-w-3xl text-center mb-10">
+            <h3 className="text-3xl font-bold text-foreground mb-4">Still have questions?</h3>
+            <p className="text-lg text-muted-foreground">
+              Our team is here to help. Reach out to us for a personalized consultation or technical support.
+            </p>
+          </div>
+
+          <div className="relative z-10 grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+            <a
+              href="mailto:support@planivo.com"
+              className="group relative flex flex-col items-center p-6 rounded-2xl bg-muted/40 hover:bg-muted/80 border border-border transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
+            >
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 text-primary group-hover:scale-110 transition-transform duration-300">
+                <Mail className="h-6 w-6" />
+              </div>
+              <h4 className="text-xl font-semibold text-foreground mb-2">Email Support</h4>
+              <p className="text-sm text-muted-foreground mb-4">Get a response within 2 hours</p>
+              <span className="text-primary text-sm font-medium flex items-center group-hover:underline">
+                support@planivo.com
+              </span>
+            </a>
+
+            <a
+              href="tel:+1234567890"
+              className="group relative flex flex-col items-center p-6 rounded-2xl bg-muted/40 hover:bg-muted/80 border border-border transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
+            >
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 text-primary group-hover:scale-110 transition-transform duration-300">
+                <Phone className="h-6 w-6" />
+              </div>
+              <h4 className="text-xl font-semibold text-foreground mb-2">Call Sales</h4>
+              <p className="text-sm text-muted-foreground mb-4">Mon-Fri 9am-6pm EST</p>
+              <span className="text-primary text-sm font-medium flex items-center group-hover:underline">
+                +1 (555) 123-4567
+              </span>
+            </a>
+          </div>
+        </div>
       </div>
     </section>
   );

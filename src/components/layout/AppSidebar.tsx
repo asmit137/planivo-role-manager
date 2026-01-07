@@ -27,7 +27,7 @@ import {
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
 import NotificationBell from '@/components/notifications/NotificationBell';
-import MessagingPanel from '@/components/messaging/MessagingPanel';
+import MessageNotification from '@/components/messaging/MessageNotification';
 import UserProfile from '@/components/UserProfile';
 import { ThemeToggleSimple } from '@/components/ThemeToggle';
 import {
@@ -69,6 +69,21 @@ const moduleConfig = [
   { key: 'training', label: 'Meeting & Training', icon: GraduationCap, path: '/dashboard?tab=training' },
   { key: 'messaging', label: 'Messages', icon: MessageSquare, path: '/dashboard?tab=messaging' },
   { key: 'notifications', label: 'Notifications', icon: Bell, path: '/dashboard?tab=notifications' },
+  { key: 'emails', label: 'Broadcasts', icon: Mail, path: '/dashboard?tab=emails' },
+];
+
+const systemModuleConfig = [
+  { key: 'analytics', label: 'Analytics', icon: BarChart3, path: '/dashboard?tab=analytics' },
+  { key: 'audit', label: 'Audit Logs', icon: FileText, path: '/dashboard?tab=audit' },
+  { key: 'settings', label: 'Settings', icon: Cog, path: '/dashboard?tab=settings' },
+  { key: 'modules', label: 'Module Access', icon: Settings, path: '/dashboard?tab=modules' },
+];
+
+const developerModuleConfig = [
+  { key: 'activity', label: 'Live Activity', icon: Activity, path: '/dashboard?tab=activity' },
+  { key: 'security', label: 'Security', icon: Shield, path: '/dashboard?tab=security' },
+  { key: 'validator', label: 'System Validator', icon: ShieldCheck, path: '/dashboard?tab=validator' },
+  { key: 'source-code', label: 'Source Code', icon: Code, path: '/dashboard?tab=source-code' },
 ];
 
 // Inner content component that uses sidebar context (must be rendered inside Sidebar)
@@ -76,8 +91,9 @@ function SidebarInnerContent({
   hasAccess,
   signOut,
   roleLabel,
-  primaryRole,
   visibleModules,
+  visibleSystemModules,
+  visibleDeveloperModules,
   currentTab,
   handleNavigation,
   isActive
@@ -85,8 +101,9 @@ function SidebarInnerContent({
   hasAccess: (moduleKey: string) => boolean;
   signOut: () => void;
   roleLabel: string;
-  primaryRole: string | null;
   visibleModules: typeof moduleConfig;
+  visibleSystemModules: typeof systemModuleConfig;
+  visibleDeveloperModules: typeof developerModuleConfig;
   currentTab: string;
   handleNavigation: (path: string) => void;
   isActive: (path: string) => boolean;
@@ -136,119 +153,58 @@ function SidebarInnerContent({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* System Tools (Admin only) */}
-        {primaryRole === 'super_admin' && (
+        {/* System Tools */}
+        {visibleSystemModules.length > 0 && (
           <SidebarGroup>
             <SidebarGroupLabel>System</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => handleNavigation('/dashboard?tab=analytics')}
-                    isActive={currentTab === 'analytics'}
-                    className="w-full"
-                  >
-                    <BarChart3 className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
-                    {!collapsed && <span>Analytics</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => handleNavigation('/dashboard?tab=audit')}
-                    isActive={currentTab === 'audit'}
-                    className="w-full"
-                  >
-                    <FileText className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
-                    {!collapsed && <span>Audit Logs</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => handleNavigation('/dashboard?tab=emails')}
-                    isActive={currentTab === 'emails'}
-                    className="w-full"
-                  >
-                    <Mail className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
-                    {!collapsed && <span>Broadcasts</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => handleNavigation('/dashboard?tab=settings')}
-                    isActive={currentTab === 'settings'}
-                    className="w-full"
-                  >
-                    <Cog className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
-                    {!collapsed && <span>Settings</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => handleNavigation('/dashboard?tab=modules')}
-                    isActive={currentTab === 'modules'}
-                    className="w-full"
-                  >
-                    <Settings className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
-                    {!collapsed && <span>Module Access</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-
-                {/* Inactive Tabs Dropdown */}
-                <Collapsible className="group/collapsible">
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton tooltip="Inactive Tabs">
-                        <Archive className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
-                        {!collapsed && (
-                          <>
-                            <span>Inactive Tabs</span>
-                            <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                          </>
-                        )}
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            onClick={() => handleNavigation('/dashboard?tab=activity')}
-                            isActive={currentTab === 'activity'}
-                          >
-                            <Activity size={16} />
-                            <span>Live Activity</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            onClick={() => handleNavigation('/dashboard?tab=security')}
-                            isActive={currentTab === 'security'}
-                          >
-                            <Shield size={16} />
-                            <span>Security</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            onClick={() => handleNavigation('/dashboard?tab=validator')}
-                            isActive={currentTab === 'validator'}
-                          >
-                            <ShieldCheck size={16} />
-                            <span>System Validator</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            onClick={() => handleNavigation('/dashboard?tab=source-code')}
-                            isActive={currentTab === 'source-code'}
-                          >
-                            <Code size={16} />
-                            <span>Source Code</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
+                {visibleSystemModules.map((module) => (
+                  <SidebarMenuItem key={module.key}>
+                    <SidebarMenuButton
+                      onClick={() => handleNavigation(module.path)}
+                      isActive={isActive(module.path)}
+                      className="w-full"
+                    >
+                      <module.icon className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
+                      {!collapsed && <span>{module.label}</span>}
+                    </SidebarMenuButton>
                   </SidebarMenuItem>
-                </Collapsible>
+                ))}
+
+                {/* Inactive Tabs Dropdown (Developer Tools) */}
+                {visibleDeveloperModules.length > 0 && (
+                  <Collapsible className="group/collapsible">
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton tooltip="Developer Tools">
+                          <Archive className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
+                          {!collapsed && (
+                            <>
+                              <span>Developer Tools</span>
+                              <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                            </>
+                          )}
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {visibleDeveloperModules.map((module) => (
+                            <SidebarMenuSubItem key={module.key}>
+                              <SidebarMenuSubButton
+                                onClick={() => handleNavigation(module.path)}
+                                isActive={isActive(module.path)}
+                              >
+                                <module.icon size={16} />
+                                <span>{module.label}</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -262,7 +218,7 @@ function SidebarInnerContent({
             <div className="flex items-center gap-2 justify-between">
               <ThemeToggleSimple />
               {hasAccess('notifications') && <NotificationBell />}
-              {hasAccess('messaging') && <MessagingPanel />}
+              {hasAccess('messaging') && <MessageNotification />}
               <UserProfile collapsed={false} />
             </div>
             <Button onClick={signOut} variant="outline" size="sm" className="w-full min-h-[44px]">
@@ -274,7 +230,7 @@ function SidebarInnerContent({
           <div className="flex flex-col gap-2 items-center">
             <ThemeToggleSimple />
             {hasAccess('notifications') && <NotificationBell />}
-            {hasAccess('messaging') && <MessagingPanel />}
+            {hasAccess('messaging') && <MessageNotification />}
             <UserProfile collapsed={true} />
             <Button onClick={signOut} variant="ghost" size="icon" className="w-full min-h-[44px] min-w-[44px]">
               <LogOut className="h-4 w-4" />
@@ -295,9 +251,11 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
   const searchParams = new URLSearchParams(location.search);
   const currentTab = searchParams.get('tab') || 'overview';
 
+  const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
+
   const getPrimaryRole = () => {
     if (!roles || roles.length === 0) return null;
-    const roleHierarchy = ['super_admin', 'organization_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'];
+    const roleHierarchy = ['super_admin', 'organization_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'custom'];
     for (const role of roleHierarchy) {
       if (roles.some(r => r.role === role)) {
         return role;
@@ -311,14 +269,33 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
   // Format role label
   const getRoleLabel = () => {
     if (!primaryRole) return '';
+
+    // If it's a custom role, try to find the actual name
+    if (primaryRole === 'custom') {
+      const customRole = roles?.find(r => r.role === 'custom' && r.custom_role?.name)?.custom_role;
+      if (customRole) return customRole.name;
+    }
+
     return primaryRole.split('_').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
   };
 
   // Filter modules based on permissions
-  const visibleModules = moduleConfig.filter(module =>
-    module.alwaysShow || hasAccess(module.key)
+  const visibleModules = moduleConfig.filter(module => {
+    // Broadcasts only for Super Admin
+    if (module.key === 'emails') {
+      return isSuperAdmin;
+    }
+    return module.alwaysShow || hasAccess(module.key);
+  });
+
+  const visibleSystemModules = systemModuleConfig.filter(module =>
+    hasAccess(module.key)
+  );
+
+  const visibleDeveloperModules = developerModuleConfig.filter(module =>
+    hasAccess(module.key)
   );
 
   const handleNavigation = (path: string) => {
@@ -342,8 +319,9 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
         hasAccess={hasAccess}
         signOut={signOut}
         roleLabel={getRoleLabel()}
-        primaryRole={primaryRole}
         visibleModules={visibleModules}
+        visibleSystemModules={visibleSystemModules}
+        visibleDeveloperModules={visibleDeveloperModules}
         currentTab={currentTab}
         handleNavigation={handleNavigation}
         isActive={isActive}

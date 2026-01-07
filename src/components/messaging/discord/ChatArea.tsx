@@ -202,6 +202,30 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
     }, [channelId]);
 
 
+    // Automatic "Read Receipt" Logic
+    useEffect(() => {
+        if (!channelId || !user || !isParticipant) return;
+
+        const markAsRead = async () => {
+            const { error } = await supabase
+                .from('conversation_participants')
+                .update({ last_read_at: new Date().toISOString() })
+                .eq('conversation_id', channelId)
+                .eq('user_id', user.id);
+
+            if (error) {
+                console.error('Error marking as read:', error);
+            } else {
+                // Invalidate queries to refresh sidebar and notification unread status
+                queryClient.invalidateQueries({ queryKey: ['discord-channels'] });
+                queryClient.invalidateQueries({ queryKey: ['discord-dms'] });
+                queryClient.invalidateQueries({ queryKey: ['user-conversations-summary'] });
+            }
+        };
+
+        markAsRead();
+    }, [channelId, user?.id, isParticipant]);
+
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
@@ -274,20 +298,24 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
 
     if (!channelId) {
         return (
-            <div className="flex-1 flex flex-col items-center justify-center text-zinc-400">
-                <div className="bg-zinc-800 p-4 rounded-full mb-4">
-                    <Hash className="h-8 w-8" />
+            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground bg-background/50">
+                <div className="bg-primary/10 p-6 rounded-full mb-6 ring-1 ring-primary/20">
+                    <MessageSquare className="h-10 w-10 text-primary" />
                 </div>
-                <h3 className="text-zinc-200 font-semibold mb-2">No Channel Selected</h3>
-                <p>Choose a channel from the sidebar to start chatting.</p>
+                <h3 className="text-2xl font-bold text-foreground mb-3">
+                    Welcome back, {user?.user_metadata?.full_name?.split(' ')[0] || 'Member'}!
+                </h3>
+                <p className="text-muted-foreground/80 text-center max-w-sm">
+                    Select a channel or conversation from the sidebar to start collaborating with your team.
+                </p>
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col h-full overflow-hidden bg-zinc-700/10">
+        <div className="flex flex-col h-full overflow-hidden bg-background">
             {/* Channel Header */}
-            <div className="h-14 border-b border-zinc-900 bg-zinc-900/50 flex items-center justify-between px-4 shadow-sm flex-shrink-0">
+            <div className="h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between px-4 shadow-sm flex-shrink-0">
                 <div className="flex items-center gap-2">
                     <Button variant="ghost" className="lg:hidden mr-2 px-0" onClick={onMobileMenuToggle}>
                         <Menu className="h-6 w-6" />
@@ -295,11 +323,11 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
                     {conversation?.type === 'channel' ? (
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2">
-                                <Hash className="h-6 w-6 text-zinc-400" />
-                                <h3 className="text-zinc-100 font-bold capitalize">{conversation?.slug || conversation?.title}</h3>
+                                <Hash className="h-6 w-6 text-muted-foreground" />
+                                <h3 className="text-foreground font-bold capitalize">{conversation?.slug || conversation?.title}</h3>
                             </div>
                             {conversation.conversation_participants && (
-                                <span className="text-xs text-zinc-400 ml-8 truncate max-w-md block">
+                                <span className="text-xs text-muted-foreground ml-8 truncate max-w-md block">
                                     {conversation.conversation_participants
                                         .map((p: any) => {
                                             const profile = Array.isArray(p.profiles) ? p.profiles[0] : p.profiles;
@@ -313,11 +341,11 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
                     ) : (
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2">
-                                <MessageSquare className="h-5 w-5 text-zinc-400" />
-                                <h3 className="text-zinc-100 font-bold text-sm sm:text-base capitalize">{conversation?.title || 'Unknown User'}</h3>
+                                <MessageSquare className="h-5 w-5 text-muted-foreground" />
+                                <h3 className="text-foreground font-bold text-sm sm:text-base capitalize">{conversation?.title || 'Unknown User'}</h3>
                             </div>
                             {conversation?.is_group && conversation.conversation_participants && (
-                                <span className="text-xs text-zinc-400 ml-7 truncate max-w-md block">
+                                <span className="text-xs text-muted-foreground ml-7 truncate max-w-md block">
                                     {conversation.conversation_participants
                                         .map((p: any) => p.profiles?.full_name || p.profiles?.email)
                                         .filter(Boolean)
@@ -328,8 +356,8 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
                     )}
                     {conversation?.description && (
                         <>
-                            <div className="h-4 w-[1px] bg-zinc-700 mx-2 hidden md:block" />
-                            <span className="text-xs text-zinc-400 hidden md:block truncate max-w-sm">
+                            <div className="h-4 w-[1px] bg-border mx-2 hidden md:block" />
+                            <span className="text-xs text-muted-foreground hidden md:block truncate max-w-sm">
                                 {conversation.description}
                             </span>
                         </>
@@ -343,25 +371,25 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
 
             {/* Messages Scroll Area */}
             <div className="flex-1 relative min-h-0">
-                <div className="h-full px-4 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+                <div className="h-full px-4 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
                     <div className="flex flex-col justify-end min-h-full space-y-4"> {/* Align bottom if few messages */}
                         {/* Welcome Message - only show if no messages */}
                         {messages.length === 0 && (
                             conversation?.type === 'channel' ? (
                                 <div className="mt-10 mb-8 px-4">
-                                    <div className="bg-zinc-800 h-16 w-16 rounded-full flex items-center justify-center mb-4">
-                                        <Hash className="h-10 w-10 text-white" />
+                                    <div className="bg-muted h-16 w-16 rounded-full flex items-center justify-center mb-4">
+                                        <Hash className="h-10 w-10 text-muted-foreground" />
                                     </div>
-                                    <h1 className="text-3xl font-bold text-white mb-2">Welcome to #{conversation?.slug || conversation?.title}</h1>
-                                    <p className="text-zinc-400">This is the start of the #{conversation?.slug || conversation?.title} channel.</p>
+                                    <h1 className="text-3xl font-bold text-foreground mb-2">Welcome to #{conversation?.slug || conversation?.title}</h1>
+                                    <p className="text-muted-foreground">This is the start of the #{conversation?.slug || conversation?.title} channel.</p>
                                 </div>
                             ) : (
                                 <div className="mt-10 mb-8 px-4">
-                                    <div className="bg-zinc-800 h-16 w-16 rounded-full flex items-center justify-center mb-4">
-                                        <MessageSquare className="h-10 w-10 text-white" />
+                                    <div className="bg-muted h-16 w-16 rounded-full flex items-center justify-center mb-4">
+                                        <MessageSquare className="h-10 w-10 text-muted-foreground" />
                                     </div>
-                                    <h1 className="text-3xl font-bold text-white mb-2">{conversation?.title || 'Direct Message'}</h1>
-                                    <p className="text-zinc-400">This is the beginning of your conversation{conversation?.is_group ? ' with this group' : ''}.</p>
+                                    <h1 className="text-3xl font-bold text-foreground mb-2">{conversation?.title || 'Direct Message'}</h1>
+                                    <p className="text-muted-foreground">This is the beginning of your conversation{conversation?.is_group ? ' with this group' : ''}.</p>
                                 </div>
                             )
                         )}
@@ -374,11 +402,13 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
                                 <div key={msg.id} className={`flex gap-3 mb-2 ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}>
                                     {/* Avatar - only show for first message in sequence */}
                                     {!isSequence && (
-                                        <Avatar className="h-8 w-8 flex-shrink-0">
-                                            <AvatarFallback className={isOwnMessage ? "bg-blue-600 text-white" : "bg-zinc-700 text-white"}>
-                                                {(msg.sender?.full_name || msg.sender?.email || 'U').substring(0, 1).toUpperCase()}
-                                            </AvatarFallback>
-                                        </Avatar>
+                                        <div className="flex-shrink-0">
+                                            <Avatar className="h-8 w-8 ring-2 ring-background ring-offset-2 ring-offset-transparent">
+                                                <AvatarFallback className={isOwnMessage ? "bg-primary text-primary-foreground font-bold" : "bg-muted text-muted-foreground font-bold"}>
+                                                    {(msg.sender?.full_name || msg.sender?.email || 'U').substring(0, 1).toUpperCase()}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                        </div>
                                     )}
 
                                     {/* Spacer for sequence messages */}
@@ -389,20 +419,24 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
                                         {/* Sender name and time - only for first in sequence */}
                                         {!isSequence && !isOwnMessage && (
                                             <div className="flex items-center gap-2 mb-1 px-1">
-                                                <span className="text-xs font-semibold text-zinc-300">
+                                                <span className="text-xs font-semibold text-foreground">
                                                     {msg.sender?.full_name || msg.sender?.email || 'Unknown User'}
                                                 </span>
-                                                <span className="text-[10px] text-zinc-500">
+                                                <span className="text-[10px] text-muted-foreground">
                                                     {format(new Date(msg.created_at), 'h:mm a')}
                                                 </span>
                                             </div>
                                         )}
 
                                         {/* Message content */}
-                                        <div className={`rounded-2xl px-4 py-2 ${isOwnMessage
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-zinc-800 text-zinc-100'
-                                            }`}>
+                                        <div className={`px-5 py-2.5 shadow-sm relative group/msg transition-all duration-200
+                                            ${isOwnMessage
+                                                ? 'bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-3xl rounded-tr-sm'
+                                                : 'bg-muted/80 backdrop-blur-sm text-foreground rounded-3xl rounded-tl-sm hover:bg-muted'
+                                            }
+                                            ${isSequence && isOwnMessage ? 'rounded-tr-3xl mr-10' : ''}
+                                            ${isSequence && !isOwnMessage ? 'rounded-tl-3xl ml-10' : ''}
+                                        `}>
                                             <div className="text-[15px] leading-relaxed break-words">
                                                 {(() => {
                                                     return msg.content.split('\n').map((line: string, i: number) => {
@@ -422,14 +456,14 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
                                                                     </div>
                                                                 );
                                                             }
-                                                            return <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-blue-300 underline block">{name}</a>;
+                                                            return <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="underline block hover:opacity-80">{name}</a>;
                                                         }
                                                         return <p key={i} className="mb-1 last:mb-0">{line}</p>;
                                                     });
                                                 })()}
                                             </div>
                                             {isOwnMessage && (
-                                                <span className="text-[10px] text-blue-100 opacity-70 mt-1 block text-right">
+                                                <span className="text-[9px] opacity-70 mt-1 block text-right font-medium tracking-wide">
                                                     {format(new Date(msg.created_at), 'h:mm a')}
                                                 </span>
                                             )}
@@ -444,34 +478,34 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
             </div>
 
             {/* Input Area or Join Button */}
-            <div className="p-4 bg-zinc-900 flex-shrink-0">
+            <div className="p-4 bg-background border-t border-border/40 flex-shrink-0 z-10">
                 {!isParticipant && conversation?.type === 'channel' ? (
-                    <div className="flex items-center justify-center p-4 bg-zinc-800/50 rounded-lg">
+                    <div className="flex items-center justify-center p-6 bg-muted/30 rounded-2xl border border-dashed border-border">
                         <div className="text-center">
-                            <p className="text-zinc-400 mb-3">You are viewing <strong>#{conversation.title || conversation.slug}</strong></p>
+                            <p className="text-muted-foreground mb-3 font-medium">You are viewing <strong>#{conversation.title || conversation.slug}</strong></p>
                             <Button
                                 onClick={() => joinChannelMutation.mutate()}
                                 disabled={joinChannelMutation.isPending}
-                                className="bg-indigo-500 hover:bg-indigo-600 text-white"
+                                className="bg-primary hover:bg-primary/90 text-white font-bold px-8 shadow-lg shadow-primary/20 rounded-full"
                             >
                                 {joinChannelMutation.isPending ? 'Joining...' : 'Join Channel'}
                             </Button>
                         </div>
                     </div>
                 ) : (
-                    <div className="bg-zinc-800/50 rounded-lg p-2.5 flex flex-col gap-2">
+                    <div className="bg-muted/30 border border-border/50 rounded-3xl p-2 flex flex-col gap-2 transition-all focus-within:ring-2 focus-within:ring-primary/20 focus-within:bg-background focus-within:shadow-xl">
                         {previewUrl && (
-                            <div className="relative w-24 h-24 group">
-                                <img src={previewUrl} alt="Preview" className="w-full h-full object-cover rounded-md" />
+                            <div className="relative w-24 h-24 group mx-2 mt-2">
+                                <img src={previewUrl} alt="Preview" className="w-full h-full object-cover rounded-xl shadow-md" />
                                 <button
                                     onClick={handleRemoveFile}
-                                    className="absolute -top-2 -right-2 bg-zinc-900 rounded-full p-1 shadow-md hover:bg-zinc-700 transition-colors"
+                                    className="absolute -top-2 -right-2 bg-background rounded-full p-1.5 shadow-md hover:bg-destructive hover:text-destructive-foreground transition-all border border-border"
                                 >
-                                    <X className="h-4 w-4 text-zinc-400" />
+                                    <X className="h-3.5 w-3.5" />
                                 </button>
                             </div>
                         )}
-                        <div className="flex items-center gap-3 w-full">
+                        <div className="flex items-center gap-2 w-full pl-2 pr-2">
                             <input
                                 type="file"
                                 ref={fileInputRef}
@@ -479,7 +513,7 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
                                 onChange={handleFileSelect}
                             />
                             <button
-                                className={`text-zinc-400 hover:text-zinc-200 ${previewUrl ? 'text-blue-400' : ''}`}
+                                className={`text-muted-foreground hover:text-primary transition-colors p-2 hover:bg-muted rounded-full ${previewUrl ? 'text-primary bg-primary/10' : ''}`}
                                 onClick={() => fileInputRef.current?.click()}
                             >
                                 <PlusCircle className="h-6 w-6" />
@@ -493,13 +527,15 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
                                 value={messageInput}
                                 onChange={(e) => setMessageInput(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                className="bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-zinc-200 placeholder:text-zinc-500 p-0 h-auto flex-1"
+                                className="bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-foreground placeholder:text-muted-foreground/70 p-2 h-auto flex-1 font-medium"
                             />
-                            <div className="flex items-center gap-3 text-zinc-400">
-
+                            <div className="flex items-center gap-1 text-muted-foreground">
                                 {(messageInput.trim() || selectedFile) && (
-                                    <button onClick={handleSendMessage} className="text-blue-500 hover:text-blue-400">
-                                        <Send className="h-6 w-6" />
+                                    <button
+                                        onClick={handleSendMessage}
+                                        className="text-primary-foreground bg-primary hover:bg-primary/90 p-2 rounded-full shadow-md transition-all active:scale-95"
+                                    >
+                                        <Send className="h-5 w-5 ml-0.5" />
                                     </button>
                                 )}
                             </div>

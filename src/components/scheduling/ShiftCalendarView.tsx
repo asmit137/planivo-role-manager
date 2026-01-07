@@ -10,6 +10,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isTod
 import { LoadingState } from '@/components/layout/LoadingState';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { cn } from '@/lib/utils';
+import { ShiftAssignmentDialog } from './ShiftAssignmentDialog';
 
 interface ShiftCalendarViewProps {
   departmentId: string;
@@ -18,6 +19,7 @@ interface ShiftCalendarViewProps {
 export const ShiftCalendarView: React.FC<ShiftCalendarViewProps> = ({ departmentId }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>('all');
+  const [selectedShiftData, setSelectedShiftData] = useState<{ shift: any; date: Date } | null>(null);
 
   // Fetch published and draft schedules
   const { data: schedules, isLoading: schedulesLoading } = useQuery({
@@ -173,18 +175,19 @@ export const ShiftCalendarView: React.FC<ShiftCalendarViewProps> = ({ department
                     {dayAssignments.slice(0, 3).map((item, idx) => (
                       <div
                         key={`${item.shift.id}-${idx}`}
-                        className="text-xs px-1 py-0.5 rounded truncate"
+                        className="text-xs px-1 py-0.5 rounded truncate cursor-pointer hover:brightness-95 active:scale-95 transition-all"
                         style={{
                           backgroundColor: `${item.shift.color}20`,
                           color: item.shift.color,
                           borderLeft: `2px solid ${item.shift.color}`,
                         }}
+                        onClick={() => setSelectedShiftData({ shift: item.shift, date: day })}
                       >
                         <span className="hidden sm:inline">{item.shift.name}</span>
                         <span className="sm:hidden">{item.shift.name?.charAt(0)}</span>
                         {item.assignments.length > 0 && (
                           <span className="ml-1 opacity-75">
-                            ({item.assignments.length})
+                            ({item.assignments.length}/{item.shift.required_staff})
                           </span>
                         )}
                       </div>
@@ -228,6 +231,15 @@ export const ShiftCalendarView: React.FC<ShiftCalendarViewProps> = ({ department
           </div>
         </CardContent>
       </Card>
+
+      {/* Shift Assignment Dialog */}
+      <ShiftAssignmentDialog
+        open={!!selectedShiftData}
+        onOpenChange={(open) => !open && setSelectedShiftData(null)}
+        shift={selectedShiftData?.shift}
+        date={selectedShiftData?.date || new Date()}
+        departmentId={departmentId}
+      />
     </div>
   );
 };

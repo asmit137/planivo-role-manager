@@ -2211,6 +2211,18 @@ export type Database = {
         Returns: Json
       }
       get_public_schedule: { Args: { p_token: string }; Returns: Json }
+      get_my_modules: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          can_admin: boolean
+          can_delete: boolean
+          can_edit: boolean
+          can_view: boolean
+          module_id: string
+          module_key: string
+          module_name: string
+        }[]
+      }
       get_user_modules: {
         Args: { _user_id: string }
         Returns: {

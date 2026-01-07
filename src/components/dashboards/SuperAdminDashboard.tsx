@@ -475,7 +475,7 @@ const SuperAdminDashboard = () => {
                 <CardContent>
                   <div className="space-y-3">
                     {recentActivity?.vacationPlans.map((plan: any) => (
-                      <div key={plan.id} className="flex items-center justify-between p-3 bg-accent rounded-lg">
+                      <div key={plan.id} className="flex items-center justify-between p-3 bg-secondary rounded-lg">
                         <div>
                           <p className="text-sm font-medium">{plan.vacation_types?.name || 'Unknown Type'}</p>
                           <p className="text-xs text-muted-foreground">
@@ -500,7 +500,7 @@ const SuperAdminDashboard = () => {
                 <CardContent>
                   <div className="space-y-3">
                     {recentActivity?.tasks.map((task: any) => (
-                      <div key={task.id} className="flex items-center justify-between p-3 bg-accent rounded-lg">
+                      <div key={task.id} className="flex items-center justify-between p-3 bg-secondary rounded-lg">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{task.title}</p>
                           <p className="text-xs text-muted-foreground">
