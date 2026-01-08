@@ -82,7 +82,7 @@ export const ShiftAssignmentDialog: React.FC<ShiftAssignmentDialogProps> = ({
 
             // Only approved or pending-above-staff vacations count as conflicts
             return data?.filter((v: any) =>
-                ['approved', 'department_pending', 'facility_pending', 'workspace_pending'].includes(v.vacation_plans.status)
+                ['approved', 'pending_approval', 'department_pending', 'facility_pending', 'workspace_pending'].includes(v.vacation_plans.status)
             ) || [];
         },
         enabled: !!dateStr && open,

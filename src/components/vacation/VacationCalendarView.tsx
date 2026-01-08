@@ -38,8 +38,17 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
 
   // Fetch vacations based on role and status filter
   const { data: vacations, isLoading, error, refetch } = useQuery({
-    queryKey: ['vacations', user?.id, userDepartmentId, userFacilityId, userWorkspaceId, timeFilter, statusFilter],
+    queryKey: ['vacations', user?.id, userDepartmentId, userFacilityId, userWorkspaceId, roles, timeFilter, statusFilter],
     queryFn: async () => {
+      // Find the specific role records for scope detection
+      const workplaceRole = roles?.find(r => r.role === 'workplace_supervisor');
+      const facilityRole = roles?.find(r => r.role === 'facility_supervisor');
+      const deptHeadRole = roles?.find(r => r.role === 'department_head');
+
+      const effectiveWorkspaceId = userWorkspaceId || workplaceRole?.workspace_id;
+      const effectiveFacilityId = userFacilityId || facilityRole?.facility_id;
+      const effectiveDeptId = userDepartmentId || deptHeadRole?.department_id;
+
       let query = supabase
         .from('vacation_plans')
         .select(`
@@ -50,30 +59,35 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
           status,
           total_days,
           profiles!vacation_plans_staff_id_fkey(id, full_name, email),
-          departments!vacation_plans_department_id_fkey(id, name, facility_id),
+          departments!vacation_plans_department_id_fkey(
+            id, 
+            name, 
+            facility_id,
+            facilities(name)
+          ),
           vacation_types(id, name),
           vacation_splits(id, start_date, end_date, days)
         `);
 
-      // Apply status filter - ensure 'draft' is included when appropriate
+      // Apply status filter - ensure 'pending_approval' is included
       if (statusFilter === 'approved') {
         query = query.eq('status', 'approved');
       } else if (statusFilter === 'pending') {
-        query = query.in('status', ['department_pending', 'facility_pending', 'workspace_pending']);
+        query = query.in('status', ['pending_approval', 'department_pending', 'facility_pending', 'workspace_pending']);
       } else {
         // 'all' - show all relevant statuses
-        query = query.in('status', ['draft', 'approved', 'department_pending', 'facility_pending', 'workspace_pending']);
+        query = query.in('status', ['draft', 'pending_approval', 'approved', 'department_pending', 'facility_pending', 'workspace_pending']);
       }
 
       // Apply role-based filtering
       if (isSuperAdmin) {
         // Super admin sees all, no additional filters
-      } else if (isWorkplaceSupervisor && userWorkspaceId) {
+      } else if (isWorkplaceSupervisor && effectiveWorkspaceId) {
         // Workplace supervisor sees all departments in the workspace - get facility IDs first
         const { data: facilities } = await supabase
           .from('facilities')
           .select('id')
-          .eq('workspace_id', userWorkspaceId);
+          .eq('workspace_id', effectiveWorkspaceId);
 
         const facilityIds = facilities?.map(f => f.id) || [];
 
@@ -87,25 +101,25 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
         } else {
           query = query.eq('staff_id', user?.id);
         }
-      } else if (isFacilitySupervisor && userFacilityId) {
+      } else if (isFacilitySupervisor && effectiveFacilityId) {
         // Facility supervisor sees all departments in their facility
         const { data: depts } = await supabase
           .from('departments')
           .select('id')
-          .eq('facility_id', userFacilityId);
+          .eq('facility_id', effectiveFacilityId);
 
-        if (depts) {
+        if (depts && depts.length > 0) {
           query = query.in('department_id', depts.map(d => d.id));
         } else {
           query = query.eq('staff_id', user?.id);
         }
-      } else if (isDepartmentHead && userDepartmentId) {
+      } else if (isDepartmentHead && effectiveDeptId) {
         // Department head sees their department
-        query = query.eq('department_id', userDepartmentId);
+        query = query.eq('department_id', effectiveDeptId);
       } else {
         // Staff sees own + approved in department
         const staffFilters = [`staff_id.eq.${user?.id}`];
-        if (userDepartmentId) staffFilters.push(`department_id.eq.${userDepartmentId}`);
+        if (effectiveDeptId) staffFilters.push(`department_id.eq.${effectiveDeptId}`);
         query = query.or(staffFilters.join(','));
       }
 
@@ -148,7 +162,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
   // Determine color for days with vacations
   const getVacationStatusColor = (vacationsOnDay: any[]) => {
     const hasApproved = vacationsOnDay.some(v => v.status === 'approved');
-    const hasPending = vacationsOnDay.some(v => ['department_pending', 'facility_pending', 'workspace_pending'].includes(v.status));
+    const hasPending = vacationsOnDay.some(v => ['pending_approval', 'department_pending', 'facility_pending', 'workspace_pending'].includes(v.status));
 
     if (hasApproved && hasPending) {
       return 'bg-purple-100 dark:bg-purple-950 border-purple-300 dark:border-purple-800 hover:bg-purple-200 dark:hover:bg-purple-900';
@@ -417,7 +431,8 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                                       <p className="font-medium truncate">
                                         {vacation.profiles?.full_name || 'Unknown'}
                                       </p>
-                                      <p className="text-sm text-muted-foreground">
+                                      <p className="text-xs font-semibold text-primary/80">
+                                        {vacation.departments?.facilities?.name && `${vacation.departments.facilities.name} - `}
                                         {vacation.departments?.name}
                                       </p>
                                       <div className="mt-1 flex items-center gap-1">
@@ -499,7 +514,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {upcomingVacations.map((item, index) => {
                 const isApproved = item.status === 'approved';
-                const isPending = ['department_pending', 'facility_pending', 'workspace_pending'].includes(item.status);
+                const isPending = ['pending_approval', 'department_pending', 'facility_pending', 'workspace_pending'].includes(item.status);
 
                 return (
                   <div
@@ -518,7 +533,8 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                         <p className="font-semibold text-base truncate">
                           {item.profiles?.full_name || 'Unknown'}
                         </p>
-                        <p className="text-sm text-muted-foreground truncate">
+                        <p className="text-xs font-semibold text-primary/80 truncate">
+                          {item.departments?.facilities?.name && `${item.departments.facilities.name} - `}
                           {item.departments?.name}
                         </p>
                       </div>
@@ -527,15 +543,17 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                     <div className="space-y-2">
                       <Badge className={cn(
                         isApproved && "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
+                        item.status === 'pending_approval' && "bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
                         item.status === 'department_pending' && "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
                         item.status === 'facility_pending' && "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
                         item.status === 'workspace_pending' && "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800"
                       )}>
                         {isApproved ? '✓ Approved' :
-                          item.status === 'department_pending' ? '⏳ Dept. Pending' :
-                            item.status === 'facility_pending' ? '⏳ Facility Pending' :
-                              item.status === 'workspace_pending' ? '⏳ Workspace Pending' :
-                                item.status}
+                          item.status === 'pending_approval' ? '⏳ Request Sent' :
+                            item.status === 'department_pending' ? '⏳ Dept. Pending' :
+                              item.status === 'facility_pending' ? '⏳ Facility Pending' :
+                                item.status === 'workspace_pending' ? '⏳ Workspace Pending' :
+                                  item.status}
                       </Badge>
                       <div className="flex items-center gap-2 text-sm">
                         <Badge variant="secondary">

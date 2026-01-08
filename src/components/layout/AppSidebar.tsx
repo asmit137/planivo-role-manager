@@ -287,6 +287,14 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
     if (module.key === 'emails') {
       return isSuperAdmin;
     }
+
+    // Hide Users tab for Workspace and Facility Supervisors
+    if (module.key === 'user_management') {
+      if (primaryRole === 'workplace_supervisor' || primaryRole === 'facility_supervisor') {
+        return false;
+      }
+    }
+
     return module.alwaysShow || hasAccess(module.key);
   });
 

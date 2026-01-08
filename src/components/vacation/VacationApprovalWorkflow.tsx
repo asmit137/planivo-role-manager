@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { CheckCircle2, XCircle, Calendar, User, FileText, Clock, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { sendVacationStatusNotification } from '@/lib/vacationNotifications';
 import {
   Dialog,
   DialogContent,
@@ -63,7 +64,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         `);
 
       // Fetch all plans in scope that are awaiting approval
-      query = query.in('status', ['department_pending', 'facility_pending', 'workspace_pending']);
+      query = query.eq('status', 'pending_approval');
 
       const { data: plans, error } = await query;
       if (error) throw error;
@@ -71,6 +72,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       // Filter by scope
       let filtered = plans || [];
 
+      // Filter by Scope ID
       if (scopeId === 'all') {
         // Super Admin: View all plans globally
       } else if (approvalLevel === 1) {
@@ -89,20 +91,35 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         filtered = filtered.filter(p => facilityIds.includes(p.departments?.facility_id));
       }
 
-      // Fetch staff and creator info
-      return await Promise.all(
+      // Fetch staff and creator info, including roles
+      const extendedPlans = await Promise.all(
         filtered.map(async (plan) => {
-          const [staffProfile, creatorProfile] = await Promise.all([
+          const [staffProfile, creatorProfile, roles] = await Promise.all([
             supabase.from('profiles').select('full_name, email').eq('id', plan.staff_id).single(),
             supabase.from('profiles').select('full_name').eq('id', plan.created_by).single(),
+            supabase.from('user_roles').select('role').eq('user_id', plan.staff_id),
           ]);
           return {
             ...plan,
             staff_profile: staffProfile.data,
             creator_profile: creatorProfile.data,
+            staff_roles: roles.data || [],
           };
         })
       );
+
+      // Filter by Visibility Rules (Parallel Workflow)
+      // 1. Supervisors (L1, L2, L3) should ONLY see plans from 'staff' role.
+      // 2. Super Admin (which uses scopeId='all' usually) sees everything.
+      if (scopeId === 'all') {
+        return extendedPlans;
+      }
+
+      return extendedPlans.filter(p => {
+        // Check if ANY of the staff's roles is 'staff'
+        const roles = Array.isArray(p.staff_roles) ? p.staff_roles : [p.staff_roles];
+        return roles.some((r: any) => r.role === 'staff');
+      });
     },
     enabled: !!user && !!scopeId,
   });
@@ -208,19 +225,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       }
 
       // Update vacation plan status
-      let newStatus = '';
-      if (action === 'reject') {
-        newStatus = 'rejected';
-      } else {
-        // Check if all splits were rejected
-        const hasApprovedSplits = selectedSplitIds.length > 0;
-        if (!hasApprovedSplits) {
-          newStatus = 'rejected';
-        } else {
-          // Simplified: Any authorized approval makes it fully approved
-          newStatus = 'approved';
-        }
-      }
+      const newStatus = action === 'approve' ? 'approved' : 'rejected';
 
       const { error: updateError } = await supabase
         .from('vacation_plans')
@@ -228,6 +233,28 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         .eq('id', planId);
 
       if (updateError) throw updateError;
+
+      // Send notification to staff member
+      const { data: planData } = await supabase
+        .from('vacation_plans')
+        .select('staff_id')
+        .eq('id', planId)
+        .single();
+
+      if (planData) {
+        const { data: approverProfile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user?.id)
+          .single();
+
+        await sendVacationStatusNotification(
+          planId,
+          newStatus,
+          planData.staff_id,
+          approverProfile?.full_name
+        );
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-vacation-plans'] });
@@ -336,9 +363,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
   const getStatusBadge = (status: string) => {
     const configs = {
       draft: { label: 'Draft', className: 'bg-warning text-warning-foreground' },
-      department_pending: { label: 'Pending Dept Head', className: 'bg-primary text-primary-foreground' },
-      facility_pending: { label: 'Pending Facility', className: 'bg-accent text-accent-foreground' },
-      workspace_pending: { label: 'Pending Final', className: 'bg-secondary text-secondary-foreground' },
+      pending_approval: { label: 'Pending Approval', className: 'bg-primary text-primary-foreground' },
       approved: { label: 'Approved', className: 'bg-success text-success-foreground' },
       rejected: { label: 'Rejected', className: 'bg-destructive text-destructive-foreground' },
     };
@@ -361,10 +386,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       <Card>
         <CardHeader>
           <CardTitle>
-            {approvalLevel === 1 && 'Level 1 (Department Head) Approvals'}
-            {approvalLevel === 2 && 'Level 2 (Facility Supervisor) Approvals'}
-            {approvalLevel === 3 && 'Level 3 (Workspace Supervisor) Approvals'}
-            {' - Pending Review'}
+            Approvals - Pending Review
           </CardTitle>
         </CardHeader>
         <CardContent>

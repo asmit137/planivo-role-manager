@@ -56,7 +56,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
         .from('user_roles')
         .select('*')
         .eq('user_id', user.id)
-        .in('role', ['department_head', 'staff'])
+        .eq('user_id', user.id)
         .maybeSingle();
       return data;
     },
@@ -66,7 +66,8 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   // Determine effective department ID and mode
   const isStaff = currentUserRole?.role === 'staff';
   const isDepartmentHead = currentUserRole?.role === 'department_head';
-  const isSuperAdmin = !currentUserRole && user?.id;
+  const isSupervisor = ['facility_supervisor', 'workplace_supervisor'].includes(currentUserRole?.role);
+  const isSuperAdmin = currentUserRole?.role === 'super_admin' || currentUserRole?.role === 'organization_admin';
   const effectiveDepartmentId = departmentId || selectedDepartment || currentUserRole?.department_id;
   const effectiveStaffOnly = staffOnly || isStaff;
 
@@ -88,7 +89,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       if (error) throw error;
       return data;
     },
-    enabled: !!isSuperAdmin,
+    enabled: !!(isSuperAdmin || isSupervisor),
   });
 
   // Real-time subscriptions for live updates
@@ -96,11 +97,11 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     table: 'vacation_plans',
     invalidateQueries: ['vacation-plans', 'department-staff'],
   });
-  +
-    useRealtimeSubscription({
-      table: 'vacation_splits',
-      invalidateQueries: ['vacation-plans'],
-    });
+
+  useRealtimeSubscription({
+    table: 'vacation_splits',
+    invalidateQueries: ['vacation-plans'],
+  });
 
   useRealtimeSubscription({
     table: 'vacation_types',
@@ -130,7 +131,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
         .from('user_roles')
         .select('user_id, role')
         .eq('department_id', effectiveDepartmentId)
-        .in('role', ['staff', 'department_head']);
+        .in('role', ['staff', 'department_head', 'facility_supervisor', 'workplace_supervisor']);
 
       if (rolesError) throw rolesError;
       if (!roles || roles.length === 0) return [];
@@ -165,8 +166,35 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
           return 0;
         });
     },
-    enabled: Boolean(effectiveDepartmentId && (isDepartmentHead || isSuperAdmin || !effectiveStaffOnly)),
+    enabled: Boolean((effectiveDepartmentId && (isDepartmentHead || isSuperAdmin || isSupervisor || !effectiveStaffOnly)) || isSupervisor),
   });
+
+  // Effect: If I am a Supervisor/Admin planning for myself, and I am not in the list, inject myself or handle it.
+  // Actually, simpler: If I am a supervisor, I probably want to select MYSELF by default if I picked a department.
+  // But wait, if I pick a department, do I become a "staff" of that department?
+  // User Requirement: "supervisors can plan there vacation".
+  // Solution: If the user is a Supervisor, just allow them to be the "selectedStaff" even if not in the list, 
+  // OR fetch their profile specifically.
+
+  const { data: userProfile } = useQuery({
+    queryKey: ['user-profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      return data;
+    },
+    enabled: !!user?.id
+  });
+
+  // Merge current user into departmentStaff if missing (for Supervisors planning for themselves)
+  const effectiveStaffList = [...(departmentStaff || [])];
+  if (isSupervisor && userProfile && !effectiveStaffList.find(s => s.user_id === user?.id)) {
+    effectiveStaffList.push({
+      user_id: user!.id,
+      role: currentUserRole?.role,
+      profiles: userProfile
+    });
+  }
 
   const createPlanMutation = useMutation({
     mutationFn: async (planData: any) => {
@@ -200,7 +228,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
           total_days: planData.total_days,
           notes: planData.notes,
           created_by: user?.id,
-          status: 'draft',
+          status: 'pending_approval',
         })
         .select()
         .single();
@@ -326,7 +354,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {isSuperAdmin && !selectedDepartment && (
+          {(isSuperAdmin || (isSupervisor && !effectiveDepartmentId)) && (
             <div>
               <Label>Select Department *</Label>
               <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
@@ -352,7 +380,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                   <SelectValue placeholder="Select staff" />
                 </SelectTrigger>
                 <SelectContent>
-                  {departmentStaff?.map((staff: DepartmentStaffMember) => (
+                  {effectiveStaffList?.map((staff: DepartmentStaffMember) => (
                     <SelectItem key={staff.user_id} value={staff.user_id}>
                       {staff.profiles?.full_name || 'Unknown User'} ({staff.profiles?.email || 'No email'})
                       {staff.role === 'department_head' && ' (Department Head)'}

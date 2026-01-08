@@ -21,6 +21,7 @@ import { NotificationHub } from '@/modules/notifications';
 import { MessagingHub } from '@/modules/messaging';
 import { FacilitySchedulingHub } from '@/components/scheduling/FacilitySchedulingHub';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import WorkspaceManagement from '@/components/admin/WorkspaceManagement';
 
 const WorkplaceSupervisorDashboard = () => {
   const { user } = useAuth();
@@ -66,7 +67,7 @@ const WorkplaceSupervisorDashboard = () => {
         supabase
           .from('vacation_plans')
           .select('*', { count: 'exact', head: true })
-          .eq('status', 'workspace_pending'),
+          .in('status', ['pending_approval', 'workspace_pending']),
         supabase
           .from('vacation_approvals')
           .select('*', { count: 'exact', head: true })
@@ -115,6 +116,12 @@ const WorkplaceSupervisorDashboard = () => {
           <PageHeader
             title="Workspace Overview"
             description="Manage tasks and vacation planning for the workspace"
+          />
+        )}
+        {activeTab === 'organization' && (
+          <PageHeader
+            title="Organization Management"
+            description="Manage settings and structure for this workspace"
           />
         )}
         {activeTab === 'tasks' && (
@@ -216,6 +223,15 @@ const WorkplaceSupervisorDashboard = () => {
                 <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Published schedules</p>
               </div>
             </div>
+          )}
+
+          {activeTab === 'organization' && hasAccess('organization') && (
+            <ModuleGuard moduleKey="organization">
+              <WorkspaceManagement
+                organizationId={userRole.organization_id}
+                workspaceId={userRole.workspace_id}
+              />
+            </ModuleGuard>
           )}
 
           {activeTab === 'tasks' && hasAccess('task_management') && (

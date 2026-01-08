@@ -324,42 +324,20 @@ function getStageStatus(
     if (approval.status === 'rejected') return 'rejected';
   }
 
-  // If the plan is rejected at any level, all subsequent levels are waiting
-  if (currentStatus === 'rejected') return 'waiting';
+  // In parallel workflow, 'pending_approval' means all levels are pending
+  if (currentStatus === 'pending_approval') {
+    return 'pending';
+  }
 
-  // If the plan is draft, all levels are waiting
-  if (currentStatus === 'draft') return 'waiting';
-
-  // Level 1 (Department Head)
-  if (level === 1) {
-    if (currentStatus === 'department_pending') return 'pending';
-    // If we're past department_pending, Level 1 was approved (even without record)
-    if (['facility_pending', 'workspace_pending', 'approved'].includes(currentStatus)) {
-      return 'approved';
-    }
+  // If the plan is already approved/rejected but this level didn't act, mark as waiting/not-required
+  if (currentStatus === 'approved' || currentStatus === 'rejected') {
     return 'waiting';
   }
 
-  // Level 2 (Facility Supervisor)
-  if (level === 2) {
-    if (currentStatus === 'facility_pending') return 'pending';
-    // If we're past facility_pending, Level 2 was approved
-    if (['workspace_pending', 'approved'].includes(currentStatus)) {
-      return 'approved';
-    }
-    // Still waiting for Level 1
-    if (currentStatus === 'department_pending') return 'waiting';
-    return 'waiting';
-  }
-
-  // Level 3 (Workspace Supervisor)
-  if (level === 3) {
-    if (currentStatus === 'workspace_pending') return 'pending';
-    // If status is approved, Level 3 approved
-    if (currentStatus === 'approved') return 'approved';
-    // Still waiting for previous levels
-    return 'waiting';
-  }
+  // For legacy support of sequential statuses
+  if (level === 1 && currentStatus === 'department_pending') return 'pending';
+  if (level === 2 && currentStatus === 'facility_pending') return 'pending';
+  if (level === 3 && currentStatus === 'workspace_pending') return 'pending';
 
   return 'waiting';
 }

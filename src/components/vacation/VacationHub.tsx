@@ -97,11 +97,11 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
               <span className="hidden xs:inline">My Plans</span>
               <span className="xs:hidden">Mine</span>
             </TabsTrigger>
-            {isDepartmentHead && (
-              <TabsTrigger value="department-plans" className="min-h-[44px] px-3 text-sm">
+            {isApprover && (
+              <TabsTrigger value="team-plans" className="min-h-[44px] px-3 text-sm">
                 <List className="h-4 w-4 mr-1.5 sm:mr-2" />
-                <span className="hidden xs:inline">Department</span>
-                <span className="xs:hidden">Dept</span>
+                <span className="hidden xs:inline">Team Vacations</span>
+                <span className="xs:hidden">Team</span>
               </TabsTrigger>
             )}
             {isApprover && (
@@ -133,7 +133,9 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
           </ResponsiveTabsList>
 
           <TabsContent value="calendar">
-            <VacationCalendarView departmentId={departmentId} />
+            <ErrorBoundary fallback={<ErrorState title="Calendar Error" message="Failed to load calendar view" />}>
+              <VacationCalendarView departmentId={departmentId} />
+            </ErrorBoundary>
           </TabsContent>
 
           <TabsContent value="planner">
@@ -155,9 +157,13 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
             </TabsContent>
           )}
 
-          {isDepartmentHead && (
-            <TabsContent value="department-plans">
-              <VacationPlansList departmentId={departmentId || approvalInfo?.scopeId} />
+          {isApprover && approvalInfo && (
+            <TabsContent value="team-plans">
+              <VacationPlansList 
+                scopeType={approvalInfo.scopeType} 
+                scopeId={approvalInfo.scopeId}
+                departmentId={departmentId}
+              />
             </TabsContent>
           )}
 

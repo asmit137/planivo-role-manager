@@ -10,6 +10,7 @@ import { Calendar, Send, Trash2, User, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import VacationApprovalTimeline from './VacationApprovalTimeline';
 import { cn } from '@/lib/utils';
+import { sendVacationStatusNotification } from '@/lib/vacationNotifications';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,24 +25,53 @@ import { useState } from 'react';
 
 interface VacationPlansListProps {
   departmentId?: string;
+  scopeType?: 'workspace' | 'facility' | 'department' | 'all';
+  scopeId?: string;
   staffView?: boolean;
 }
 
-const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansListProps) => {
+const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, staffView = false }: VacationPlansListProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [deletingPlan, setDeletingPlan] = useState<string | null>(null);
   const [submittingPlan, setSubmittingPlan] = useState<string | null>(null);
 
   const { data: plans, isLoading } = useQuery({
-    queryKey: ['vacation-plans-list', departmentId, staffView, user?.id],
+    queryKey: ['vacation-plans-list', departmentId, scopeType, scopeId, staffView, user?.id],
     queryFn: async () => {
+      // Get department IDs based on scope if not filtering by staff
+      let allowedDepartmentIds: string[] = [];
+
+      if (!staffView) {
+        if (scopeType === 'facility' && scopeId) {
+          const { data: depts } = await supabase
+            .from('departments')
+            .select('id')
+            .eq('facility_id', scopeId);
+          allowedDepartmentIds = depts?.map(d => d.id) || [];
+        } else if (scopeType === 'workspace' && scopeId) {
+          const { data: facilities } = await supabase
+            .from('facilities')
+            .select('id')
+            .eq('workspace_id', scopeId);
+          const facilityIds = facilities?.map(f => f.id) || [];
+
+          const { data: depts } = await supabase
+            .from('departments')
+            .select('id')
+            .in('facility_id', facilityIds);
+          allowedDepartmentIds = depts?.map(d => d.id) || [];
+        } else if (scopeType === 'department' && (departmentId || scopeId)) {
+          allowedDepartmentIds = [departmentId || scopeId!];
+        }
+      }
+
       let query = supabase
         .from('vacation_plans')
         .select(`
           *,
           vacation_types(name),
-          departments(name, facility_id, facilities:facility_id(workspace_id)),
+          departments(name, facility_id, facilities:facility_id(name, workspace_id)),
           vacation_splits(*),
           vacation_approvals(
             *,
@@ -51,6 +81,8 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
 
       if (staffView) {
         query = query.eq('staff_id', user?.id);
+      } else if (allowedDepartmentIds.length > 0) {
+        query = query.in('department_id', allowedDepartmentIds);
       } else if (departmentId) {
         query = query.eq('department_id', departmentId);
       }
@@ -79,9 +111,20 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
     mutationFn: async (planId: string) => {
       const { error } = await supabase
         .from('vacation_plans')
-        .update({ status: 'department_pending', submitted_at: new Date().toISOString() })
+        .update({ status: 'pending_approval', submitted_at: new Date().toISOString() })
         .eq('id', planId);
       if (error) throw error;
+
+      // Send parallel notifications to all supervisors
+      const { data: planData } = await supabase
+        .from('vacation_plans')
+        .select('staff_id')
+        .eq('id', planId)
+        .single();
+
+      if (planData) {
+        await sendVacationStatusNotification(planId, 'pending_approval', planData.staff_id);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vacation-plans-list'] });
@@ -113,6 +156,7 @@ const VacationPlansList = ({ departmentId, staffView = false }: VacationPlansLis
   const getStatusBadge = (status: string) => {
     const configs = {
       draft: { label: 'Draft', className: 'bg-warning text-warning-foreground' },
+      pending_approval: { label: 'Pending Approval', className: 'bg-blue-500 text-white' },
       department_pending: { label: 'Pending Dept Head', className: 'bg-primary text-primary-foreground' },
       facility_pending: { label: 'Pending Facility', className: 'bg-accent text-accent-foreground' },
       workspace_pending: { label: 'Pending Final', className: 'bg-secondary text-secondary-foreground' },

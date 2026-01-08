@@ -90,7 +90,7 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
         .from('vacation_plans')
         .select('id, status')
         .eq('staff_id', selectedStaffId)
-        .in('status', ['approved', 'department_pending', 'facility_pending', 'workspace_pending']);
+        .in('status', ['approved', 'pending_approval', 'department_pending', 'facility_pending', 'workspace_pending']);
 
       if (plansError) throw plansError;
       if (!plans || plans.length === 0) return [];

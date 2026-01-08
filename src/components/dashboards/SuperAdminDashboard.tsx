@@ -154,7 +154,7 @@ const SuperAdminDashboard = () => {
     queryKey: ['vacation-stats'],
     queryFn: async () => {
       const [pending, approved, rejected] = await Promise.all([
-        supabase.from('vacation_plans').select('*', { count: 'exact', head: true }).in('status', ['department_pending', 'facility_pending', 'workspace_pending']),
+        supabase.from('vacation_plans').select('*', { count: 'exact', head: true }).in('status', ['pending_approval', 'department_pending', 'facility_pending', 'workspace_pending']),
         supabase.from('vacation_plans').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
         supabase.from('vacation_plans').select('*', { count: 'exact', head: true }).eq('status', 'rejected'),
       ]);

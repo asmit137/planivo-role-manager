@@ -21,6 +21,7 @@ import { NotificationHub } from '@/modules/notifications';
 import { MessagingHub } from '@/modules/messaging';
 import { FacilitySchedulingHub } from '@/components/scheduling/FacilitySchedulingHub';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import OrganizationFacilitiesView from '@/components/organization/OrganizationFacilitiesView';
 
 const FacilitySupervisorDashboard = () => {
   const { user } = useAuth();
@@ -68,7 +69,7 @@ const FacilitySupervisorDashboard = () => {
         supabase
           .from('vacation_plans')
           .select('id', { count: 'exact', head: true })
-          .eq('status', 'facility_pending'),
+          .in('status', ['pending_approval', 'facility_pending']),
         supabase
           .from('vacation_approvals')
           .select('id', { count: 'exact', head: true })
@@ -117,6 +118,12 @@ const FacilitySupervisorDashboard = () => {
           <PageHeader
             title="Facility Overview"
             description="Manage tasks and vacation planning for the facility"
+          />
+        )}
+        {activeTab === 'organization' && (
+          <PageHeader
+            title="Facility Organization"
+            description="View organization details for this facility"
           />
         )}
         {activeTab === 'tasks' && (
@@ -218,6 +225,15 @@ const FacilitySupervisorDashboard = () => {
                 <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Staff currently off</p>
               </div>
             </div>
+          )}
+
+          {activeTab === 'organization' && hasAccess('organization') && (
+            <ModuleGuard moduleKey="organization">
+              <OrganizationFacilitiesView
+                organizationId={userRole.organization_id}
+                facilityId={userRole.facility_id}
+              />
+            </ModuleGuard>
           )}
 
           {activeTab === 'tasks' && hasAccess('task_management') && (

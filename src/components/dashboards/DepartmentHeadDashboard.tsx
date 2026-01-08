@@ -34,19 +34,19 @@ const DepartmentHeadDashboard = () => {
     queryKey: ['department-head-role', user?.id],
     queryFn: async () => {
       if (!user?.id) throw new Error('User not found');
-      
+
       const { data, error } = await supabase
         .from('user_roles')
         .select('*')
         .eq('user_id', user.id)
         .eq('role', 'department_head')
         .maybeSingle();
-      
+
       if (error) {
         console.error('Department head role query error:', error);
         throw error;
       }
-      
+
       return data;
     },
     enabled: !!user,
@@ -70,7 +70,7 @@ const DepartmentHeadDashboard = () => {
           .from('vacation_plans')
           .select('*', { count: 'exact', head: true })
           .eq('department_id', userRole.department_id)
-          .eq('status', 'department_pending'),
+          .in('status', ['pending_approval', 'department_pending']),
         supabase
           .from('tasks')
           .select('*', { count: 'exact', head: true })
@@ -107,16 +107,16 @@ const DepartmentHeadDashboard = () => {
 
   if (roleError) {
     return (
-      <ErrorState 
+      <ErrorState
         title="Error Loading Department"
-        message="Error loading department information. Please try refreshing the page." 
+        message="Error loading department information. Please try refreshing the page."
       />
     );
   }
 
   if (!userRole?.department_id) {
     return (
-      <EmptyState 
+      <EmptyState
         title="No Department Assigned"
         description="No department assigned to your account. Please contact an administrator."
       />
@@ -134,145 +134,145 @@ const DepartmentHeadDashboard = () => {
       }
     >
       <>
-      {activeTab === 'staff' && (
-        <PageHeader 
-          title="Staff Management" 
-          description="Manage your department's staff members"
-        />
-      )}
-      {activeTab === 'vacation' && (
-        <PageHeader 
-          title="Vacation Planning" 
-          description="Plan and manage staff vacation schedules"
-        />
-      )}
-      {activeTab === 'tasks' && (
-        <PageHeader 
-          title="Department Tasks" 
-          description="Assign and track department tasks"
-        />
-      )}
-      {activeTab === 'messaging' && (
-        <PageHeader 
-          title="Messaging" 
-          description="Chat with staff in your department"
-        />
-      )}
-      {activeTab === 'notifications' && (
-        <PageHeader 
-          title="Notifications" 
-          description="View important updates for your department"
-        />
-      )}
-      {activeTab === 'scheduling' && (
-        <PageHeader 
-          title="Scheduling" 
-          description="Manage staff schedules and shifts"
-        />
-      )}
-      {!['staff','vacation','tasks','messaging','notifications','scheduling'].includes(activeTab || '') && (
-        <PageHeader 
-          title="Department Overview" 
-          description="Manage your department"
-        />
-      )}
-      
-      <div className="space-y-4">
-        {!['staff','vacation','tasks','messaging','notifications','scheduling'].includes(activeTab || '') && (
-          <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-            <div className="rounded-lg border bg-card p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Total Staff</p>
-                <UserPlus className="h-4 w-4 text-muted-foreground shrink-0" />
+        {activeTab === 'staff' && (
+          <PageHeader
+            title="Staff Management"
+            description="Manage your department's staff members"
+          />
+        )}
+        {activeTab === 'vacation' && (
+          <PageHeader
+            title="Vacation Planning"
+            description="Plan and manage staff vacation schedules"
+          />
+        )}
+        {activeTab === 'tasks' && (
+          <PageHeader
+            title="Department Tasks"
+            description="Assign and track department tasks"
+          />
+        )}
+        {activeTab === 'messaging' && (
+          <PageHeader
+            title="Messaging"
+            description="Chat with staff in your department"
+          />
+        )}
+        {activeTab === 'notifications' && (
+          <PageHeader
+            title="Notifications"
+            description="View important updates for your department"
+          />
+        )}
+        {activeTab === 'scheduling' && (
+          <PageHeader
+            title="Scheduling"
+            description="Manage staff schedules and shifts"
+          />
+        )}
+        {!['staff', 'vacation', 'tasks', 'messaging', 'notifications', 'scheduling'].includes(activeTab || '') && (
+          <PageHeader
+            title="Department Overview"
+            description="Manage your department"
+          />
+        )}
+
+        <div className="space-y-4">
+          {!['staff', 'vacation', 'tasks', 'messaging', 'notifications', 'scheduling'].includes(activeTab || '') && (
+            <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+              <div className="rounded-lg border bg-card p-4 sm:p-6">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Total Staff</p>
+                  <UserPlus className="h-4 w-4 text-muted-foreground shrink-0" />
+                </div>
+                <p className="text-2xl sm:text-3xl font-bold mt-2">{departmentStats?.staffCount || 0}</p>
+                <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">In your department</p>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold mt-2">{departmentStats?.staffCount || 0}</p>
-              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">In your department</p>
-            </div>
-            <div className="rounded-lg border bg-card p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Pending</p>
-                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="rounded-lg border bg-card p-4 sm:p-6">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Pending</p>
+                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                </div>
+                <p className="text-2xl sm:text-3xl font-bold mt-2">{departmentStats?.pendingVacations || 0}</p>
+                <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Vacation requests</p>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold mt-2">{departmentStats?.pendingVacations || 0}</p>
-              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Vacation requests</p>
-            </div>
-            <div className="rounded-lg border bg-card p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Tasks</p>
-                <ClipboardList className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="rounded-lg border bg-card p-4 sm:p-6">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Tasks</p>
+                  <ClipboardList className="h-4 w-4 text-muted-foreground shrink-0" />
+                </div>
+                <p className="text-2xl sm:text-3xl font-bold mt-2">{departmentStats?.activeTasks || 0}</p>
+                <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Active tasks</p>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold mt-2">{departmentStats?.activeTasks || 0}</p>
-              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Active tasks</p>
-            </div>
-            <div className="rounded-lg border bg-card p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">On Vacation</p>
-                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="rounded-lg border bg-card p-4 sm:p-6">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">On Vacation</p>
+                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                </div>
+                <p className="text-2xl sm:text-3xl font-bold mt-2">{departmentStats?.staffOnVacation || 0}</p>
+                <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Today</p>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold mt-2">{departmentStats?.staffOnVacation || 0}</p>
-              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Today</p>
-            </div>
-            <div className="rounded-lg border bg-card p-4 sm:p-6 col-span-2 md:col-span-1">
-              <div className="flex items-center justify-between">
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Training</p>
-                <GraduationCap className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="rounded-lg border bg-card p-4 sm:p-6 col-span-2 md:col-span-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Training</p>
+                  <GraduationCap className="h-4 w-4 text-muted-foreground shrink-0" />
+                </div>
+                <p className="text-2xl sm:text-3xl font-bold mt-2">{departmentStats?.upcomingTraining || 0}</p>
+                <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Upcoming</p>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold mt-2">{departmentStats?.upcomingTraining || 0}</p>
-              <p className="text-xs text-muted-foreground mt-1 sm:mt-2 hidden sm:block">Upcoming</p>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === 'staff' && hasAccess('staff_management') && (
-          <ModuleGuard moduleKey="staff_management">
-            <StaffManagementHub />
-          </ModuleGuard>
-        )}
+          {activeTab === 'staff' && hasAccess('staff_management') && (
+            <ModuleGuard moduleKey="staff_management">
+              <StaffManagementHub />
+            </ModuleGuard>
+          )}
 
-        {activeTab === 'vacation' && hasAccess('vacation_planning') && (
-          <ModuleGuard moduleKey="vacation_planning">
-            <VacationHub departmentId={userRole.department_id} />
-          </ModuleGuard>
-        )}
+          {activeTab === 'vacation' && hasAccess('vacation_planning') && (
+            <ModuleGuard moduleKey="vacation_planning">
+              <VacationHub departmentId={userRole.department_id} />
+            </ModuleGuard>
+          )}
 
-        {activeTab === 'tasks' && hasAccess('task_management') && (
-          <ModuleGuard moduleKey="task_management">
-            <TaskHub />
-          </ModuleGuard>
-        )}
+          {activeTab === 'tasks' && hasAccess('task_management') && (
+            <ModuleGuard moduleKey="task_management">
+              <TaskHub />
+            </ModuleGuard>
+          )}
 
-        {activeTab === 'messaging' && hasAccess('messaging') && (
-          <ModuleGuard moduleKey="messaging">
-            <MessagingHub />
-          </ModuleGuard>
-        )}
+          {activeTab === 'messaging' && hasAccess('messaging') && (
+            <ModuleGuard moduleKey="messaging">
+              <MessagingHub />
+            </ModuleGuard>
+          )}
 
-        {activeTab === 'notifications' && hasAccess('notifications') && (
-          <ModuleGuard moduleKey="notifications">
-            <NotificationHub />
-          </ModuleGuard>
-        )}
+          {activeTab === 'notifications' && hasAccess('notifications') && (
+            <ModuleGuard moduleKey="notifications">
+              <NotificationHub />
+            </ModuleGuard>
+          )}
 
-        {activeTab === 'scheduling' && hasAccess('scheduling') && (
-          <ModuleGuard moduleKey="scheduling">
-            <SchedulingHub departmentId={userRole.department_id} />
-          </ModuleGuard>
-        )}
+          {activeTab === 'scheduling' && hasAccess('scheduling') && (
+            <ModuleGuard moduleKey="scheduling">
+              <SchedulingHub departmentId={userRole.department_id} />
+            </ModuleGuard>
+          )}
 
-        {activeTab === 'training' && hasAccess('training') && (
-          <ModuleGuard moduleKey="training">
-            <TrainingHub />
-          </ModuleGuard>
-        )}
+          {activeTab === 'training' && hasAccess('training') && (
+            <ModuleGuard moduleKey="training">
+              <TrainingHub />
+            </ModuleGuard>
+          )}
 
-        {/* Show message if no valid tab content */}
-        {!hasAccess('staff_management') && !hasAccess('vacation_planning') && !hasAccess('task_management') && !hasAccess('messaging') && !hasAccess('notifications') && !hasAccess('scheduling') && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">No modules available. Contact your administrator.</p>
-          </div>
-        )}
-      </div>
-    </>
+          {/* Show message if no valid tab content */}
+          {!hasAccess('staff_management') && !hasAccess('vacation_planning') && !hasAccess('task_management') && !hasAccess('messaging') && !hasAccess('notifications') && !hasAccess('scheduling') && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No modules available. Contact your administrator.</p>
+            </div>
+          )}
+        </div>
+      </>
     </ErrorBoundary>
   );
 };
