@@ -61,31 +61,29 @@ const FacilitySupervisorDashboard = () => {
       const today = new Date().toISOString().split('T')[0];
 
       const [activeTasks, pendingApprovals, conflicts, activeSchedules, staffOnVacation] = await Promise.all([
-        supabase
-          .from('tasks')
+        (supabase.from('tasks') as any)
           .select('id', { count: 'exact', head: true })
           .eq('facility_id', userRole.facility_id)
           .eq('status', 'active'),
-        supabase
-          .from('vacation_plans')
+        (supabase.from('vacation_plans') as any)
           .select('id', { count: 'exact', head: true })
+          .eq('facility_id', userRole.facility_id)
           .in('status', ['pending_approval', 'facility_pending']),
-        supabase
-          .from('vacation_approvals')
-          .select('id', { count: 'exact', head: true })
+        (supabase.from('vacation_approvals') as any)
+          .select('id, vacation_plans!inner(facility_id)', { count: 'exact', head: true })
           .eq('has_conflict', true)
-          .eq('status', 'approved'),
-        supabase
-          .from('schedules')
+          .eq('status', 'approved')
+          .eq('vacation_plans.facility_id', userRole.facility_id),
+        (supabase.from('schedules') as any)
           .select('id', { count: 'exact', head: true })
           .eq('facility_id', userRole.facility_id)
           .eq('status', 'published'),
-        supabase
-          .from('vacation_splits')
-          .select('id, vacation_plans!inner(status)', { count: 'exact', head: true })
+        (supabase.from('vacation_splits') as any)
+          .select('id, vacation_plans!inner(status, facility_id)', { count: 'exact', head: true })
           .lte('start_date', today)
           .gte('end_date', today)
-          .eq('vacation_plans.status', 'approved'),
+          .eq('vacation_plans.status', 'approved')
+          .eq('vacation_plans.facility_id', userRole.facility_id),
       ]);
 
       return {
@@ -230,7 +228,7 @@ const FacilitySupervisorDashboard = () => {
           {activeTab === 'organization' && hasAccess('organization') && (
             <ModuleGuard moduleKey="organization">
               <OrganizationFacilitiesView
-                organizationId={userRole.organization_id}
+                organizationId={(userRole as any).organization_id}
                 facilityId={userRole.facility_id}
               />
             </ModuleGuard>

@@ -9,6 +9,7 @@ export interface UserRole {
   user_id: string;
   role: AppRole;
   workspace_id: string | null;
+  organization_id?: string | null;
   facility_id: string | null;
   department_id: string | null;
   custom_role_id: string | null;
@@ -36,7 +37,7 @@ export const useUserRole = () => {
 
       if (error) throw error;
 
-      return data as UserRole[];
+      return data as unknown as UserRole[];
     },
     enabled: !!user,
   });

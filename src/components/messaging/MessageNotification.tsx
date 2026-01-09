@@ -157,9 +157,9 @@ const MessageNotification = () => {
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="relative hover:bg-white/10 transition-colors rounded-full"
+                    className="relative hover:bg-muted transition-colors rounded-full"
                 >
-                    <MessageSquare className="h-5 w-5 text-white/80" />
+                    <MessageSquare className="h-5 w-5 text-muted-foreground" />
                     {totalUnread > 0 && (
                         <Badge
                             variant="destructive"
@@ -170,9 +170,9 @@ const MessageNotification = () => {
                     )}
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80 p-0 border-white/10 bg-black/80 backdrop-blur-xl">
-                <div className="flex items-center justify-between p-4 border-b border-white/5">
-                    <h3 className="font-semibold text-white/90">Messages</h3>
+            <DropdownMenuContent align="end" className="w-80 p-0 border-border bg-popover/95 backdrop-blur-xl">
+                <div className="flex items-center justify-between p-4 border-b border-border">
+                    <h3 className="font-semibold text-foreground">Messages</h3>
                     <Button
                         variant="ghost"
                         size="sm"
@@ -193,19 +193,19 @@ const MessageNotification = () => {
                             <p className="text-sm">No recent messages</p>
                         </div>
                     ) : (
-                        <div className="divide-y divide-white/5">
+                        <div className="divide-y divide-border">
                             {conversations.map((convo) => {
                                 const title = getConversationTitle(convo);
                                 return (
                                     <div
                                         key={convo.id}
                                         className={cn(
-                                            "p-4 hover:bg-white/5 transition-colors cursor-pointer flex gap-3 items-start",
+                                            "p-4 hover:bg-muted/50 transition-colors cursor-pointer flex gap-3 items-start",
                                             convo.unread_count ? "bg-primary/5" : ""
                                         )}
                                         onClick={() => handleConversationClick(convo.id)}
                                     >
-                                        <Avatar className="h-10 w-10 border border-white/10">
+                                        <Avatar className="h-10 w-10 border border-border">
                                             <AvatarFallback className="bg-primary/20 text-primary text-xs font-bold">
                                                 {convo.is_group ? <Users className="h-4 w-4" /> : title[0]}
                                             </AvatarFallback>
@@ -214,18 +214,18 @@ const MessageNotification = () => {
                                             <div className="flex items-center justify-between gap-2">
                                                 <h4 className={cn(
                                                     "text-sm font-medium truncate",
-                                                    convo.unread_count ? "text-white font-semibold" : "text-white/70"
+                                                    convo.unread_count ? "text-foreground font-semibold" : "text-muted-foreground"
                                                 )}>
                                                     {title}
                                                 </h4>
                                                 {convo.last_message && (
-                                                    <span className="text-[10px] text-white/30 whitespace-nowrap">
+                                                    <span className="text-[10px] text-muted-foreground/50 whitespace-nowrap">
                                                         {formatDistanceToNow(new Date(convo.last_message.created_at), { addSuffix: false })}
                                                     </span>
                                                 )}
                                             </div>
                                             {convo.last_message && (
-                                                <p className="text-xs text-white/40 truncate mt-0.5">
+                                                <p className="text-xs text-muted-foreground/70 truncate mt-0.5">
                                                     {convo.last_message.sender_id === user?.id ? 'You: ' : ''}
                                                     {convo.last_message.content}
                                                 </p>

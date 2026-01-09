@@ -177,9 +177,6 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
       const { data, error } = await supabase
         .from('departments')
         .select('*')
-        // Removing .is('is_template', false) as some valid departments might have null or be mislabeled
-        // logic should align with UnifiedUserCreation which only checks parent_department_id
-        .is('parent_department_id', null)
         .order('name');
       if (error) throw error;
       return data;
@@ -192,6 +189,18 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
       const { data, error } = await supabase
         .from('workspace_departments')
         .select('workspace_id, department_template_id');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: categories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('is_active', true);
       if (error) throw error;
       return data;
     },
@@ -491,6 +500,8 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
   const getFilteredDepartments = () => {
     if (!newWorkspaceId || !departments) return [];
 
+    const facilityName = facilities?.find(f => f.id === newFacilityId)?.name;
+
     // Get facility specific departments
     const facilityDepts = newFacilityId
       ? departments.filter(d => d.facility_id === newFacilityId)
@@ -501,19 +512,46 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
       ?.filter(wd => wd.workspace_id === newWorkspaceId)
       .map(wd => wd.department_template_id) || [];
 
-    const templateDepts = departments.filter(d => templateIds.includes(d.id));
+    let depts = departments.filter(d => templateIds.includes(d.id));
 
-    // Combine and deduplicate
-    const combined = [...facilityDepts, ...templateDepts];
-    return Array.from(new Map(combined.map(item => [item.id, item])).values());
+    // If we have facility-specific departments, ONLY show those.
+    // Otherwise fall back to workspace templates with category matching.
+    let finalDepts = facilityDepts.length > 0 ? facilityDepts : depts;
+
+    if (facilityDepts.length === 0 && facilityName && categories) {
+      const matchingCategory = categories.find(cat =>
+        facilityName.toLowerCase().includes(cat.name.toLowerCase()) ||
+        cat.name.toLowerCase().includes(facilityName.toLowerCase().replace(' facility', '').trim())
+      );
+
+      if (matchingCategory) {
+        finalDepts = finalDepts.filter(d =>
+          d.category?.toLowerCase() === matchingCategory.name.toLowerCase()
+        );
+      }
+    }
+
+    // Build hierarchy/labels if needed
+    const processed = finalDepts.map(d => {
+      if (d.parent_department_id) {
+        const parent = finalDepts.find(p => p.id === d.parent_department_id) ||
+          departments.find(p => p.id === d.parent_department_id);
+        if (parent) {
+          return { ...d, name: `${parent.name} └─ ${d.name}` };
+        }
+      }
+      return d;
+    });
+
+    return Array.from(new Map(processed.map(item => [item.id, item])).values());
   };
 
   const getEditFilteredDepartments = (facilityId: string) => {
     if (!facilityId || !departments) return [];
 
-    // Need workspace ID for the facility to check templates
     const facility = facilities?.find(f => f.id === facilityId);
     const workspaceId = facility?.workspace_id;
+    const facilityName = facility?.name;
 
     // Get facility specific departments
     const facilityDepts = departments.filter(d => d.facility_id === facilityId);
@@ -525,11 +563,38 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
         .map(wd => wd.department_template_id)
       : [];
 
-    const templateDepts = departments.filter(d => templateIds.includes(d.id));
+    let depts = departments.filter(d => templateIds.includes(d.id));
 
-    // Combine and deduplicate
-    const combined = [...facilityDepts, ...templateDepts];
-    return Array.from(new Map(combined.map(item => [item.id, item])).values());
+    // If we have facility-specific departments, ONLY show those.
+    // Otherwise fall back to workspace templates with category matching.
+    let finalDepts = facilityDepts.length > 0 ? facilityDepts : depts;
+
+    if (facilityDepts.length === 0 && facilityName && categories) {
+      const matchingCategory = categories.find(cat =>
+        facilityName.toLowerCase().includes(cat.name.toLowerCase()) ||
+        cat.name.toLowerCase().includes(facilityName.toLowerCase().replace(' facility', '').trim())
+      );
+
+      if (matchingCategory) {
+        finalDepts = finalDepts.filter(d =>
+          d.category?.toLowerCase() === matchingCategory.name.toLowerCase()
+        );
+      }
+    }
+
+    // Build hierarchy/labels if needed
+    const processed = finalDepts.map(d => {
+      if (d.parent_department_id) {
+        const parent = finalDepts.find(p => p.id === d.parent_department_id) ||
+          departments.find(p => p.id === d.parent_department_id);
+        if (parent) {
+          return { ...d, name: `${parent.name} └─ ${d.name}` };
+        }
+      }
+      return d;
+    });
+
+    return Array.from(new Map(processed.map(item => [item.id, item])).values());
   };
 
   // Group module access by module

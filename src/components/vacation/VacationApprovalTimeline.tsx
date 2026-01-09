@@ -153,14 +153,19 @@ const VacationApprovalTimeline = ({
                     'bg-destructive border-destructive text-destructive-foreground',
                     stage.status === 'pending' &&
                     'bg-warning border-warning text-warning-foreground animate-pulse',
-                    stage.status === 'waiting' &&
+                    stage.status === 'waiting' && (currentStatus === 'approved' || currentStatus === 'rejected') &&
+                    'bg-success/20 border-success/40 text-success',
+                    stage.status === 'waiting' && currentStatus === 'pending_approval' &&
                     'bg-muted border-border text-muted-foreground'
                   )}
                 >
                   {stage.status === 'approved' && <CheckCircle2 className="h-4 w-4 sm:h-6 sm:w-6" />}
                   {stage.status === 'rejected' && <XCircle className="h-4 w-4 sm:h-6 sm:w-6" />}
                   {stage.status === 'pending' && <Clock className="h-4 w-4 sm:h-6 sm:w-6" />}
-                  {stage.status === 'waiting' && <Hourglass className="h-4 w-4 sm:h-6 sm:w-6" />}
+                  {stage.status === 'waiting' && (currentStatus === 'approved' || currentStatus === 'rejected') &&
+                    <CheckCircle2 className="h-4 w-4 sm:h-6 sm:w-6 opacity-50" />}
+                  {stage.status === 'waiting' && currentStatus === 'pending_approval' &&
+                    <Hourglass className="h-4 w-4 sm:h-6 sm:w-6" />}
                 </div>
 
                 {/* Connecting Line */}
@@ -168,7 +173,7 @@ const VacationApprovalTimeline = ({
                   <div
                     className={cn(
                       'h-0.5 w-8 sm:w-24 md:w-32 mx-1 sm:mx-4 transition-all',
-                      stage.status === 'approved' ? 'bg-success' : 'bg-border'
+                      (stage.status === 'approved' || currentStatus === 'approved') ? 'bg-success' : 'bg-border'
                     )}
                   />
                 )}
@@ -211,7 +216,7 @@ const VacationApprovalTimeline = ({
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-semibold text-sm">{stage.level}. {stage.role}</span>
-                    {getStatusBadge(stage.status)}
+                    {getStatusBadge(stage.status, currentStatus)}
                     {stageHasConflict && stageApproval?.conflicting_plans && (
                       <TooltipProvider>
                         <Tooltip>
@@ -238,8 +243,11 @@ const VacationApprovalTimeline = ({
                   <p className="text-sm text-muted-foreground">
                     {stage.status === 'approved' ? '✅ Approved by: ' :
                       stage.status === 'rejected' ? '❌ Rejected by: ' :
-                        '⏳ Pending with: '}
-                    <span className="font-medium text-foreground">{stage.role}</span>
+                        stage.status === 'waiting' && (currentStatus === 'approved' || currentStatus === 'rejected') ? '🏁 Resolved by parallel action' :
+                          '⏳ Pending with: '}
+                    {(stage.status !== 'waiting' || (currentStatus !== 'approved' && currentStatus !== 'rejected')) && (
+                      <span className="font-medium text-foreground">{stage.role}</span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -262,7 +270,7 @@ const VacationApprovalTimeline = ({
                 </div>
               )}
 
-              {stage.status === 'waiting' && (
+              {stage.status === 'waiting' && currentStatus === 'pending_approval' && (
                 <p className="text-xs text-muted-foreground">
                   ⏸️ Waiting for previous approval
                 </p>
@@ -361,12 +369,15 @@ function getApprovalDetails(level: number, approvals: any[], designatedApprover?
 }
 
 // Helper function to render status badges
-function getStatusBadge(status: string) {
+function getStatusBadge(status: string, currentStatus: string) {
   const configs = {
     approved: { label: 'Approved', className: 'bg-success text-success-foreground' },
     rejected: { label: 'Rejected', className: 'bg-destructive text-destructive-foreground' },
     pending: { label: 'Pending', className: 'bg-warning text-warning-foreground' },
-    waiting: { label: 'Waiting', className: 'bg-muted text-muted-foreground' },
+    waiting: {
+      label: currentStatus === 'approved' || currentStatus === 'rejected' ? 'Completed' : 'Waiting',
+      className: 'bg-muted text-muted-foreground'
+    },
   };
   const config = configs[status as keyof typeof configs] || configs.waiting;
   return (

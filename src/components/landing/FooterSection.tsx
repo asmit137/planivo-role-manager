@@ -46,7 +46,7 @@ export function FooterSection() {
                 <a href="/#pricing" className="text-muted-foreground hover:text-primary transition-colors">Pricing</a>
               </li>
               <li>
-                <a href="mailto:support@planivo.com" className="text-muted-foreground hover:text-primary transition-colors">Contact Support</a>
+                <a href="/contact-us" className="text-muted-foreground hover:text-primary transition-colors">Contact Support</a>
               </li>
               <li>
                 <Link to="/auth" className="text-muted-foreground hover:text-primary transition-colors">Login / Sign Up</Link>

@@ -83,36 +83,11 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
       if (isSuperAdmin) {
         // Super admin sees all, no additional filters
       } else if (isWorkplaceSupervisor && effectiveWorkspaceId) {
-        // Workplace supervisor sees all departments in the workspace - get facility IDs first
-        const { data: facilities } = await supabase
-          .from('facilities')
-          .select('id')
-          .eq('workspace_id', effectiveWorkspaceId);
-
-        const facilityIds = facilities?.map(f => f.id) || [];
-
-        const { data: depts } = await supabase
-          .from('departments')
-          .select('id')
-          .in('facility_id', facilityIds);
-
-        if (depts && depts.length > 0) {
-          query = query.in('department_id', depts.map(d => d.id));
-        } else {
-          query = query.eq('staff_id', user?.id);
-        }
+        // Workplace supervisor sees all in the workspace
+        query = query.eq('workspace_id', effectiveWorkspaceId);
       } else if (isFacilitySupervisor && effectiveFacilityId) {
-        // Facility supervisor sees all departments in their facility
-        const { data: depts } = await supabase
-          .from('departments')
-          .select('id')
-          .eq('facility_id', effectiveFacilityId);
-
-        if (depts && depts.length > 0) {
-          query = query.in('department_id', depts.map(d => d.id));
-        } else {
-          query = query.eq('staff_id', user?.id);
-        }
+        // Facility supervisor sees all in their facility
+        query = query.eq('facility_id', effectiveFacilityId);
       } else if (isDepartmentHead && effectiveDeptId) {
         // Department head sees their department
         query = query.eq('department_id', effectiveDeptId);

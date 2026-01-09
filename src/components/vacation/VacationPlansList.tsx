@@ -39,33 +39,6 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
   const { data: plans, isLoading } = useQuery({
     queryKey: ['vacation-plans-list', departmentId, scopeType, scopeId, staffView, user?.id],
     queryFn: async () => {
-      // Get department IDs based on scope if not filtering by staff
-      let allowedDepartmentIds: string[] = [];
-
-      if (!staffView) {
-        if (scopeType === 'facility' && scopeId) {
-          const { data: depts } = await supabase
-            .from('departments')
-            .select('id')
-            .eq('facility_id', scopeId);
-          allowedDepartmentIds = depts?.map(d => d.id) || [];
-        } else if (scopeType === 'workspace' && scopeId) {
-          const { data: facilities } = await supabase
-            .from('facilities')
-            .select('id')
-            .eq('workspace_id', scopeId);
-          const facilityIds = facilities?.map(f => f.id) || [];
-
-          const { data: depts } = await supabase
-            .from('departments')
-            .select('id')
-            .in('facility_id', facilityIds);
-          allowedDepartmentIds = depts?.map(d => d.id) || [];
-        } else if (scopeType === 'department' && (departmentId || scopeId)) {
-          allowedDepartmentIds = [departmentId || scopeId!];
-        }
-      }
-
       let query = supabase
         .from('vacation_plans')
         .select(`
@@ -81,11 +54,14 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
 
       if (staffView) {
         query = query.eq('staff_id', user?.id);
-      } else if (allowedDepartmentIds.length > 0) {
-        query = query.in('department_id', allowedDepartmentIds);
-      } else if (departmentId) {
-        query = query.eq('department_id', departmentId);
+      } else if (scopeType === 'facility' && scopeId) {
+        query = query.eq('facility_id', scopeId);
+      } else if (scopeType === 'workspace' && scopeId) {
+        query = query.eq('workspace_id', scopeId);
+      } else if (scopeType === 'department' && (departmentId || scopeId)) {
+        query = query.eq('department_id', departmentId || scopeId!);
       }
+
 
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;

@@ -15,6 +15,7 @@ import Dashboard from "./pages/Dashboard";
 import MeetingRoom from "./pages/MeetingRoom";
 import ResetPassword from "./pages/ResetPassword";
 import ScheduleDisplay from "./pages/ScheduleDisplay";
+import ContactUs from "./pages/ContactUs";
 import NotFound from "./pages/NotFound";
 
 import TermsOfService from "./pages/policies/TermsOfService";
@@ -58,6 +59,7 @@ const App = () => (
                   <Route path="/policies/terms" element={<TermsOfService />} />
                   <Route path="/policies/privacy" element={<PrivacyPolicy />} />
                   <Route path="/policies/cookies" element={<CookiePolicy />} />
+                  <Route path="/contact-us" element={<ContactUs />} />
 
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />

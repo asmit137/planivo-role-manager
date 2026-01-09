@@ -4,7 +4,7 @@ project_id = "pgllmekcarufmcznoive"
 verify_jwt = false
 
 [functions.create-user]
-verify_jwt = true
+verify_jwt = false
 
 [functions.scheduling-reminder]
 verify_jwt = false

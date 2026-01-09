@@ -56,31 +56,35 @@ const WorkplaceSupervisorDashboard = () => {
     queryFn: async () => {
       if (!userRole?.workspace_id) return null;
 
+      // First get facility IDs for this workspace to filter plans
+      const { data: workspaceFacilities } = await supabase
+        .from('facilities')
+        .select('id')
+        .eq('workspace_id', userRole.workspace_id);
+      const facIds = workspaceFacilities?.map(f => f.id) || [];
       const today = new Date().toISOString().split('T')[0];
 
       const [tasksCount, approvalsCount, conflictsCount, staffOnVacation, publishedSchedules] = await Promise.all([
-        supabase
-          .from('tasks')
+        (supabase.from('tasks') as any)
           .select('*', { count: 'exact', head: true })
           .eq('workspace_id', userRole.workspace_id)
           .eq('status', 'active'),
-        supabase
-          .from('vacation_plans')
-          .select('*', { count: 'exact', head: true })
+        (supabase.from('vacation_plans') as any)
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', userRole.workspace_id)
           .in('status', ['pending_approval', 'workspace_pending']),
-        supabase
-          .from('vacation_approvals')
-          .select('*', { count: 'exact', head: true })
+        (supabase.from('vacation_approvals') as any)
+          .select('id, vacation_plans!inner(workspace_id)', { count: 'exact', head: true })
           .eq('has_conflict', true)
-          .in('status', ['pending', 'approved']),
-        supabase
-          .from('vacation_splits')
-          .select('id, vacation_plans!inner(status)', { count: 'exact', head: true })
+          .in('status', ['pending', 'approved'])
+          .eq('vacation_plans.workspace_id', userRole.workspace_id),
+        (supabase.from('vacation_splits') as any)
+          .select('id, vacation_plans!inner(status, workspace_id)', { count: 'exact', head: true })
           .lte('start_date', today)
           .gte('end_date', today)
-          .eq('vacation_plans.status', 'approved'),
-        supabase
-          .from('schedules')
+          .eq('vacation_plans.status', 'approved')
+          .eq('vacation_plans.workspace_id', userRole.workspace_id),
+        (supabase.from('schedules') as any)
           .select('id', { count: 'exact', head: true })
           .eq('workspace_id', userRole.workspace_id)
           .eq('status', 'published'),
@@ -228,7 +232,7 @@ const WorkplaceSupervisorDashboard = () => {
           {activeTab === 'organization' && hasAccess('organization') && (
             <ModuleGuard moduleKey="organization">
               <WorkspaceManagement
-                organizationId={userRole.organization_id}
+                organizationId={(userRole as any).organization_id}
                 workspaceId={userRole.workspace_id}
               />
             </ModuleGuard>

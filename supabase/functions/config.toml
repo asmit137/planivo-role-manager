@@ -1,0 +1,2 @@
+[create-user]
+verify_jwt = false

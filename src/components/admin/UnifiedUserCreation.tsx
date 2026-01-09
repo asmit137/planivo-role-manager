@@ -20,6 +20,7 @@ const userSchema = z.object({
   department_id: z.string().uuid('Invalid department').optional().nullable(),
   specialty_id: z.string().uuid().optional().nullable(),
   organization_id: z.string().uuid().optional().nullable(),
+  workspace_id: z.string().uuid().optional().nullable(),
   role: z.enum(['staff', 'department_head', 'facility_supervisor', 'workplace_supervisor', 'general_admin', 'organization_admin', 'custom']),
   custom_role_id: z.string().uuid().optional().nullable(),
 });
@@ -33,10 +34,11 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [organizationId, setOrganizationId] = useState('');
+  const [workspaceId, setWorkspaceId] = useState('');
   const [facilityId, setFacilityId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [specialtyId, setSpecialtyId] = useState('');
-  const [organizationId, setOrganizationId] = useState('');
   const [customRoleId, setCustomRoleId] = useState('');
   const [role, setRole] = useState<'staff' | 'department_head' | 'facility_supervisor' | 'workplace_supervisor' | 'general_admin' | 'organization_admin' | 'custom'>('staff');
   const queryClient = useQueryClient();
@@ -90,21 +92,23 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
 
   const availableRoles = getAvailableRoles();
 
-  // Check if department is required based on role
-  const isDepartmentRequired = role === 'staff' || role === 'department_head';
-  const isFacilityRequired = !['workplace_supervisor', 'general_admin', 'organization_admin'].includes(role);
-  const isOrganizationRequired = role === 'organization_admin';
-
   // Auto-scope facility and department based on creator's role
   useEffect(() => {
     if (currentUserRole) {
       if (highestRole === 'department_head') {
         // Department heads create within their facility and department
+        if (currentUserRole.organization_id) setOrganizationId(currentUserRole.organization_id);
+        if (currentUserRole.workspace_id) setWorkspaceId(currentUserRole.workspace_id);
         if (currentUserRole.facility_id) setFacilityId(currentUserRole.facility_id);
         if (currentUserRole.department_id) setDepartmentId(currentUserRole.department_id);
       } else if (highestRole === 'facility_supervisor') {
         // Facility supervisors create within their facility
+        if (currentUserRole.organization_id) setOrganizationId(currentUserRole.organization_id);
+        if (currentUserRole.workspace_id) setWorkspaceId(currentUserRole.workspace_id);
         if (currentUserRole.facility_id) setFacilityId(currentUserRole.facility_id);
+      } else if (highestRole === 'workplace_supervisor') {
+        if (currentUserRole.organization_id) setOrganizationId(currentUserRole.organization_id);
+        if (currentUserRole.workspace_id) setWorkspaceId(currentUserRole.workspace_id);
       }
     }
   }, [currentUserRole, highestRole]);
@@ -136,7 +140,6 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     checkSchema();
   }, []);
 
-  // Fetch organizations (for organization_admin role)
   const { data: organizations } = useQuery({
     queryKey: ['organizations'],
     queryFn: async () => {
@@ -147,7 +150,23 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       if (error) throw error;
       return data;
     },
-    enabled: role === 'organization_admin',
+    enabled: true,
+  });
+
+  // Fetch workspaces for selected organization
+  const { data: workspaces } = useQuery({
+    queryKey: ['workspaces', organizationId],
+    queryFn: async () => {
+      if (!organizationId) return [];
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select('id, name')
+        .eq('organization_id', organizationId)
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!organizationId,
   });
 
   // Fetch custom roles
@@ -164,62 +183,105 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     enabled: true,
   });
 
-  // Fetch facilities
+  // Fetch facilities for selected workspace
   const { data: facilities } = useQuery({
-    queryKey: ['facilities'],
+    queryKey: ['facilities', workspaceId],
     queryFn: async () => {
+      if (!workspaceId) return [];
       const { data, error } = await supabase
         .from('facilities')
         .select('id, name, workspace_id')
+        .eq('workspace_id', workspaceId)
         .order('name');
       if (error) throw error;
       return data;
     },
+    enabled: !!workspaceId,
   });
 
-  // Get workspace_id from selected facility for template lookup
-  const selectedFacility = facilities?.find(f => f.id === facilityId);
-  const selectedWorkspaceId = selectedFacility?.workspace_id;
+  // Fetch categories
+  const { data: categories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('is_active', true);
+      if (error) throw error;
+      return data;
+    },
+    enabled: true,
+  });
 
-  // Fetch departments - try workspace-assigned templates first, fall back to facility-specific
+  // Fetch departments - try facility-specific first, then workspace templates with category matching
   const { data: departments } = useQuery({
-    queryKey: ['departments-for-user-creation', facilityId, selectedWorkspaceId],
+    queryKey: ['departments-for-user-creation', facilityId, workspaceId, categories?.length],
     queryFn: async () => {
       if (!facilityId) return [];
 
-      // First, check for workspace-assigned template departments
-      if (selectedWorkspaceId) {
+      const facilityName = facilities?.find(f => f.id === facilityId)?.name;
+
+      // 1. First, check for any departments directly assigned to this specific facility
+      const { data: facilityDepts, error: fError } = await supabase
+        .from('departments')
+        .select('id, name, parent_department_id')
+        .eq('facility_id', facilityId)
+        .order('name');
+
+      if (!fError && facilityDepts && facilityDepts.length > 0) {
+        console.log(`Found ${facilityDepts.length} facility-specific departments`);
+        return facilityDepts;
+      }
+
+      // 2. Fallback: Check for workspace-assigned template departments
+      if (workspaceId) {
         const { data: workspaceDepts, error: wError } = await supabase
           .from('workspace_departments')
           .select(`
             department_template_id,
-            departments!inner(id, name, is_template)
+            departments!inner(id, name, is_template, category, parent_department_id)
           `)
-          .eq('workspace_id', selectedWorkspaceId);
+          .eq('workspace_id', workspaceId);
 
         if (!wError && workspaceDepts && workspaceDepts.length > 0) {
-          // Return template departments assigned to the workspace
-          return workspaceDepts
+          let depts = workspaceDepts
             .filter(wd => wd.departments)
-            .map(wd => ({
-              id: wd.departments.id,
-              name: wd.departments.name
-            }));
+            .map(wd => wd.departments);
+
+          // SMART FILTERING: If facility name matches a category, filter by that category
+          if (facilityName && categories) {
+            const matchingCategory = categories.find(cat =>
+              facilityName.toLowerCase().includes(cat.name.toLowerCase()) ||
+              cat.name.toLowerCase().includes(facilityName.toLowerCase().replace(' facility', '').trim())
+            );
+
+            if (matchingCategory) {
+              console.log(`Detected category match: ${matchingCategory.name}`);
+              depts = depts.filter(d =>
+                d.category?.toLowerCase() === matchingCategory.name.toLowerCase()
+              );
+            }
+          }
+
+          // Build hierarchy/labels if needed (e.g. "Software Engineering > Frontend")
+          const processed = depts.map(d => {
+            if (d.parent_department_id) {
+              const parent = depts.find(p => p.id === d.parent_department_id);
+              if (parent) {
+                return { ...d, name: `${parent.name} └─ ${d.name}` };
+              }
+            }
+            return d;
+          });
+
+          console.log(`Found ${processed.length} filtered departments`);
+          return processed;
         }
       }
 
-      // Fall back to facility-specific departments
-      const { data, error } = await supabase
-        .from('departments')
-        .select('id, name')
-        .eq('facility_id', facilityId)
-        .is('parent_department_id', null)
-        .order('name');
-
-      if (error) throw error;
-      return data || [];
+      return [];
     },
-    enabled: !!facilityId,
+    enabled: !!facilityId && !!categories,
   });
 
   // Fetch specialties for selected department
@@ -238,132 +300,212 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     enabled: !!departmentId,
   });
 
+  // const createUserMutation = useMutation({
+  //   mutationFn: async (userData: z.infer<typeof userSchema>) => {
+  //     // Get the current user to ensure we have a valid auth token and session
+  //     const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+
+  //     if (userError || !currentUser) {
+  //       throw new Error('Authentication failed. Please log in again.');
+  //     }
+
+  //     const { data: { session } } = await supabase.auth.getSession();
+  //     console.log("Diagnostic: Session token found:", !!session?.access_token);
+  //     if (session?.access_token) {
+  //       console.log("Diagnostic: Token length:", session.access_token.length);
+  //     }
+
+  //     // Role-specific validation
+  //     if (userData.role === 'organization_admin') {
+  //       if (!userData.organization_id) throw new Error('Organization is required for this role');
+  //     } else if (userData.role === 'workplace_supervisor') {
+  //       if (!userData.workspace_id) throw new Error('Workspace is required for this role');
+  //     } else if (userData.role === 'facility_supervisor') {
+  //       if (!userData.facility_id) throw new Error('Facility is required for this role');
+  //     } else if (userData.role === 'department_head' || userData.role === 'staff') {
+  //       if (!userData.facility_id) throw new Error('Facility is required for this role');
+  //       if (!userData.department_id) throw new Error('Department is required for this role');
+  //     }
+
+  //     // For organization_admin, call edge function with organization_id
+  //     if (userData.role === 'organization_admin') {
+  //       const { data, error } = await supabase.functions.invoke('create-user', {
+  //         body: {
+  //           email: userData.email,
+  //           password: password,
+  //           full_name: userData.full_name,
+  //           role: 'organization_admin',
+  //           organization_id: userData.organization_id,
+  //           force_password_change: true,
+  //         },
+  //       });
+  //       if (error) throw error;
+  //       return data;
+  //     }
+
+  //     // Determine final workspace ID
+  //     const finalWorkspaceId = userData.workspace_id || workspaceId;
+  //     if (!finalWorkspaceId && userData.role !== 'general_admin') {
+  //       throw new Error('Could not determine workspace');
+  //     }
+
+  //     // Call edge function to create user
+  //     const { data, error } = await supabase.functions.invoke('create-user', {
+  //       body: {
+  //         email: userData.email,
+  //         password: password,
+  //         full_name: userData.full_name,
+  //         role: userData.role,
+  //         workspace_id: finalWorkspaceId,
+  //         organization_id: userData.organization_id,
+  //         facility_id: userData.facility_id || null,
+  //         department_id: userData.department_id || null,
+  //         specialty_id: userData.specialty_id || null,
+  //         custom_role_id: userData.custom_role_id || null,
+  //         force_password_change: true,
+  //       },
+  //     });
+
+  //     if (error) throw error;
+  //     return data;
+  //   },
+  //   onSuccess: () => {
+  //     toast.success(`User created successfully! Password: ${password}`);
+  //     queryClient.invalidateQueries({ queryKey: ['unified-users'] });
+  //     queryClient.invalidateQueries({ queryKey: ['users'] });
+  //     queryClient.invalidateQueries({ queryKey: ['profiles'] });
+  //     handleReset();
+  //     onOpenChange(false);
+  //   },
+  //   onError: (error: any) => {
+  //     console.error('Edge Function Error Object:', error);
+  //     let errorMessage = 'Failed to create user';
+
+  //     // Try to extract detailed error from Edge Function response
+  //     if (error.context && (error.context.error || error.context.details)) {
+  //       errorMessage = error.context.error || 'Database Error';
+  //       if (error.context.details) errorMessage += `: ${error.context.details}`;
+  //       if (error.context.diagnostic) console.log("Diagnostic Info:", error.context.diagnostic);
+  //     } else if (error instanceof Error) {
+  //       // Try to parse structured validation errors (e.g. Zod arrays) from message
+  //       try {
+  //         const parsed = JSON.parse(error.message);
+  //         if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.message) {
+  //           errorMessage = parsed.map((e: { message: string }) => e.message).join(', ');
+  //         } else if (parsed.error) {
+  //           errorMessage = parsed.error;
+  //           if (parsed.details) errorMessage += `: ${parsed.details}`;
+  //         } else {
+  //           errorMessage = error.message;
+  //         }
+  //       } catch {
+  //         errorMessage = error.message;
+  //       }
+  //     } else if (typeof error === 'string') {
+  //       errorMessage = error;
+  //     }
+
+  //     // Check for specific database errors even if they are wrapped
+  //     if (errorMessage.includes('force_password_change')) {
+  //       errorMessage = "Database Error: Missing 'force_password_change' column. Please run the Diagnostic Script.";
+  //     } else if (errorMessage.includes('specialty_id')) {
+  //       errorMessage = "Database Error: Missing 'specialty_id' column. Please run the Diagnostic Script.";
+  //     } else if (errorMessage.includes('Edge Function returned a non-2xx status code')) {
+  //       // Fallback: If we can't read the body, it might be in the logs or content
+  //       console.log("Full error for debugging:", JSON.stringify(error, null, 2));
+  //       errorMessage = "System Error: Database schema mismatch. Please run the Diagnostic Script!";
+  //     }
+
+  //     toast.error(errorMessage);
+  //   },
+  // });
+
   const createUserMutation = useMutation({
     mutationFn: async (userData: z.infer<typeof userSchema>) => {
-      // Get the current user to ensure we have a valid auth token and session
-      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      if (userError || !currentUser) {
-        throw new Error('Authentication failed. Please log in again.');
+      if (!session?.access_token) {
+        throw new Error("No active session");
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log("Diagnostic: Session token found:", !!session?.access_token);
-      if (session?.access_token) {
-        console.log("Diagnostic: Token length:", session.access_token.length);
-      }
-
-      // Role-specific validation
-      if (userData.role === 'organization_admin') {
-        if (!userData.organization_id) throw new Error('Organization is required for this role');
-      } else if (userData.role === 'staff' || userData.role === 'department_head') {
-        if (!userData.facility_id) throw new Error('Facility is required for this role');
-        if (!userData.department_id) throw new Error('Department is required for this role');
-      } else if (userData.role === 'facility_supervisor') {
-        if (!userData.facility_id) throw new Error('Facility is required for this role');
-      }
-
-      // For organization_admin, call edge function with organization_id
-      if (userData.role === 'organization_admin') {
-        const { data, error } = await supabase.functions.invoke('create-user', {
+      const { data, error } = await supabase.functions.invoke(
+        "create-user",
+        {
           body: {
             email: userData.email,
-            password: password,
+            password,
             full_name: userData.full_name,
-            role: 'organization_admin',
+            role: userData.role,
             organization_id: userData.organization_id,
+            workspace_id: userData.workspace_id,
+            facility_id: userData.facility_id,
+            department_id: userData.department_id,
+            specialty_id: userData.specialty_id,
+            custom_role_id: userData.custom_role_id,
             force_password_change: true,
           },
-        });
-        if (error) throw error;
-        return data;
-      }
-
-      // Get workspace_id from facility if facility is selected
-      let workspaceId: string | null = null;
-      if (userData.facility_id) {
-        const facility = facilities?.find(f => f.id === userData.facility_id);
-        if (!facility) throw new Error('Facility not found');
-        workspaceId = facility.workspace_id;
-      } else {
-        // For workplace_supervisor without facility, get workspace from first facility or current user's scope
-        const firstFacility = facilities?.[0];
-        if (firstFacility) {
-          workspaceId = firstFacility.workspace_id;
         }
-      }
-
-      if (!workspaceId) throw new Error('Could not determine workspace');
-
-      // Call edge function to create user
-      const { data, error } = await supabase.functions.invoke('create-user', {
-        body: {
-          email: userData.email,
-          password: password,
-          full_name: userData.full_name,
-          role: userData.role,
-          workspace_id: workspaceId,
-          facility_id: userData.facility_id || null,
-          department_id: userData.department_id || null,
-          specialty_id: userData.specialty_id || null,
-          custom_role_id: userData.custom_role_id || null,
-          force_password_change: true,
-        },
-      });
+      );
 
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
-      toast.success(`User created successfully! Password: ${password}`);
+      toast.success(`User created successfully!`);
       queryClient.invalidateQueries({ queryKey: ['unified-users'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
       handleReset();
       onOpenChange(false);
     },
-    onError: (error: any) => {
-      console.error('Edge Function Error Object:', error);
+    onError: async (error: any) => {
+      console.error('--- EDGE FUNCTION ERROR ---');
+      console.dir(error);
+
       let errorMessage = 'Failed to create user';
 
-      // Try to extract detailed error from Edge Function response
-      if (error.context && (error.context.error || error.context.details)) {
-        errorMessage = error.context.error || 'Database Error';
-        if (error.context.details) errorMessage += `: ${error.context.details}`;
-        if (error.context.diagnostic) console.log("Diagnostic Info:", error.context.diagnostic);
-      } else if (error instanceof Error) {
-        // Try to parse structured validation errors (e.g. Zod arrays) from message
+      // Handle the case where error.context is a Response object
+      if (error.context && typeof error.context.json === 'function') {
+        try {
+          const body = await error.context.json();
+          console.log('Processed Error Body:', body);
+
+          if (body.error) {
+            errorMessage = body.error;
+            if (body.details) errorMessage += `: ${body.details}`;
+            if (body.hint) errorMessage += ` (Hint: ${body.hint})`;
+            if (body.diagnostic) {
+              console.log('--- BACKEND DIAGNOSTIC ---');
+              console.log(JSON.stringify(body.diagnostic, null, 2));
+              // Provide more specific info for auth errors
+              if (body.error === "Unauthorized_from_code") {
+                errorMessage = `Auth Failed: ${body.details || 'Token invalid'}`;
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Failed to parse error body:', e);
+          errorMessage = `HTTP ${error.context.status}: ${error.context.statusText || 'Unknown Error'}`;
+        }
+      } else if (error.message) {
         try {
           const parsed = JSON.parse(error.message);
-          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]?.message) {
-            errorMessage = parsed.map((e: { message: string }) => e.message).join(', ');
-          } else if (parsed.error) {
+          if (parsed.error) {
             errorMessage = parsed.error;
             if (parsed.details) errorMessage += `: ${parsed.details}`;
-          } else {
-            errorMessage = error.message;
           }
         } catch {
           errorMessage = error.message;
         }
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      }
-
-      // Check for specific database errors even if they are wrapped
-      if (errorMessage.includes('force_password_change')) {
-        errorMessage = "Database Error: Missing 'force_password_change' column. Please run the Diagnostic Script.";
-      } else if (errorMessage.includes('specialty_id')) {
-        errorMessage = "Database Error: Missing 'specialty_id' column. Please run the Diagnostic Script.";
-      } else if (errorMessage.includes('Edge Function returned a non-2xx status code')) {
-        // Fallback: If we can't read the body, it might be in the logs or content
-        console.log("Full error for debugging:", JSON.stringify(error, null, 2));
-        errorMessage = "System Error: Database schema mismatch. Please run the Diagnostic Script!";
       }
 
       toast.error(errorMessage);
     },
   });
+
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -371,10 +513,11 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     createUserMutation.mutate({
       email: email.trim(),
       full_name: fullName.trim(),
+      organization_id: organizationId || null,
+      workspace_id: workspaceId || null,
       facility_id: facilityId || null,
       department_id: departmentId || null,
       specialty_id: specialtyId || null,
-      organization_id: organizationId || null,
       custom_role_id: customRoleId || null,
       role,
     });
@@ -384,12 +527,28 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     setEmail('');
     setPassword('');
     setFullName('');
+    setOrganizationId('');
+    setWorkspaceId('');
     setFacilityId('');
     setDepartmentId('');
     setSpecialtyId('');
-    setOrganizationId('');
     setCustomRoleId('');
     setRole('staff');
+  };
+
+  const handleOrganizationChange = (value: string) => {
+    setOrganizationId(value);
+    setWorkspaceId('');
+    setFacilityId('');
+    setDepartmentId('');
+    setSpecialtyId('');
+  };
+
+  const handleWorkspaceChange = (value: string) => {
+    setWorkspaceId(value);
+    setFacilityId('');
+    setDepartmentId('');
+    setSpecialtyId('');
   };
 
   const handleFacilityChange = (value: string) => {
@@ -421,12 +580,13 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     if (['workplace_supervisor', 'general_admin', 'organization_admin'].includes(value)) {
       setFacilityId('');
     }
-    if (value !== 'organization_admin') {
-      setOrganizationId('');
-    }
-    if (value !== 'custom') {
-      setCustomRoleId('');
-    }
+
+    // Clear everything when role changes to ensure clean slate
+    setOrganizationId('');
+    setWorkspaceId('');
+    setFacilityId('');
+    setDepartmentId('');
+    setSpecialtyId('');
   };
 
   return (
@@ -549,151 +709,135 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
             {/* Removed separate custom role selector as it's now integrated */}
           </div>
 
-          {/* Organization Selector - Shows only for organization_admin role */}
-          {role === 'organization_admin' && (
+          {/* Organizational Scoping Section */}
+          {role !== 'general_admin' && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-semibold">
+              <div className="flex items-center gap-2 text-sm font-semibold border-t pt-4">
                 <Building2 className="h-4 w-4" />
-                Organization Selection
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="organization">Organization *</Label>
-                <Select
-                  value={organizationId}
-                  onValueChange={setOrganizationId}
-                  required
-                >
-                  <SelectTrigger id="organization">
-                    <SelectValue placeholder="Select organization" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {organizations?.map((org) => (
-                      <SelectItem key={org.id} value={org.id}>
-                        {org.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  This user will become the owner/admin of the selected organization
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Organization Assignment - Shows conditionally based on role (not for organization_admin) */}
-          {role !== 'organization_admin' && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <Building2 className="h-4 w-4" />
-                Organization Assignment
+                Organization & Scope Assignment
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Organization - Required for almost all roles */}
                 <div className="space-y-2">
-                  <Label htmlFor="facility">
-                    Facility {isFacilityRequired ? '*' : '(Optional)'}
-                  </Label>
+                  <Label htmlFor="organization">Organization *</Label>
                   <Select
-                    value={facilityId}
-                    onValueChange={handleFacilityChange}
-                    required={isFacilityRequired}
-                    disabled={highestRole === 'department_head' || highestRole === 'facility_supervisor' || !isFacilityRequired}
+                    value={organizationId}
+                    onValueChange={handleOrganizationChange}
+                    required
+                    disabled={!!currentUserRole?.organization_id}
                   >
-                    <SelectTrigger id="facility">
-                      <SelectValue placeholder={!isFacilityRequired ? "Not required for this role" : "Select facility"} />
+                    <SelectTrigger id="organization">
+                      <SelectValue placeholder="Select organization" />
                     </SelectTrigger>
                     <SelectContent>
-                      {facilities?.map((facility) => (
-                        <SelectItem key={facility.id} value={facility.id}>
-                          {facility.name}
+                      {organizations?.map((org) => (
+                        <SelectItem key={org.id} value={org.id}>
+                          {org.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {(highestRole === 'department_head' || highestRole === 'facility_supervisor') && (
-                    <p className="text-xs text-muted-foreground">
-                      Auto-assigned to your facility
-                    </p>
+                  {currentUserRole?.organization_id && (
+                    <p className="text-[10px] text-muted-foreground italic">Restricted to your current organization</p>
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="department">
-                    Department {isDepartmentRequired ? '*' : '(Optional)'}
-                  </Label>
-                  <Select
-                    value={departmentId}
-                    onValueChange={handleDepartmentChange}
-                    disabled={!facilityId || highestRole === 'department_head' || !isDepartmentRequired}
-                    required={isDepartmentRequired}
-                  >
-                    <SelectTrigger id="department">
-                      <SelectValue placeholder={
-                        !facilityId ? "Select facility first" :
-                          !isDepartmentRequired ? "Not required" :
-                            departments?.length === 0 ? "No departments available" :
-                              "Select department"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments && departments.length > 0 ? (
-                        departments.map((dept) => (
-                          <SelectItem key={dept.id} value={dept.id}>
-                            {dept.name}
+                {/* Workspace - Required for Workplace Supervisor and below */}
+                {['workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'].includes(role) && (
+                  <div className="space-y-2">
+                    <Label htmlFor="workspace">Workspace *</Label>
+                    <Select
+                      value={workspaceId}
+                      onValueChange={handleWorkspaceChange}
+                      required
+                      disabled={!organizationId || !!currentUserRole?.workspace_id}
+                    >
+                      <SelectTrigger id="workspace">
+                        <SelectValue placeholder={!organizationId ? "Select organization first" : "Select workspace"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {workspaces?.map((ws) => (
+                          <SelectItem key={ws.id} value={ws.id}>
+                            {ws.name}
                           </SelectItem>
-                        ))
-                      ) : (
-                        <div className="py-2 px-2 text-sm text-muted-foreground">
-                          No departments found for this facility
-                        </div>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  {highestRole === 'department_head' && (
-                    <p className="text-xs text-muted-foreground">
-                      Auto-assigned to your department
-                    </p>
-                  )}
-                  {!isDepartmentRequired && (
-                    <p className="text-xs text-muted-foreground">
-                      Not required for {role === 'workplace_supervisor' ? 'Workplace' : 'Facility'} Supervisor
-                    </p>
-                  )}
-                  {facilityId && departments?.length === 0 && isDepartmentRequired && (
-                    <p className="text-xs text-destructive">
-                      No departments exist for this facility. Please create departments first in Organization management.
-                    </p>
-                  )}
-                </div>
-              </div>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
-              {isDepartmentRequired && (
-                <div className="space-y-2">
-                  <Label htmlFor="specialty">Specialty (Optional)</Label>
-                  <Select
-                    value={specialtyId}
-                    onValueChange={setSpecialtyId}
-                    disabled={!departmentId}
-                  >
-                    <SelectTrigger id="specialty">
-                      <SelectValue placeholder="Select specialty" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {specialties?.map((specialty) => (
-                        <SelectItem key={specialty.id} value={specialty.id}>
-                          {specialty.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {specialties && specialties.length === 0 && departmentId && (
-                    <p className="text-xs text-muted-foreground">
-                      No specialties available for this department
-                    </p>
-                  )}
-                </div>
-              )}
+                {/* Facility - Required for Facility Supervisor and below */}
+                {['facility_supervisor', 'department_head', 'staff'].includes(role) && (
+                  <div className="space-y-2">
+                    <Label htmlFor="facility">Facility *</Label>
+                    <Select
+                      value={facilityId}
+                      onValueChange={handleFacilityChange}
+                      required
+                      disabled={!workspaceId || !!currentUserRole?.facility_id}
+                    >
+                      <SelectTrigger id="facility">
+                        <SelectValue placeholder={!workspaceId ? "Select workspace first" : "Select facility"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {facilities?.map((f) => (
+                          <SelectItem key={f.id} value={f.id}>
+                            {f.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Department - Required for Department Head and Staff */}
+                {['department_head', 'staff'].includes(role) && (
+                  <div className="space-y-2">
+                    <Label htmlFor="department">Department *</Label>
+                    <Select
+                      value={departmentId}
+                      onValueChange={handleDepartmentChange}
+                      required
+                      disabled={!facilityId || !!currentUserRole?.department_id}
+                    >
+                      <SelectTrigger id="department">
+                        <SelectValue placeholder={!facilityId ? "Select facility first" : "Select department"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments?.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Specialty - Optional for Staff */}
+                {role === 'staff' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="specialty">Specialty (Optional)</Label>
+                    <Select
+                      value={specialtyId}
+                      onValueChange={setSpecialtyId}
+                      disabled={!departmentId}
+                    >
+                      <SelectTrigger id="specialty">
+                        <SelectValue placeholder={!departmentId ? "Select department first" : "Select specialty"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {specialties?.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -706,20 +850,23 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
             </AlertDescription>
           </Alert>
 
-          <div className="flex gap-2 justify-end">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={createUserMutation.isPending}>
-              {createUserMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                'Create User'
-              )}
-            </Button>
+          <div className="flex gap-2 justify-between items-center w-full">
+
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createUserMutation.isPending}>
+                {createUserMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create User'
+                )}
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>

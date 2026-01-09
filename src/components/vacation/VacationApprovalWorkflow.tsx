@@ -61,65 +61,144 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
             *,
             profiles:approver_id(full_name, email)
           )
-        `);
+        `) as any;
 
-      // Fetch all plans in scope that are awaiting approval
-      query = query.eq('status', 'pending_approval');
+      // Add status filter
+      query = query.in('status', ['pending_approval', 'department_pending', 'facility_pending', 'workspace_pending']);
 
-      const { data: plans, error } = await query;
-      if (error) throw error;
-
-      // Filter by scope
-      let filtered = plans || [];
-
-      // Filter by Scope ID
-      if (scopeId === 'all') {
-        // Super Admin: View all plans globally
+      // Filter by Scope ID using direct columns with fallback
+      if (!scopeId || scopeId === 'all') {
+        // Super Admin or global view: See EVERYTHING
+        // console.log('Super Admin / Global view detected: bypassing scope filters');
       } else if (approvalLevel === 1) {
         // Department scope
-        filtered = filtered.filter(p => p.department_id === scopeId);
+        query = query.eq('department_id', scopeId);
       } else if (approvalLevel === 2) {
-        // Facility scope
-        filtered = filtered.filter(p => p.departments?.facility_id === scopeId);
+        // Facility scope - Try direct column first
+        query = query.eq('facility_id', scopeId);
       } else if (approvalLevel === 3) {
-        // Workspace scope
-        const { data: facilities } = await supabase
-          .from('facilities')
-          .select('id')
-          .eq('workspace_id', scopeId);
-        const facilityIds = facilities?.map(f => f.id) || [];
-        filtered = filtered.filter(p => facilityIds.includes(p.departments?.facility_id));
+        // Workspace scope - Try direct column first
+        query = query.eq('workspace_id', scopeId);
       }
+
+      // DIAGNOSTIC: Check total visible plans
+      const { count: totalVisible } = await supabase.from('vacation_plans').select('*', { count: 'exact', head: true });
+      // console.log('DIAGNOSTIC - Total visible plans for user:', totalVisible);
+
+      let { data: allPlans, error } = await query;
+
+      // FALLBACK: If direct query returned 0 but totalVisible > 0, try join-based fallback
+      if (!error && (!allPlans || allPlans.length === 0) && totalVisible && totalVisible > 0 && scopeId !== 'all') {
+        // console.log(`Direct query for level ${approvalLevel} returned 0. Attempting join-based fallback...`);
+        let fallbackQuery = supabase
+          .from('vacation_plans')
+          .select(`
+            *,
+            vacation_types(name, description),
+            departments!inner(name, facility_id, facilities!inner(workspace_id)),
+            vacation_splits(*),
+            vacation_approvals(
+              *,
+              profiles:approver_id(full_name, email)
+            )
+          `) as any;
+
+        fallbackQuery = fallbackQuery.in('status', ['pending_approval', 'department_pending', 'facility_pending', 'workspace_pending']);
+
+        if (approvalLevel === 1) {
+          fallbackQuery = fallbackQuery.eq('department_id', scopeId);
+        } else if (approvalLevel === 2) {
+          fallbackQuery = fallbackQuery.eq('departments.facility_id', scopeId);
+        } else if (approvalLevel === 3) {
+          fallbackQuery = fallbackQuery.eq('departments.facilities.workspace_id', scopeId);
+        }
+
+        const fallbackResult = await fallbackQuery;
+        if (!fallbackResult.error && fallbackResult.data && fallbackResult.data.length > 0) {
+          // console.log(`Fallback query successful! Found ${fallbackResult.data.length} plans.`);
+          allPlans = fallbackResult.data;
+        }
+      }
+
+      if (error) {
+        console.error('Error fetching vacation plans:', error);
+        throw error;
+      }
+
+      // console.log(`Raw plans from DB for level ${approvalLevel}:`, allPlans?.length || 0);
+      if (allPlans && allPlans.length > 0) {
+        const firstPlan = allPlans[0] as any;
+        // console.log('DEBUG: First Plan Data (Unified):', {
+        //   id: firstPlan.id,
+        //   status: firstPlan.status,
+        //   department_id: firstPlan.department_id,
+        //   facility_id: firstPlan.facility_id,
+        //   workspace_id: firstPlan.workspace_id
+        // });
+      }
+
+      let filtered = allPlans || [];
+      // console.log(`Initial plans for level ${approvalLevel}:`, filtered.length);
 
       // Fetch staff and creator info, including roles
       const extendedPlans = await Promise.all(
         filtered.map(async (plan) => {
-          const [staffProfile, creatorProfile, roles] = await Promise.all([
-            supabase.from('profiles').select('full_name, email').eq('id', plan.staff_id).single(),
-            supabase.from('profiles').select('full_name').eq('id', plan.created_by).single(),
-            supabase.from('user_roles').select('role').eq('user_id', plan.staff_id),
-          ]);
-          return {
-            ...plan,
-            staff_profile: staffProfile.data,
-            creator_profile: creatorProfile.data,
-            staff_roles: roles.data || [],
-          };
+          try {
+            const [staffProfile, creatorProfile, roles] = await Promise.all([
+              supabase.from('profiles').select('full_name, email').eq('id', plan.staff_id).maybeSingle(),
+              supabase.from('profiles').select('full_name').eq('id', plan.created_by).maybeSingle(),
+              supabase.from('user_roles').select('role').eq('user_id', plan.staff_id),
+            ]);
+
+            return {
+              ...plan,
+              staff_profile: staffProfile.data,
+              creator_profile: creatorProfile.data,
+              staff_roles: roles.data || [],
+            };
+          } catch (e) {
+            console.error(`Error fetching details for plan ${plan.id}:`, e);
+            return { ...plan, staff_roles: [] };
+          }
         })
       );
 
       // Filter by Visibility Rules (Parallel Workflow)
       // 1. Supervisors (L1, L2, L3) should ONLY see plans from 'staff' role.
       // 2. Super Admin (which uses scopeId='all' usually) sees everything.
-      if (scopeId === 'all') {
+      if (!scopeId || scopeId === 'all') {
         return extendedPlans;
       }
 
-      return extendedPlans.filter(p => {
-        // Check if ANY of the staff's roles is 'staff'
-        const roles = Array.isArray(p.staff_roles) ? p.staff_roles : [p.staff_roles];
-        return roles.some((r: any) => r.role === 'staff');
+      const finalPlans = extendedPlans.filter(p => {
+        const roles = Array.isArray(p.staff_roles) ? p.staff_roles : [];
+        const roleNames = roles.map((r: any) => r.role);
+
+        // If roles failed to load, log warning but show the plan (better than hiding valid requests)
+        if (roleNames.length === 0) {
+          console.warn(`Plan ${p.id} has no roles loaded. Role-based visibility check bypassed.`);
+          return true;
+        }
+
+        if (approvalLevel === 1) {
+          // Dept Head (Level 1): Only see Staff vacations
+          return roleNames.includes('staff');
+        }
+        if (approvalLevel === 2) {
+          // Facility Supervisor (Level 2): See Staff and Dept Head vacations
+          return roleNames.includes('staff') || roleNames.includes('department_head');
+        }
+        if (approvalLevel === 3) {
+          // Workspace Supervisor (Level 3): See Staff, Dept Heads, and Facility Supervisors
+          return roleNames.includes('staff') || roleNames.includes('department_head') ||
+            roleNames.includes('facility_supervisor');
+        }
+
+        return false;
       });
+
+      // console.log(`Final plans for approval level ${approvalLevel}:`, finalPlans.length);
+      return finalPlans;
     },
     enabled: !!user && !!scopeId,
   });
@@ -391,7 +470,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {pendingPlans?.map((plan) => (
+            {(pendingPlans as any[])?.map((plan) => (
               <Card key={plan.id} className="border-2">
                 <CardHeader>
                   <div className="flex justify-between items-start">
@@ -523,110 +602,139 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       </Card>
 
       <Dialog open={showApprovalDialog} onOpenChange={setShowApprovalDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {approvalAction === 'approve' ? 'Approve' : 'Reject'} Vacation Plan
-            </DialogTitle>
-            <DialogDescription>
-              {approvalAction === 'approve'
-                ? `You are about to approve this vacation plan for ${selectedPlan?.staff_profile?.full_name}. This will be the final approval and the vacation will be confirmed.`
-                : `You are about to reject this vacation plan for ${selectedPlan?.staff_profile?.full_name}. Please provide a reason for rejection.`}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-md max-h-[95vh] flex flex-col p-0 overflow-hidden">
+          <div className="p-6 border-b shrink-0">
+            <DialogHeader className="p-0">
+              <DialogTitle className="text-xl">
+                {approvalAction === 'approve' ? 'Approve' : 'Reject'} Vacation Plan
+              </DialogTitle>
+              <DialogDescription className="mt-1.5">
+                {approvalAction === 'approve'
+                  ? `You are about to approve this vacation plan for ${selectedPlan?.staff_profile?.full_name}.`
+                  : `You are about to reject this vacation plan for ${selectedPlan?.staff_profile?.full_name}.`}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
-          <div className="space-y-4 py-4">
-            {selectedPlan && (
-              <div className="space-y-2">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="space-y-4">
+              <div className="bg-muted/30 rounded-lg p-3 space-y-2 border border-border/50">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Staff:</span>
-                  <span className="font-medium">{selectedPlan.staff_profile?.full_name}</span>
+                  <span className="text-muted-foreground">Staff Member:</span>
+                  <span className="font-semibold">{selectedPlan?.staff_profile?.full_name}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Vacation Type:</span>
-                  <span className="font-medium">{selectedPlan.vacation_types?.name}</span>
+                  <span className="font-semibold text-primary">{selectedPlan?.vacation_types?.name}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total Days:</span>
-                  <span className="font-medium">{selectedPlan.total_days} days</span>
+                  <span className="text-muted-foreground">Total Duration:</span>
+                  <span className="font-semibold">{selectedPlan?.total_days} days</span>
                 </div>
               </div>
-            )}
 
-            <Separator />
+              <Separator className="bg-border/50" />
 
-            {/* Vacation Segments with Checkboxes */}
-            {approvalAction === 'approve' && selectedPlan?.vacation_splits && (
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  Select Vacation Segments to Approve
-                </Label>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Uncheck segments to reject them individually. At least one segment must be selected.
-                </p>
-                <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-3">
-                  {selectedPlan.vacation_splits.map((split: any, index: number) => {
-                    const isSelected = selectedSplits.has(split.id);
+              {/* Vacation Segments with Checkboxes */}
+              {approvalAction === 'approve' && selectedPlan?.vacation_splits && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    Select Vacation Segments to Approve
+                  </Label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Uncheck segments to reject them individually. At least one segment must be selected.
+                  </p>
+                  <div className="space-y-3">
+                    {selectedPlan.vacation_splits.map((split: any, index: number) => {
+                      const isSelected = selectedSplits.has(split.id);
 
-                    return (
-                      <div
-                        key={split.id}
-                        className={cn(
-                          "flex items-start gap-3 p-3 rounded-lg border-2 transition-colors",
-                          isSelected ? "bg-primary/5 border-primary" : "bg-muted border-border"
-                        )}
-                      >
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleSplitSelection(split.id)}
-                          id={`split-${split.id}`}
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <label
-                            htmlFor={`split-${split.id}`}
-                            className="text-sm font-medium cursor-pointer block mb-1"
-                          >
-                            Segment {index + 1}
-                          </label>
-                          <p className="text-sm text-muted-foreground">
-                            {format(new Date(split.start_date), 'MMM dd, yyyy')} → {format(new Date(split.end_date), 'MMM dd, yyyy')}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {split.days} days
-                          </p>
+                      return (
+                        <div
+                          key={split.id}
+                          className={cn(
+                            "flex items-start gap-3 p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer hover:shadow-md",
+                            isSelected
+                              ? "bg-primary/5 border-primary shadow-sm"
+                              : "bg-muted/50 border-transparent grayscale-[0.5] opacity-80"
+                          )}
+                          onClick={() => toggleSplitSelection(split.id)}
+                        >
+                          <div className="pt-1">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSplitSelection(split.id)}
+                              id={`split-${split.id}`}
+                              className="h-5 w-5 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <label
+                                htmlFor={`split-${split.id}`}
+                                className="text-sm font-bold cursor-pointer transition-colors"
+                              >
+                                Segment {index + 1}
+                              </label>
+                              {isSelected ? (
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                  Selected
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                                  Excluded
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm font-medium">
+                              {format(new Date(split.start_date), 'MMM dd, yyyy')} → {format(new Date(split.end_date), 'MMM dd, yyyy')}
+                            </p>
+                            <p className="text-xs text-muted-foreground font-medium">
+                              Duration: {split.days} days
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center justify-between px-1">
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      Selected: {selectedSplits.size} of {selectedPlan.vacation_splits.length} segments
+                    </p>
+                    <p className="text-xs font-semibold text-primary">
+                      {selectedPlan.total_days} days total
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Selected: {selectedSplits.size} of {selectedPlan.vacation_splits.length} segments
-                </p>
+              )}
+
+              <Separator className="bg-border/50" />
+
+              <div>
+                <label className="text-sm font-bold mb-2 block">
+                  Comments {approvalAction === 'reject' && <span className="text-destructive font-black">*</span>}
+                </label>
+                <Textarea
+                  value={comments}
+                  onChange={(e) => setComments(e.target.value)}
+                  placeholder={
+                    approvalAction === 'approve'
+                      ? 'Optional comments or notes'
+                      : 'Please explain the reason for rejection'
+                  }
+                  rows={2}
+                  className="resize-none"
+                />
               </div>
-            )}
-
-            <Separator />
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Comments {approvalAction === 'reject' && '(Required)'}
-              </label>
-              <Textarea
-                value={comments}
-                onChange={(e) => setComments(e.target.value)}
-                placeholder={
-                  approvalAction === 'approve'
-                    ? 'Optional comments or notes'
-                    : 'Please explain the reason for rejection'
-                }
-                rows={4}
-              />
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowApprovalDialog(false)}>
+          <DialogFooter className="p-6 border-t bg-muted/5 sm:gap-4 shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowApprovalDialog(false)}
+              className="px-8"
+            >
               Cancel
             </Button>
             <Button
@@ -636,6 +744,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                 (approvalAction === 'reject' && !comments.trim())
               }
               variant={approvalAction === 'approve' ? 'default' : 'destructive'}
+              className="px-8 font-bold"
             >
               {approvalAction === 'approve' ? (
                 <>
@@ -651,10 +760,10 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Conflict Warning Dialog with Per-Segment Selection */}
-      <Dialog open={showConflictDialog} onOpenChange={setShowConflictDialog}>
+      < Dialog open={showConflictDialog} onOpenChange={setShowConflictDialog} >
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
@@ -683,60 +792,67 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                   <div
                     key={split.id}
                     className={cn(
-                      "border-2 rounded-lg p-4 transition-colors",
-                      hasConflict && "border-warning bg-warning/5",
-                      !hasConflict && isSelected && "border-primary bg-primary/5",
-                      !hasConflict && !isSelected && "border-border bg-muted"
+                      "border-2 rounded-xl p-4 transition-all duration-200 cursor-pointer hover:shadow-md",
+                      hasConflict
+                        ? "border-warning bg-warning/5 shadow-sm"
+                        : isSelected
+                          ? "border-primary bg-primary/5 shadow-sm"
+                          : "border-transparent bg-muted/50 grayscale-[0.5] opacity-80"
                     )}
+                    onClick={() => toggleSplitSelection(split.id)}
                   >
                     <div className="flex items-start gap-3">
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleSplitSelection(split.id)}
-                        id={`conflict-split-${split.id}`}
-                        className="mt-1"
-                      />
+                      <div className="pt-1">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleSplitSelection(split.id)}
+                          id={`conflict-split-${split.id}`}
+                          className="h-5 w-5 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex items-center justify-between mb-2">
                           <label
                             htmlFor={`conflict-split-${split.id}`}
-                            className="text-sm font-semibold cursor-pointer"
+                            className="text-sm font-bold cursor-pointer"
                           >
                             Segment {index + 1}
                           </label>
-                          {hasConflict && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger>
-                                  <Badge className="bg-warning text-warning-foreground text-xs">
-                                    <AlertCircle className="h-3 w-3 mr-1" />
-                                    Conflict
-                                  </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="text-xs">This segment overlaps with other staff vacations</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                          {!hasConflict && (
-                            <Badge className="bg-success text-success-foreground text-xs">
-                              No Conflict
-                            </Badge>
-                          )}
+                          <div className="flex gap-2">
+                            {hasConflict ? (
+                              <Badge className="bg-warning text-warning-foreground text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border-none">
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Conflict
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-success text-success-foreground text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border-none">
+                                No Conflict
+                              </Badge>
+                            )}
+                            {isSelected ? (
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                Selected
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                                Excluded
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <p className="text-sm text-muted-foreground mb-1">
                           {format(new Date(split.start_date), 'MMM dd, yyyy')} → {format(new Date(split.end_date), 'MMM dd, yyyy')} ({split.days} days)
                         </p>
 
                         {hasConflict && conflicts && conflicts.length > 0 && (
-                          <div className="mt-2 p-3 bg-background rounded-md border border-warning/20">
-                            <p className="text-xs font-medium text-warning mb-2">Conflicting Staff:</p>
-                            <div className="space-y-1">
+                          <div className="mt-3 p-3 bg-background rounded-lg border border-warning/20 shadow-inner">
+                            <p className="text-[10px] font-bold text-warning uppercase tracking-tighter mb-2">Conflicting Staff:</p>
+                            <div className="space-y-2">
                               {conflicts.map((cp: any, cpIdx: number) => (
-                                <div key={cpIdx} className="text-xs text-muted-foreground pl-3 border-l-2 border-warning">
-                                  <p className="font-medium">{cp.staff_name}</p>
-                                  <p>
+                                <div key={cpIdx} className="text-xs text-muted-foreground pl-3 border-l-2 border-warning/50">
+                                  <p className="font-bold text-foreground/80">{cp.staff_name}</p>
+                                  <p className="text-[10px] font-medium">
                                     {format(new Date(cp.start_date), 'MMM dd')} - {format(new Date(cp.end_date), 'MMM dd, yyyy')} ({cp.days} days)
                                   </p>
                                 </div>
@@ -790,10 +906,10 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Level 2 & 3 Previous Conflict Acknowledgment Dialog */}
-      <Dialog open={showPreviousConflictDialog} onOpenChange={setShowPreviousConflictDialog}>
+      < Dialog open={showPreviousConflictDialog} onOpenChange={setShowPreviousConflictDialog} >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -894,7 +1010,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
     </>
   );
 };

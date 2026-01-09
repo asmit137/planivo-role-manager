@@ -173,7 +173,7 @@ export function PricingSection() {
                   className="w-full"
                   size="lg"
                 >
-                  <a href="mailto:sales@planivo.com">Contact Sales</a>
+                  <Link to="/contact-us">Contact Sales</Link>
                 </Button>
               </CardFooter>
             </Card>

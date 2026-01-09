@@ -220,13 +220,42 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      // Delete user_roles first (cascading should handle this but being explicit)
-      const { error: rolesError } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId);
+      if (isSuperAdmin) {
+        // Get the current session to pass the access token
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          throw new Error('Not authenticated. Please log in again.');
+        }
 
-      if (rolesError) throw rolesError;
+        // Try Edge Function first
+        try {
+          const { data, error } = await supabase.functions.invoke('delete-user', {
+            body: { userId },
+            headers: {
+              Authorization: `Bearer ${session.access_token}`
+            }
+          });
+          if (error) throw error;
+          return data;
+        } catch (edgeFunctionError) {
+          console.warn('Edge Function failed, falling back to RPC:', edgeFunctionError);
+
+          // Fallback: Use RPC to delete profile and roles (auth.users entry will remain orphaned)
+          const { data: rpcData, error: rpcError } = await supabase.rpc('delete_user_cascade', {
+            target_user_id: userId
+          });
+          if (rpcError) throw rpcError;
+          return rpcData;
+        }
+      } else {
+        // Department scopes removal (original logic)
+        const { error: rolesError } = await supabase
+          .from('user_roles')
+          .delete()
+          .eq('user_id', userId);
+
+        if (rolesError) throw rolesError;
+      }
     },
     onSuccess: () => {
       toast.success('User removed successfully');
@@ -234,6 +263,7 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
       setDeleteUserId(null);
     },
     onError: (error: Error) => {
+      console.error('Delete User Mutation Error:', error);
       toast.error(`Failed to remove user: ${error.message}`);
     },
   });
@@ -375,15 +405,16 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
             <Pencil className="h-4 w-4" />
           </Button>
         )}
-        {hasDeletePermission && detectedScope === 'department' && (
+        {(hasDeletePermission && detectedScope === 'department') || isSuperAdmin ? (
           <Button
             variant="ghost"
             size="icon"
             onClick={() => handleDeleteClick(row.id)}
+            disabled={deleteUserMutation.isPending && deleteUserId === row.id}
           >
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
-        )}
+        ) : null}
       </div>
     ),
   });
@@ -419,15 +450,20 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
         <AlertDialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Remove User</AlertDialogTitle>
+              <AlertDialogTitle>{isSuperAdmin ? 'Permanently Delete User' : 'Remove User'}</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to remove this user from the department? This action cannot be undone.
+                {isSuperAdmin
+                  ? "Are you sure you want to permanently delete this user from the entire system? This action cannot be undone and will remove all their data and access."
+                  : "Are you sure you want to remove this user from the department? This action cannot be undone."}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground">
-                Remove
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isSuperAdmin ? 'Delete Permanently' : 'Remove'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
