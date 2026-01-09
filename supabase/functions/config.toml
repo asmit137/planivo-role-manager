@@ -1,2 +1,1 @@
-[create-user]
-verify_jwt = false
+# This file is redundant. Use supabase/config.toml instead.

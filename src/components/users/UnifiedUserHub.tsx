@@ -227,26 +227,21 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
           throw new Error('Not authenticated. Please log in again.');
         }
 
-        // Try Edge Function first
-        try {
-          const { data, error } = await supabase.functions.invoke('delete-user', {
-            body: { userId },
-            headers: {
-              Authorization: `Bearer ${session.access_token}`
-            }
-          });
-          if (error) throw error;
-          return data;
-        } catch (edgeFunctionError) {
-          console.warn('Edge Function failed, falling back to RPC:', edgeFunctionError);
+        console.log('--- INVOKING DELETE-USER ---');
+        // Use Edge Function only (RPC fallback disabled)
+        // We pass the token manually as a fallback if the client isn't doing it
+        const { data, error } = await supabase.functions.invoke('delete-user', {
+          body: { userId },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
+        });
 
-          // Fallback: Use RPC to delete profile and roles (auth.users entry will remain orphaned)
-          const { data: rpcData, error: rpcError } = await supabase.rpc('delete_user_cascade', {
-            target_user_id: userId
-          });
-          if (rpcError) throw rpcError;
-          return rpcData;
+        if (error) {
+          console.error('Invoke error:', error);
+          throw error;
         }
+        return data;
       } else {
         // Department scopes removal (original logic)
         const { error: rolesError } = await supabase
@@ -262,11 +257,58 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
       queryClient.invalidateQueries({ queryKey: ['unified-users'] });
       setDeleteUserId(null);
     },
-    onError: (error: Error) => {
-      console.error('Delete User Mutation Error:', error);
-      toast.error(`Failed to remove user: ${error.message}`);
+    onError: async (error: any) => {
+      console.error('--- DELETE USER MUTATION ERROR ---');
+      console.dir(error);
+
+      let errorMessage = 'Failed to remove user';
+
+      // Attempt to extract verbose error from Edge Function response
+      if (error.context && typeof error.context.json === 'function') {
+        try {
+          const body = await error.context.json();
+          console.log('Processed Error Body:', body);
+
+          if (body.error) {
+            errorMessage = body.error;
+            if (body.details) errorMessage += `: ${body.details}`;
+            if (body.hint) errorMessage += ` (Hint: ${body.hint})`;
+          }
+        } catch (e) {
+          console.warn('Could not parse error response body', e);
+          errorMessage = error.message || errorMessage;
+        }
+      } else {
+        errorMessage = error.message || errorMessage;
+      }
+
+      toast.error(errorMessage);
     },
   });
+
+  const testConnection = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { type: 'health' },
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        }
+      });
+
+      if (error) {
+        console.error('Test Connection Error:', error);
+        toast.error(`Connection failed: ${error.message}`);
+        return;
+      }
+
+      console.log('Test Connection Success:', data);
+      toast.success('Successfully connected to delete-user Edge Function!');
+    } catch (err: any) {
+      console.error('Test Connection Exception:', err);
+      toast.error(`Connection error: ${err.message}`);
+    }
+  };
 
   const handleToggleActive = (userId: string, currentStatus: boolean) => {
     toggleActiveMutation.mutate({ userId, isActive: !currentStatus });
@@ -484,6 +526,16 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
                 </CardDescription>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
+                {isSuperAdmin && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={testConnection}
+                    className="w-full sm:w-auto"
+                  >
+                    Test Connection
+                  </Button>
+                )}
                 {hasEditPermission && (
                   <ActionButton
                     onClick={() => setUnifiedCreateOpen(true)}
