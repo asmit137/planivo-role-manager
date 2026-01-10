@@ -20,45 +20,17 @@ serve(async (req: Request) => {
         const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
         const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-        console.log("--- DELETE USER INVOKED ---");
-        console.log("URL present:", !!SUPABASE_URL);
-        console.log("Anon present:", !!SUPABASE_ANON_KEY);
-        console.log("Service present:", !!SUPABASE_SERVICE_ROLE_KEY);
-
         if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
             console.error("Missing environment variables!");
             return new Response(
                 JSON.stringify({
-                    error: "Server configuration error (missing env vars)",
-                    diagnostic: {
-                        hasUrl: !!SUPABASE_URL,
-                        hasAnon: !!SUPABASE_ANON_KEY,
-                        hasService: !!SUPABASE_SERVICE_ROLE_KEY
-                    }
+                    error: "Server configuration error (missing env vars)"
                 }),
                 { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
         const body = await req.json();
-
-        // Health check endpoint
-        if (body.type === "health") {
-            return new Response(
-                JSON.stringify({
-                    status: "ok",
-                    message: "Function reached successfully",
-                    config: {
-                        supabaseUrl: SUPABASE_URL,
-                        hasAnonKey: !!SUPABASE_ANON_KEY,
-                        hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY,
-                        authHeaderPresent: !!req.headers.get("Authorization"),
-                    }
-                }),
-                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-        }
-
         const { userId } = body;
 
         // 1. Validate the requesting user using the ANON client (same as create-user)
