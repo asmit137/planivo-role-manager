@@ -5,9 +5,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 declare const Deno: any;
 
-/* =========================
-   CORS
-========================= */
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -141,7 +138,7 @@ serve(async (req: Request) => {
 
     const roles = requestingUserRoles;
     const isSuperAdmin = roles.some((r: any) => r.role === 'super_admin');
-    const isOrgAdmin = roles.some((r: any) => r.role === 'org_admin');
+    const isOrgAdmin = roles.some((r: any) => r.role === 'organization_admin');
     const isWorkspaceSupervisor = roles.some((r: any) => r.role === 'workspace_supervisor');
     const isFacilitySupervisor = roles.some((r: any) => r.role === 'facility_supervisor');
     const isDepartmentHead = roles.some((r: any) => r.role === 'department_head');
@@ -247,9 +244,10 @@ serve(async (req: Request) => {
       facility_id,
       department_id,
       specialty_id,
+      organization_id,
       custom_role_id,
       created_by: requestingUser.id,
-    }, { onConflict: 'user_id, workspace_id, role' });
+    }, { onConflict: 'user_id, role, workspace_id, facility_id, department_id, organization_id' });
 
     if (roleError) {
       console.error("ROLE ASSIGNMENT ERROR:", roleError);

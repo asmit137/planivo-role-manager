@@ -12,6 +12,9 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorState } from '@/components/layout/ErrorState';
 import { LoadingState } from '@/components/layout/LoadingState';
+import { LeaveBalanceView } from './LeaveBalanceView';
+import { AdminBalanceManager } from './AdminBalanceManager';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface VacationHubProps {
   departmentId?: string;
@@ -29,7 +32,7 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
 
   // Find approver role and determine level (supports 3-level approval workflow)
   const approverRole = roles?.find(r =>
-    ['department_head', 'facility_supervisor', 'workplace_supervisor'].includes(r.role)
+    ['department_head', 'facility_supervisor', 'workplace_supervisor', 'workspace_supervisor'].includes(r.role)
   );
 
   const isApprover = !!approverRole || isSuperAdmin;
@@ -57,7 +60,7 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
         scopeType: 'facility' as const,
         scopeId: approverRole.facility_id!
       };
-    } else if (approverRole.role === 'workplace_supervisor') {
+    } else if (approverRole.role === 'workplace_supervisor' || approverRole.role === 'workspace_supervisor') {
       return {
         approvalLevel: 3 as const,
         scopeType: 'workspace' as const,
@@ -124,6 +127,10 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
                   <Settings className="h-4 w-4 mr-1.5 sm:mr-2" />
                   <span className="hidden sm:inline">Types</span>
                 </TabsTrigger>
+                <TabsTrigger value="balances" className="min-h-[44px] px-3 text-sm">
+                  <CheckSquare className="h-4 w-4 mr-1.5 sm:mr-2" />
+                  <span className="hidden sm:inline">Balances</span>
+                </TabsTrigger>
                 <TabsTrigger value="rules" className="min-h-[44px] px-3 text-sm">
                   <Settings className="h-4 w-4 mr-1.5 sm:mr-2" />
                   <span className="hidden sm:inline">Rules</span>
@@ -131,6 +138,9 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
               </>
             )}
           </ResponsiveTabsList>
+
+          <LeaveBalanceView />
+
 
           <TabsContent value="calendar">
             <ErrorBoundary fallback={<ErrorState title="Calendar Error" message="Failed to load calendar view" />}>
@@ -159,8 +169,8 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
 
           {isApprover && approvalInfo && (
             <TabsContent value="team-plans">
-              <VacationPlansList 
-                scopeType={approvalInfo.scopeType} 
+              <VacationPlansList
+                scopeType={approvalInfo.scopeType}
                 scopeId={approvalInfo.scopeId}
                 departmentId={departmentId}
               />
@@ -177,6 +187,9 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
             <>
               <TabsContent value="types">
                 <VacationTypeManagement />
+              </TabsContent>
+              <TabsContent value="balances">
+                <AdminBalanceManager />
               </TabsContent>
               <TabsContent value="rules">
                 <VacationRulesManagement />

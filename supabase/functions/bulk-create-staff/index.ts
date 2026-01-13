@@ -1,5 +1,9 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+// @ts-ignore
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+// @ts-ignore
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.84.0";
+
+declare const Deno: any;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,15 +15,20 @@ interface BulkCreateStaffRequest {
   departmentId: string;
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
+  console.log("--- BULK CREATE STAFF REQUEST RECEIVED ---");
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
   try {
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      SUPABASE_URL ?? '',
+      SUPABASE_SERVICE_ROLE_KEY ?? '',
       {
         auth: {
           autoRefreshToken: false,
@@ -38,16 +47,18 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
 
     if (authError || !user) {
+      console.error("AUTH ERROR:", authError);
       throw new Error('Unauthorized');
     }
 
-    // Verify user has appropriate role (super_admin, general_admin, or department_head)
-    const { data: userRoles } = await supabaseClient
+    // Verify user has appropriate role
+    const { data: userRoles, error: rolesError } = await supabaseClient
       .from('user_roles')
       .select('role, department_id')
       .eq('user_id', user.id);
 
-    if (!userRoles || userRoles.length === 0) {
+    if (rolesError || !userRoles || userRoles.length === 0) {
+      console.error("ROLES ERROR:", rolesError);
       throw new Error('User has no roles assigned');
     }
 
@@ -61,27 +72,28 @@ serve(async (req) => {
       throw new Error('Department ID is required');
     }
 
-    // Get department details with facility and workspace info
+    // Get department details
     const { data: department, error: deptError } = await supabaseClient
       .from('departments')
-      .select('*, facilities(id, workspace_id)')
+      .select('*, facilities(id, workspace_id, workspaces(organization_id))')
       .eq('id', departmentId)
       .single();
 
     if (deptError || !department) {
+      console.error("DEPT ERROR:", deptError);
       throw new Error('Department not found');
     }
 
     // Check authorization - must be super_admin, general_admin, or department_head of this dept
-    const isSuperAdmin = userRoles.some(r => r.role === 'super_admin');
-    const isGeneralAdmin = userRoles.some(r => r.role === 'general_admin');
-    const isDeptHead = userRoles.some(r => r.role === 'department_head' && r.department_id === departmentId);
+    const isSuperAdmin = userRoles.some((r: any) => r.role === 'super_admin');
+    const isGeneralAdmin = userRoles.some((r: any) => r.role === 'general_admin');
+    const isDeptHead = userRoles.some((r: any) => r.role === 'department_head' && r.department_id === departmentId);
 
     if (!isSuperAdmin && !isGeneralAdmin && !isDeptHead) {
       throw new Error('Insufficient permissions to create staff for this department');
     }
 
-    console.log(`Creating staff for department: ${department.name}, workspace: ${department.facilities.workspace_id}`);
+    console.log(`Creating ${emails.length} staff for department: ${department.name}`);
 
     const results = {
       created: 0,
@@ -91,80 +103,76 @@ serve(async (req) => {
 
     for (const email of emails) {
       try {
-        // Create user with default password 1234
+        const trimmedEmail = email.trim();
+
+        // Create/Get auth user
+        let newUserId: string;
         const { data: newUser, error: createError } = await supabaseClient.auth.admin.createUser({
-          email: email.trim(),
+          email: trimmedEmail,
           password: '1234',
           email_confirm: true,
+          user_metadata: {
+            full_name: trimmedEmail.split('@')[0],
+          },
         });
 
         if (createError) {
-          results.failed++;
-          results.errors.push(`${email}: ${createError.message}`);
-          console.error(`Failed to create user ${email}:`, createError);
-          continue;
+          if (createError.message?.includes("already registered") || createError.status === 422) {
+            console.log(`User ${trimmedEmail} already exists, fetching ID...`);
+            const { data: existingUsers, error: listError } = await supabaseClient.auth.admin.listUsers();
+            if (listError) throw listError;
+            const existingUser = existingUsers.users.find((u: any) => u.email?.toLowerCase() === trimmedEmail.toLowerCase());
+            if (!existingUser) throw new Error(`User ${trimmedEmail} exists but could not be found`);
+            newUserId = existingUser.id;
+          } else {
+            results.failed++;
+            results.errors.push(`${trimmedEmail}: ${createError.message}`);
+            continue;
+          }
+        } else {
+          newUserId = newUser.user.id;
         }
 
-        if (!newUser.user) {
-          results.failed++;
-          results.errors.push(`${email}: Failed to create user`);
-          console.error(`No user object returned for ${email}`);
-          continue;
-        }
-
-        console.log(`Created auth user for ${email}: ${newUser.user.id}`);
-
-        // Create profile with force_password_change flag
+        // Upsert profile
         const { error: profileError } = await supabaseClient
           .from('profiles')
-          .insert({
-            id: newUser.user.id,
-            email: email.trim(),
-            full_name: email.split('@')[0], // Temporary name from email
+          .upsert({
+            id: newUserId,
+            email: trimmedEmail,
+            full_name: trimmedEmail.split('@')[0],
             force_password_change: true,
             created_by: user.id,
-          });
+          }, { onConflict: 'id' });
 
         if (profileError) {
-          // Rollback: delete the auth user
-          await supabaseClient.auth.admin.deleteUser(newUser.user.id);
           results.failed++;
-          results.errors.push(`${email}: Profile creation failed - ${profileError.message}`);
-          console.error(`Failed to create profile for ${email}:`, profileError);
+          results.errors.push(`${trimmedEmail}: Profile error - ${profileError.message}`);
           continue;
         }
 
-        console.log(`Created profile for ${email}`);
-
-        // Create user role as staff in the department
+        // Upsert user role
         const { error: roleError } = await supabaseClient
           .from('user_roles')
-          .insert({
-            user_id: newUser.user.id,
+          .upsert({
+            user_id: newUserId,
             role: 'staff',
             workspace_id: department.facilities.workspace_id,
             facility_id: department.facility_id,
             department_id: departmentId,
+            organization_id: department.facilities?.workspaces?.organization_id,
             created_by: user.id,
-          });
+          }, { onConflict: 'user_id, role, workspace_id, facility_id, department_id, organization_id' });
 
         if (roleError) {
-          // Rollback: delete profile and auth user
-          await supabaseClient.from('profiles').delete().eq('id', newUser.user.id);
-          await supabaseClient.auth.admin.deleteUser(newUser.user.id);
           results.failed++;
-          results.errors.push(`${email}: Role assignment failed - ${roleError.message}`);
-          console.error(`Failed to create role for ${email}:`, roleError);
+          results.errors.push(`${trimmedEmail}: Role error - ${roleError.message}`);
           continue;
         }
 
-        console.log(`Assigned staff role to ${email} in department ${departmentId}`);
         results.created++;
-      } catch (error) {
+      } catch (innerError: any) {
         results.failed++;
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        results.errors.push(`${email}: ${errorMessage}`);
-        console.error(`Error processing ${email}:`, error);
+        results.errors.push(`${email}: ${innerError.message || 'Unknown error'}`);
       }
     }
 
@@ -172,20 +180,13 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(results),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Bulk create staff error:', error);
+  } catch (error: any) {
+    console.error('Bulk staff error:', error);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
+      JSON.stringify({ error: error.message || 'Unknown error' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
     );
   }
 });

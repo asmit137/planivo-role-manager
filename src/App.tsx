@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/lib/auth";
 import { ModuleProvider } from "@/contexts/ModuleContext";
+import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
 import { useSecurityProtection } from "@/hooks/useSecurityProtection";
@@ -45,26 +46,28 @@ const App = () => (
           <NetworkStatusIndicator />
           <BrowserRouter>
             <AuthProvider>
-              <ModuleProvider>
-                <Routes>
-                  <Route path="/" element={<Landing />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/bootstrap" element={<Bootstrap />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route path="/meeting" element={<MeetingRoom />} />
-                  <Route path="/schedule-display" element={<ScheduleDisplay />} />
+              <OrganizationProvider>
+                <ModuleProvider>
+                  <Routes>
+                    <Route path="/" element={<Landing />} />
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/bootstrap" element={<Bootstrap />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/meeting" element={<MeetingRoom />} />
+                    <Route path="/schedule-display" element={<ScheduleDisplay />} />
 
-                  {/* Policy Pages */}
-                  <Route path="/policies/terms" element={<TermsOfService />} />
-                  <Route path="/policies/privacy" element={<PrivacyPolicy />} />
-                  <Route path="/policies/cookies" element={<CookiePolicy />} />
-                  <Route path="/contact-us" element={<ContactUs />} />
+                    {/* Policy Pages */}
+                    <Route path="/policies/terms" element={<TermsOfService />} />
+                    <Route path="/policies/privacy" element={<PrivacyPolicy />} />
+                    <Route path="/policies/cookies" element={<CookiePolicy />} />
+                    <Route path="/contact-us" element={<ContactUs />} />
 
-                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </ModuleProvider>
+                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </ModuleProvider>
+              </OrganizationProvider>
             </AuthProvider>
           </BrowserRouter>
         </SecurityWrapper>

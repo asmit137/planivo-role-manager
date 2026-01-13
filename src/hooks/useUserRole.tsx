@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 
-export type AppRole = 'super_admin' | 'organization_admin' | 'general_admin' | 'workplace_supervisor' | 'facility_supervisor' | 'department_head' | 'staff' | 'custom';
+export type AppRole = 'super_admin' | 'organization_admin' | 'general_admin' | 'workplace_supervisor' | 'workspace_supervisor' | 'facility_supervisor' | 'department_head' | 'staff' | 'intern' | 'custom';
 
 export interface UserRole {
   id: string;

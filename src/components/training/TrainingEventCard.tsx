@@ -7,13 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  Video, 
-  Users, 
-  CheckCircle, 
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  Video,
+  Users,
+  CheckCircle,
   XCircle,
   ExternalLink,
   Loader2,
@@ -44,11 +44,11 @@ interface TrainingEventCardProps {
   onViewRegistrations?: (eventId: string) => void;
 }
 
-const TrainingEventCard = ({ 
-  event, 
+const TrainingEventCard = ({
+  event,
   isAdminView = false,
   onEdit,
-  onViewRegistrations 
+  onViewRegistrations
 }: TrainingEventCardProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -88,10 +88,23 @@ const TrainingEventCard = ({
   const registerMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error('You must be logged in');
-      
+
       // Check capacity
       if (event.max_participants && registrationCount && registrationCount >= event.max_participants) {
         throw new Error('This event has reached its maximum capacity');
+      }
+
+      // Check vacation availability
+      const { data: availability, error: availabilityError } = await supabase.rpc('check_staff_availability', {
+        _staff_id: user.id,
+        _start_time: event.start_datetime,
+        _end_time: event.end_datetime
+      });
+
+      if (availabilityError) throw availabilityError;
+
+      if (availability && availability.length > 0 && !availability[0].is_available) {
+        throw new Error(availability[0].conflict_reason || 'You are on vacation during this event.');
       }
 
       const { error } = await supabase
@@ -198,18 +211,18 @@ const TrainingEventCard = ({
           </div>
         </div>
       </CardHeader>
-      
+
       <CardContent className="space-y-3">
         {event.description && (
           <p className="text-sm text-muted-foreground line-clamp-2">{event.description}</p>
         )}
-        
+
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Calendar className="h-4 w-4 shrink-0" />
             <span>{format(startDate, 'EEEE, MMMM d, yyyy')}</span>
           </div>
-          
+
           <div className="flex items-center gap-2 text-muted-foreground">
             <Clock className="h-4 w-4 shrink-0" />
             <span>
@@ -221,7 +234,7 @@ const TrainingEventCard = ({
               )}
             </span>
           </div>
-          
+
           <div className="flex items-center gap-2 text-muted-foreground">
             {getLocationIcon()}
             <span className="capitalize">{event.location_type}</span>
@@ -237,9 +250,9 @@ const TrainingEventCard = ({
         </div>
 
         {event.online_link && isRegistered && (
-          <a 
-            href={event.online_link} 
-            target="_blank" 
+          <a
+            href={event.online_link}
+            target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-sm text-primary hover:underline"
           >
@@ -252,7 +265,7 @@ const TrainingEventCard = ({
       <CardFooter className="flex flex-wrap gap-2 pt-4 border-t">
         {/* Video Conference Join Button */}
         {event.enable_video_conference && isRegistered && !isEventPast && (
-          <Button 
+          <Button
             size="sm"
             className="bg-emerald-600 hover:bg-emerald-700"
             onClick={() => navigate(`/meeting?eventId=${event.id}`)}
@@ -265,8 +278,8 @@ const TrainingEventCard = ({
         {!isAdminView && !isEventPast && event.status === 'published' && (
           <>
             {isRegistered ? (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => cancelRegistrationMutation.mutate()}
                 disabled={cancelRegistrationMutation.isPending}
@@ -279,7 +292,7 @@ const TrainingEventCard = ({
                 Cancel Registration
               </Button>
             ) : (
-              <Button 
+              <Button
                 size="sm"
                 onClick={() => registerMutation.mutate()}
                 disabled={registerMutation.isPending || isFull || checkingRegistration}

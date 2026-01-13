@@ -52,6 +52,7 @@ const OrganizationManagement = () => {
   const [maxWorkspaces, setMaxWorkspaces] = useState<LimitState>({ value: 5, unlimited: true });
   const [maxFacilities, setMaxFacilities] = useState<LimitState>({ value: 10, unlimited: true });
   const [maxUsers, setMaxUsers] = useState<LimitState>({ value: 100, unlimited: true });
+  const [vacationMode, setVacationMode] = useState<'planning' | 'full'>('full');
 
   // Real-time subscriptions
   useRealtimeSubscription({
@@ -147,6 +148,7 @@ const OrganizationManagement = () => {
       maxWorkspaces?: number | null;
       maxFacilities?: number | null;
       maxUsers?: number | null;
+      vacationMode?: 'planning' | 'full';
     }) => {
       const validated = organizationSchema.parse({ name: params.name, description: params.description });
 
@@ -183,6 +185,7 @@ const OrganizationManagement = () => {
           max_workspaces: params.maxWorkspaces,
           max_facilities: params.maxFacilities,
           max_users: params.maxUsers,
+          vacation_mode: params.vacationMode,
         }])
         .select()
         .single();
@@ -213,6 +216,7 @@ const OrganizationManagement = () => {
       selectedOwnerId?: string | null;
       newOwnerEmail?: string;
       newOwnerName?: string;
+      vacationMode?: 'planning' | 'full';
     }) => {
       const validated = organizationSchema.parse({ name: params.name, description: params.description });
 
@@ -244,6 +248,7 @@ const OrganizationManagement = () => {
         max_workspaces: params.maxWorkspaces,
         max_facilities: params.maxFacilities,
         max_users: params.maxUsers,
+        vacation_mode: params.vacationMode,
       };
 
       // Only update owner_id if changed
@@ -300,6 +305,7 @@ const OrganizationManagement = () => {
     setMaxWorkspaces({ value: 5, unlimited: true });
     setMaxFacilities({ value: 10, unlimited: true });
     setMaxUsers({ value: 100, unlimited: true });
+    setVacationMode('full');
     setSelectedOrg(null);
   };
 
@@ -313,6 +319,7 @@ const OrganizationManagement = () => {
       maxWorkspaces: maxWorkspaces.unlimited ? null : maxWorkspaces.value,
       maxFacilities: maxFacilities.unlimited ? null : maxFacilities.value,
       maxUsers: maxUsers.unlimited ? null : maxUsers.value,
+      vacationMode: vacationMode,
     });
   };
 
@@ -337,6 +344,7 @@ const OrganizationManagement = () => {
       selectedOwnerId: selectedOwnerId,
       newOwnerEmail: editOwnerEmail.trim(),
       newOwnerName: editOwnerName.trim(),
+      vacationMode,
     });
   };
 
@@ -353,6 +361,7 @@ const OrganizationManagement = () => {
     setMaxUsers(org.max_users === null
       ? { value: 100, unlimited: true }
       : { value: org.max_users, unlimited: false });
+    setVacationMode(org.vacation_mode || 'full');
     // Set owner mode based on current owner
     setOwnerMode(org.owner_id ? 'keep' : 'create');
     setSelectedOwnerId(org.owner_id || null);
@@ -455,6 +464,26 @@ const OrganizationManagement = () => {
                     onChange={(e) => setDescription(e.target.value)}
                     rows={2}
                   />
+                </div>
+
+                <div className="space-y-3">
+                  <Label>Vacation Mode</Label>
+                  <RadioGroup value={vacationMode} onValueChange={(v: any) => setVacationMode(v)} className="flex gap-4">
+                    <div className="flex items-center space-x-2 border p-3 rounded-md flex-1 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem value="full" id="mode-full" />
+                      <div>
+                        <Label htmlFor="mode-full" className="font-semibold cursor-pointer">Full Mode</Label>
+                        <p className="text-xs text-muted-foreground">Balances are deducted. Limits enforced.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2 border p-3 rounded-md flex-1 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem value="planning" id="mode-planning" />
+                      <div>
+                        <Label htmlFor="mode-planning" className="font-semibold cursor-pointer">Planning Mode</Label>
+                        <p className="text-xs text-muted-foreground">No balance deducted. For scheduling only.</p>
+                      </div>
+                    </div>
+                  </RadioGroup>
                 </div>
 
                 <Separator />
@@ -583,6 +612,9 @@ const OrganizationManagement = () => {
                             <Badge variant="outline" className="text-xs">
                               Users: {formatLimit(org.max_users)}
                             </Badge>
+                            <Badge variant={org.vacation_mode === 'planning' ? 'secondary' : 'default'} className="text-xs">
+                              {org.vacation_mode === 'planning' ? 'Planning Mode' : 'Full Mode'}
+                            </Badge>
                           </div>
                         </div>
                       </div>
@@ -668,6 +700,26 @@ const OrganizationManagement = () => {
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
               />
+            </div>
+
+            <div className="space-y-3">
+              <Label>Vacation Mode</Label>
+              <RadioGroup value={vacationMode} onValueChange={(v: any) => setVacationMode(v)} className="flex gap-4">
+                <div className="flex items-center space-x-2 border p-3 rounded-md flex-1 cursor-pointer hover:bg-muted/50 transition-colors">
+                  <RadioGroupItem value="full" id="edit-mode-full" />
+                  <div>
+                    <Label htmlFor="edit-mode-full" className="font-semibold cursor-pointer">Full Mode</Label>
+                    <p className="text-xs text-muted-foreground">Balances are deducted. Limits enforced.</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2 border p-3 rounded-md flex-1 cursor-pointer hover:bg-muted/50 transition-colors">
+                  <RadioGroupItem value="planning" id="edit-mode-planning" />
+                  <div>
+                    <Label htmlFor="edit-mode-planning" className="font-semibold cursor-pointer">Planning Mode</Label>
+                    <p className="text-xs text-muted-foreground">No balance deducted. For scheduling only.</p>
+                  </div>
+                </div>
+              </RadioGroup>
             </div>
 
             <Separator />

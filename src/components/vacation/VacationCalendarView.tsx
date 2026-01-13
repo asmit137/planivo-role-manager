@@ -98,7 +98,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
         query = query.or(staffFilters.join(','));
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query as any;
       if (error) throw error;
 
       return data || [];
@@ -125,8 +125,8 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
   const getVacationsForDate = (date: Date) => {
     if (!vacations) return [];
 
-    return vacations.filter(vacation => {
-      return vacation.vacation_splits?.some(split => {
+    return vacations.filter((vacation: any) => {
+      return vacation.vacation_splits?.some((split: any) => {
         const start = parseISO(split.start_date);
         const end = parseISO(split.end_date);
         return isWithinInterval(date, { start, end }) || isSameDay(date, start) || isSameDay(date, end);
@@ -159,38 +159,21 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
     const today = new Date();
 
     return vacations
-      .flatMap(vacation => {
+      .flatMap((vacation: any) => {
         return vacation.vacation_splits
-          ?.map(split => ({
+          ?.map((split: any) => ({
             ...vacation,
             split,
             splitStartDate: parseISO(split.start_date),
             splitEndDate: parseISO(split.end_date),
           })) || [];
       })
-      .filter(item => {
+      .filter((item: any) => {
         const isUpcoming = item.splitStartDate >= today;
         if (!dateRange) return isUpcoming;
         return isUpcoming && isWithinInterval(item.splitStartDate, dateRange);
       })
-      .sort((a, b) => a.splitStartDate.getTime() - b.splitStartDate.getTime());
-  };
-
-  // Custom day content with vacation indicators
-  const renderDay = (date: Date) => {
-    const vacationsOnDay = getVacationsForDate(date);
-    const count = vacationsOnDay.length;
-
-    return (
-      <div className="relative w-full h-full flex items-center justify-center">
-        <span>{format(date, 'd')}</span>
-        {count > 0 && (
-          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2">
-            <div className="w-1.5 h-1.5 rounded-full bg-success" />
-          </div>
-        )}
-      </div>
-    );
+      .sort((a: any, b: any) => a.splitStartDate.getTime() - b.splitStartDate.getTime());
   };
 
   if (isLoading) {
@@ -357,13 +340,13 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                             <div className="w-full flex items-center justify-between">
                               <div className={cn(
                                 "text-white text-[9px] sm:text-[10px] font-black rounded-lg px-1.5 py-0.5 flex items-center justify-center shadow-md z-10 border border-white/10",
-                                vacationsOnDay.some(v => v.status === 'approved') ? "bg-emerald-500" : "bg-amber-500"
+                                vacationsOnDay.some((v: any) => v.status === 'approved') ? "bg-emerald-500" : "bg-amber-500"
                               )}>
                                 {vacationsOnDay.length}
                               </div>
 
                               <div className="flex -space-x-1.5 overflow-hidden">
-                                {vacationsOnDay.slice(0, 3).map((v, idx) => (
+                                {vacationsOnDay.slice(0, 3).map((v: any, idx: number) => (
                                   <div
                                     key={idx}
                                     className={cn(
@@ -387,8 +370,8 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                               {vacationsOnDay.length} staff member{vacationsOnDay.length > 1 ? 's' : ''} on vacation
                             </p>
                             <div className="space-y-2 max-h-96 overflow-y-auto">
-                              {vacationsOnDay.map((vacation) => {
-                                const split = vacation.vacation_splits?.find(s => {
+                              {vacationsOnDay.map((vacation: any) => {
+                                const split = vacation.vacation_splits?.find((s: any) => {
                                   const start = parseISO(s.start_date);
                                   const end = parseISO(s.end_date);
                                   return isWithinInterval(date, { start, end }) || isSameDay(date, start) || isSameDay(date, end);
@@ -487,7 +470,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {upcomingVacations.map((item, index) => {
+              {upcomingVacations.map((item: any, index: number) => {
                 const isApproved = item.status === 'approved';
                 const isPending = ['pending_approval', 'department_pending', 'facility_pending', 'workspace_pending'].includes(item.status);
 

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Building2, Users, Plus, UserPlus } from 'lucide-react';
+import { Building2, Users, Plus, UserPlus, FolderTree, Trash2 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -31,6 +31,9 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
   const [facilityDialogOpen, setFacilityDialogOpen] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState('');
   const [facilityName, setFacilityName] = useState('');
+  const [deptDialogOpen, setDeptDialogOpen] = useState(false);
+  const [selectedFacilityId, setSelectedFacilityId] = useState('');
+  const [selectedDeptTemplateId, setSelectedDeptTemplateId] = useState('');
   const queryClient = useQueryClient();
 
   // Real-time subscriptions for live updates
@@ -70,9 +73,18 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
 
           if (facilitiesError) throw facilitiesError;
 
-          // Fetch users for each facility
-          const facilitiesWithUsers = await Promise.all(
+          // Fetch facilities for each workspace with their departments
+          const facilitiesWithDetails = await Promise.all(
             facilities.map(async (facility) => {
+              // Fetch departments for this facility
+              const { data: departments, error: deptsError } = await supabase
+                .from('departments')
+                .select('*')
+                .eq('facility_id', facility.id)
+                .order('name');
+
+              if (deptsError) throw deptsError;
+
               const { data: userRoles, error: rolesError } = await supabase
                 .from('user_roles')
                 .select('*')
@@ -91,6 +103,7 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
 
               return {
                 ...facility,
+                departments: departments || [],
                 users: userRoles.map((ur: any) => {
                   const profile = userProfiles?.find(p => p.id === ur.user_id);
                   return {
@@ -107,7 +120,7 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
 
           return {
             ...workspace,
-            facilities: facilitiesWithUsers,
+            facilities: facilitiesWithDetails,
           };
         })
       );
@@ -141,6 +154,88 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to create facility');
+    },
+  });
+
+  // Fetch available department templates for the selected facility's workspace
+  const { data: deptTemplates } = useQuery({
+    queryKey: ['workspace-dept-templates', selectedFacilityId],
+    enabled: !!selectedFacilityId,
+    queryFn: async () => {
+      // Find the workspace ID for this facility
+      const { data: facility } = await supabase
+        .from('facilities')
+        .select('workspace_id')
+        .eq('id', selectedFacilityId)
+        .single();
+
+      if (!facility) return [];
+
+      const { data, error } = await supabase
+        .from('workspace_departments')
+        .select(`
+          department_template_id,
+          departments!workspace_departments_department_template_id_fkey (*)
+        `)
+        .eq('workspace_id', facility.workspace_id);
+
+      if (error) throw error;
+      return data.map(item => item.departments);
+    },
+  });
+
+  const addDeptMutation = useMutation({
+    mutationFn: async ({ facilityId, templateId }: { facilityId: string; templateId: string }) => {
+      // Get template details
+      const { data: template, error: templateError } = await supabase
+        .from('departments')
+        .select('*')
+        .eq('id', templateId)
+        .single();
+
+      if (templateError) throw templateError;
+
+      // Create new department instance
+      const { data, error } = await supabase
+        .from('departments')
+        .insert({
+          name: template.name,
+          category: template.category,
+          min_staffing: template.min_staffing,
+          facility_id: facilityId,
+          is_template: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspaces-with-facilities'] });
+      toast.success('Department added to facility');
+      setDeptDialogOpen(false);
+      setSelectedDeptTemplateId('');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to add department');
+    },
+  });
+
+  const deleteDeptMutation = useMutation({
+    mutationFn: async (deptId: string) => {
+      const { error } = await supabase
+        .from('departments')
+        .delete()
+        .eq('id', deptId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspaces-with-facilities'] });
+      toast.success('Department removed successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to remove department');
     },
   });
 
@@ -218,6 +313,44 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
                 </DialogContent>
               </Dialog>
 
+              <Dialog open={deptDialogOpen} onOpenChange={setDeptDialogOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Department Template</DialogTitle>
+                    <DialogDescription>Select a department template to add to this facility</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Available Templates</Label>
+                      <Select value={selectedDeptTemplateId} onValueChange={setSelectedDeptTemplateId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a template" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {deptTemplates?.map((template: any) => (
+                            <SelectItem key={template.id} value={template.id}>
+                              {template.name} ({template.category || 'No Category'})
+                            </SelectItem>
+                          ))}
+                          {(!deptTemplates || deptTemplates.length === 0) && (
+                            <SelectItem value="none" disabled>No templates available</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      className="w-full"
+                      disabled={!selectedDeptTemplateId || addDeptMutation.isPending}
+                      onClick={() => addDeptMutation.mutate({
+                        facilityId: selectedFacilityId,
+                        templateId: selectedDeptTemplateId
+                      })}
+                    >
+                      {addDeptMutation.isPending ? 'Adding...' : 'Add Department'}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </CardHeader>
@@ -261,15 +394,69 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
                       <div className="space-y-3 mt-2">
                         {workspace.facilities.map((facility: any) => (
                           <div key={facility.id} className="border rounded-lg p-4 bg-muted/30">
-                            <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center justify-between mb-4 pb-2 border-b">
                               <div className="flex items-center gap-2">
-                                <Building2 className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium">{facility.name}</span>
+                                <Building2 className="h-4 w-4 text-primary" />
+                                <span className="font-semibold text-lg">{facility.name}</span>
                               </div>
-                              <Badge variant="outline">
-                                <Users className="h-3 w-3 mr-1" />
-                                {facility.users?.length || 0} users
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedFacilityId(facility.id);
+                                    setDeptDialogOpen(true);
+                                  }}
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Add Dept
+                                </Button>
+                                <Badge variant="outline">
+                                  <Users className="h-3 w-3 mr-1" />
+                                  {facility.users?.length || 0} users
+                                </Badge>
+                              </div>
+                            </div>
+
+                            {/* Departments Section */}
+                            <div className="mb-4">
+                              <div className="flex items-center gap-2 mb-2 text-sm font-medium text-muted-foreground">
+                                <FolderTree className="h-4 w-4" />
+                                <span>Departments</span>
+                              </div>
+                              {(!facility.departments || facility.departments.length === 0) ? (
+                                <p className="text-xs text-muted-foreground bg-background p-2 rounded border border-dashed text-center">
+                                  No departments assigned
+                                </p>
+                              ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {facility.departments.map((dept: any) => (
+                                    <div key={dept.id} className="flex items-center justify-between p-2 rounded bg-background border text-sm group">
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{dept.name}</span>
+                                        <span className="text-[10px] text-muted-foreground uppercase">{dept.category}</span>
+                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
+                                        onClick={() => {
+                                          if (confirm(`Are you sure you want to remove ${dept.name}?`)) {
+                                            deleteDeptMutation.mutate(dept.id);
+                                          }
+                                        }}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 mb-2 text-sm font-medium text-muted-foreground">
+                              <Users className="h-4 w-4" />
+                              <span>Users</span>
                             </div>
                             {facility.users && facility.users.length > 0 && (
                               <div className="space-y-2">

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,10 +48,10 @@ interface UserGroup {
 const GroupManagement = () => {
   const { user } = useAuth();
   const { data: roles } = useUserRole();
+  const { selectedOrganizationId } = useOrganization();
   const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
   const queryClient = useQueryClient();
 
-  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -60,7 +61,7 @@ const GroupManagement = () => {
   const [groupDescription, setGroupDescription] = useState('');
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
 
-  // Determine user's organization id
+  // Determine user's organization id (fallback for non-super-admins)
   const { data: userOrgId } = useQuery({
     queryKey: ['user-org-id', user?.id],
     queryFn: async () => {
@@ -74,9 +75,11 @@ const GroupManagement = () => {
         .maybeSingle();
       return (data?.workspaces as any)?.organization_id || null;
     },
+    enabled: !isSuperAdmin && !!user,
   });
 
-  const organizationId = isSuperAdmin ? selectedOrgId : userOrgId;
+  // Use context org for super admin, fallback for others
+  const organizationId = isSuperAdmin ? selectedOrganizationId : userOrgId;
 
   // Fetch all organizations for super admin
   const { data: organizations } = useQuery({
@@ -311,19 +314,7 @@ const GroupManagement = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            {isSuperAdmin && (
-              <Select value={selectedOrgId || ''} onValueChange={setSelectedOrgId}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Select Organization" />
-                </SelectTrigger>
-                <SelectContent>
-                  {organizations?.map(org => (
-                    <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <Button onClick={() => setShowCreateDialog(true)} disabled={isSuperAdmin && !selectedOrgId}>
+            <Button onClick={() => setShowCreateDialog(true)} disabled={isSuperAdmin && !organizationId}>
               <Plus className="h-4 w-4 mr-2" />
               New Group
             </Button>

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Calendar, Users, AlertTriangle, CheckCircle, Clipboard } from 'lucide-react';
 import { format, parseISO, isWithinInterval, startOfWeek, endOfWeek, addDays } from 'date-fns';

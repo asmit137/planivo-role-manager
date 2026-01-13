@@ -24,6 +24,7 @@ import UserEditDialog from '@/components/admin/UserEditDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorState } from '@/components/layout/ErrorState';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface UnifiedUserHubProps {
   scope?: 'system' | 'workspace' | 'facility' | 'department';
@@ -57,6 +58,11 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
       userRoles?.[0]?.role === 'department_head' ? 'department' : 'system');
   const detectedScopeId = scopeId || userRoles?.[0]?.department_id || userRoles?.[0]?.facility_id || userRoles?.[0]?.workspace_id;
 
+  const { selectedOrganizationId } = useOrganization();
+
+  // Use prop if provided (scoped view), otherwise use context (super admin switcher)
+  const activeOrganizationId = organizationId || selectedOrganizationId;
+
   // Check permissions for user management module
   const hasViewPermission = true; // If they're on this page, they have view
   const hasEditPermission = canEdit('user_management') || canEdit('staff_management');
@@ -65,96 +71,100 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
   const hasBulkUpload = hasAdminPermission;
 
   const { data: workspaces } = useQuery({
-    queryKey: ['workspaces'],
+    queryKey: ['workspaces', activeOrganizationId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('workspaces')
         .select('*')
         .order('name');
+
+      if (activeOrganizationId && activeOrganizationId !== 'all') {
+        query = query.eq('organization_id', activeOrganizationId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
     enabled: detectedScope === 'system',
   });
 
-  // Fetch all departments including specialties for display
+  // Fetch all departments including specialties for display, filtered by org
   const { data: allDepartments } = useQuery({
-    queryKey: ['all-departments'],
+    queryKey: ['all-departments', activeOrganizationId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('departments')
-        .select('*')
+        .select('*, facilities(workspace_id, workspaces(organization_id))')
         .order('name');
+
+      if (activeOrganizationId && activeOrganizationId !== 'all') {
+        query = query.eq('facilities.workspaces.organization_id', activeOrganizationId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
   });
 
   const { data: users, isLoading: usersLoading, error: usersError } = useQuery({
-    queryKey: ['unified-users', detectedScope, detectedScopeId, filterWorkspace, filterDepartment],
+    queryKey: ['unified-users', detectedScope, detectedScopeId, activeOrganizationId, filterWorkspace, filterDepartment],
     queryFn: async () => {
+      // Build optimized query based on scope
       let query = supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          user_roles!inner(
+            *,
+            custom_role:custom_roles(id, name)
+          )
+        `)
         .order('created_at', { ascending: false });
 
-      const { data: profiles, error: profilesError } = await query;
-      if (profilesError) throw profilesError;
-
-      // Fetch all user roles including custom role names
-      const { data: allUserRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('*, custom_role:custom_roles(id, name)');
-      if (rolesError) throw rolesError;
-
-      // Filter profiles based on scope
-      let filteredProfiles = profiles || [];
-
       if (detectedScope === 'department' && detectedScopeId) {
-        // Department Heads see staff in their department
-        const departmentRoles = allUserRoles?.filter(
-          (ur) => ur.department_id === detectedScopeId &&
-            (ur.role === 'staff' || ur.role === 'department_head')
-        );
-        const userIds = departmentRoles?.map((ur) => ur.user_id) || [];
-        filteredProfiles = profiles?.filter((p) => userIds.includes(p.id)) || [];
+        query = query
+          .eq('user_roles.department_id', detectedScopeId)
+          .in('user_roles.role', ['staff', 'department_head']);
       } else if (detectedScope === 'facility' && detectedScopeId) {
-        // Facility supervisors see users in their facility
-        const facilityRoles = allUserRoles?.filter((ur) => ur.facility_id === detectedScopeId);
-        const userIds = facilityRoles?.map((ur) => ur.user_id) || [];
-        filteredProfiles = profiles?.filter((p) => userIds.includes(p.id)) || [];
+        query = query.eq('user_roles.facility_id', detectedScopeId);
       } else if (detectedScope === 'workspace' && detectedScopeId) {
-        // Workspace admins see users in their workspace
-        const workspaceRoles = allUserRoles?.filter((ur) => ur.workspace_id === detectedScopeId);
-        const userIds = workspaceRoles?.map((ur) => ur.user_id) || [];
-        filteredProfiles = profiles?.filter((p) => userIds.includes(p.id)) || [];
+        query = query.eq('user_roles.workspace_id', detectedScopeId);
+      } else if (activeOrganizationId && activeOrganizationId !== 'all') {
+        // Core organization filter - always apply if we have an org context (and it's not 'all')
+        // This ensures we normally don't leak users across organizations, but allows 'all' for super admins
+        query = query.eq('user_roles.organization_id', activeOrganizationId);
       }
 
-      // Apply workspace filter if selected
-      if (filterWorkspace && filterWorkspace !== 'all') {
-        const workspaceRoles = allUserRoles?.filter((ur) => ur.workspace_id === filterWorkspace);
-        const userIds = workspaceRoles?.map((ur) => ur.user_id) || [];
-        filteredProfiles = filteredProfiles?.filter((p) => userIds.includes(p.id)) || [];
-      }
+      const { data: profilesWithRoles, error: queryError } = await query;
+      if (queryError) throw queryError;
 
-      // Apply department filter if selected (super admin only)
-      if (filterDepartment && filterDepartment !== 'all') {
-        const departmentRoles = allUserRoles?.filter((ur) => ur.department_id === filterDepartment);
-        const userIds = departmentRoles?.map((ur) => ur.user_id) || [];
-        filteredProfiles = filteredProfiles?.filter((p) => userIds.includes(p.id)) || [];
-      }
-
-      // Combine profiles with their roles
-      const usersWithRoles = filteredProfiles?.map((profile) => {
-        const roles = allUserRoles?.filter((ur) => ur.user_id === profile.id) || [];
-        return {
-          ...profile,
-          roles,
-        };
-      });
-
-      return usersWithRoles;
+      // Map back to the structure the component expects
+      return (profilesWithRoles || []).map((p: any) => ({
+        ...p,
+        roles: p.user_roles || []
+      }));
     },
+  });
+
+  // Secondary filters (dropdowns)
+  const filteredProfiles = (users || []).filter((user: any) => {
+    // Apply workspace filter
+    if (filterWorkspace && filterWorkspace !== 'all') {
+      if (!user.roles.some((r: any) => r.workspace_id === filterWorkspace)) {
+        return false;
+      }
+    }
+
+    // Apply department filter
+    if (filterDepartment && filterDepartment !== 'all') {
+      if (!user.roles.some((r: any) => r.department_id === filterDepartment)) {
+        return false;
+      }
+    }
+
+    return true;
   });
 
   // Fetch rate limits for super admin
@@ -337,7 +347,9 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
             <Badge key={idx} variant="outline">
               {roleData.role === 'custom' && roleData.custom_role?.name
                 ? roleData.custom_role.name
-                : roleData.role.replace(/_/g, ' ')}
+                : roleData.role === 'workplace_supervisor'
+                  ? 'Workspace Supervisor'
+                  : roleData.role.replace(/_/g, ' ')}
             </Badge>
           ))}
           {row.roles.length === 0 && (
@@ -382,7 +394,7 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
               const workspace = workspaces?.find((w: any) => w.id === roleData.workspace_id);
               if (!workspace) return null;
               return (
-                <Badge key={idx} className="bg-primary/10">
+                <Badge key={idx} className="bg-primary">
                   {workspace.name}
                 </Badge>
               );
@@ -443,8 +455,13 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
         />
       }
     >
+
       <>
-        <UnifiedUserCreation open={unifiedCreateOpen} onOpenChange={setUnifiedCreateOpen} />
+        <UnifiedUserCreation
+          open={unifiedCreateOpen}
+          onOpenChange={setUnifiedCreateOpen}
+          initialOrganizationId={activeOrganizationId === 'all' ? undefined : activeOrganizationId}
+        />
         <UserEditDialog
           open={editOpen}
           onOpenChange={setEditOpen}
@@ -512,25 +529,25 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
           <CardContent>
             {hasBulkUpload && detectedScope === 'system' ? (
               <Tabs defaultValue="list" className="space-y-4">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="list">
-                    <Filter className="h-4 w-4 mr-2" />
+                <TabsList className="inline-flex h-auto gap-1 w-auto">
+                  <TabsTrigger value="list" className="min-h-[40px] px-4 text-sm">
+                    <Filter className="h-4 w-4 mr-2 shrink-0" />
                     User List
                   </TabsTrigger>
-                  <TabsTrigger value="bulk">
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  <TabsTrigger value="bulk" className="min-h-[40px] px-4 text-sm">
+                    <FileSpreadsheet className="h-4 w-4 mr-2 shrink-0" />
                     Bulk Upload
                   </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="list" className="space-y-4">
                   {detectedScope === 'system' && (
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
                       <div className="flex items-center gap-2">
-                        <Filter className="h-4 w-4 text-muted-foreground" />
-                        <Label className="text-sm">Filter by Workspace:</Label>
+                        <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <Label className="text-sm whitespace-nowrap shrink-0">Workspace:</Label>
                         <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
-                          <SelectTrigger className="w-64">
+                          <SelectTrigger className="w-[180px] min-h-[40px]">
                             <SelectValue placeholder="Select workspace" />
                           </SelectTrigger>
                           <SelectContent>
@@ -546,10 +563,10 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
 
                       {isSuperAdmin && (
                         <div className="flex items-center gap-2">
-                          <Filter className="h-4 w-4 text-muted-foreground" />
-                          <Label className="text-sm">Filter by Department:</Label>
+                          <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <Label className="text-sm whitespace-nowrap shrink-0">Department:</Label>
                           <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-                            <SelectTrigger className="w-64">
+                            <SelectTrigger className="w-[180px] min-h-[40px]">
                               <SelectValue placeholder="Select department" />
                             </SelectTrigger>
                             <SelectContent>
@@ -567,7 +584,7 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
                   )}
 
                   <DataTable
-                    data={users}
+                    data={filteredProfiles}
                     columns={columns}
                     isLoading={usersLoading}
                     error={usersError as Error}
@@ -585,18 +602,20 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
                 </TabsContent>
 
                 <TabsContent value="bulk">
-                  <BulkUserUpload />
+                  <BulkUserUpload organizationId={activeOrganizationId === 'all' ? undefined : activeOrganizationId} />
                 </TabsContent>
               </Tabs>
             ) : (
               <div className="space-y-4">
                 {detectedScope === 'system' && (
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <Filter className="h-4 w-4 text-muted-foreground" />
-                      <Label className="text-sm">Filter by Workspace:</Label>
+                  <div className="flex flex-col gap-3 sm:gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Filter className="h-4 w-4 text-muted-foreground" />
+                        <Label className="text-sm whitespace-nowrap">Workspace:</Label>
+                      </div>
                       <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
-                        <SelectTrigger className="w-64">
+                        <SelectTrigger className="w-full sm:w-48 md:w-64 min-h-[44px]">
                           <SelectValue placeholder="Select workspace" />
                         </SelectTrigger>
                         <SelectContent>
@@ -611,11 +630,13 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
                     </div>
 
                     {isSuperAdmin && (
-                      <div className="flex items-center gap-2">
-                        <Filter className="h-4 w-4 text-muted-foreground" />
-                        <Label className="text-sm">Filter by Department:</Label>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Filter className="h-4 w-4 text-muted-foreground" />
+                          <Label className="text-sm whitespace-nowrap">Department:</Label>
+                        </div>
                         <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-                          <SelectTrigger className="w-64">
+                          <SelectTrigger className="w-full sm:w-48 md:w-64 min-h-[44px]">
                             <SelectValue placeholder="Select department" />
                           </SelectTrigger>
                           <SelectContent>
@@ -633,7 +654,7 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
                 )}
 
                 <DataTable
-                  data={users}
+                  data={filteredProfiles}
                   columns={columns}
                   isLoading={usersLoading}
                   error={usersError as Error}

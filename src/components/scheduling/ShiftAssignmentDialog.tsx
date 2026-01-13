@@ -104,6 +104,22 @@ export const ShiftAssignmentDialog: React.FC<ShiftAssignmentDialogProps> = ({
                 throw new Error('This shift has already reached its staffing requirement.');
             }
 
+            // Check availability via RPC
+            const shiftStart = `${dateStr}T${shift.start_time}`;
+            const shiftEnd = `${dateStr}T${shift.end_time}`;
+
+            const { data: availability, error: availabilityError } = await supabase.rpc('check_staff_availability', {
+                _staff_id: staffId,
+                _start_time: shiftStart,
+                _end_time: shiftEnd
+            });
+
+            if (availabilityError) throw availabilityError;
+
+            if (availability && availability.length > 0 && !availability[0].is_available) {
+                throw new Error(availability[0].conflict_reason || 'Staff is unavailable during this time.');
+            }
+
             const { error } = await supabase
                 .from('shift_assignments')
                 .insert({

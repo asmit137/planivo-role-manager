@@ -36,21 +36,36 @@ const OrganizationAdminDashboard = () => {
     invalidateQueries: ['org-admin-stats'],
   });
 
-  // Fetch the organization owned by this user
+  // Fetch the organization this user belongs to
   const { data: organization, isLoading: orgLoading, error: orgError } = useQuery({
-    queryKey: ['organization-admin-org', user?.id],
+    queryKey: ['organization-admin-org', user?.id, roles?.length],
     queryFn: async () => {
-      if (!user) return null;
-      const { data, error } = await supabase
+      if (!user || !roles) return null;
+
+      // If user is owner of an org, prioritize that
+      const { data: ownedOrg } = await supabase
         .from('organizations')
         .select('*')
         .eq('owner_id', user.id)
         .single();
 
-      if (error) throw error;
-      return data;
+      if (ownedOrg) return ownedOrg;
+
+      // Otherwise, get organization from their roles
+      const orgId = roles.find(r => r.organization_id)?.organization_id;
+      if (orgId) {
+        const { data: memberOrg, error } = await supabase
+          .from('organizations')
+          .select('*')
+          .eq('id', orgId)
+          .single();
+        if (error) throw error;
+        return memberOrg;
+      }
+
+      return null;
     },
-    enabled: !!user,
+    enabled: !!user && !!roles,
   });
 
   // Fetch usage stats
@@ -83,15 +98,11 @@ const OrganizationAdminDashboard = () => {
         facilityCount = count || 0;
       }
 
-      // Get user count (users assigned to workspaces in this org)
-      let userCount = 0;
-      if (workspaceIds.length > 0) {
-        const { count } = await supabase
-          .from('user_roles')
-          .select('*', { count: 'exact', head: true })
-          .in('workspace_id', workspaceIds);
-        userCount = count || 0;
-      }
+      // Get user count (include all users assigned to this organization!)
+      const { count: userCount } = await supabase
+        .from('user_roles')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organization.id);
 
       // Get pending vacation count
       let pendingVacations = 0;
@@ -121,15 +132,11 @@ const OrganizationAdminDashboard = () => {
       }
 
       // Get active tasks count
-      let activeTasks = 0;
-      if (workspaceIds.length > 0) {
-        const { count } = await supabase
-          .from('tasks')
-          .select('*', { count: 'exact', head: true })
-          .in('workspace_id', workspaceIds)
-          .eq('status', 'active');
-        activeTasks = count || 0;
-      }
+      const { count: activeTasks } = await supabase
+        .from('tasks')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organization.id)
+        .eq('status', 'active');
 
       // Get upcoming training count
       const { count: upcomingTraining } = await supabase
@@ -142,9 +149,9 @@ const OrganizationAdminDashboard = () => {
       return {
         workspaces: workspaceCount || 0,
         facilities: facilityCount,
-        users: userCount,
+        users: userCount || 0,
         pendingVacations,
-        activeTasks,
+        activeTasks: activeTasks || 0,
         upcomingTraining: upcomingTraining || 0,
       };
     },

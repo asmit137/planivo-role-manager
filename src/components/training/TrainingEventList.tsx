@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import TrainingEventCard from './TrainingEventCard';
 import TrainingEventForm from './TrainingEventForm';
 import { LoadingState } from '@/components/layout/LoadingState';
@@ -31,6 +32,7 @@ const TrainingEventList = ({
 }: TrainingEventListProps) => {
   const { user } = useAuth();
   const { data: roles } = useUserRole();
+  const { selectedOrganizationId } = useOrganization();
   const [searchQuery, setSearchQuery] = useState('');
   const [eventTypeFilter, setEventTypeFilter] = useState<string>('all');
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -41,7 +43,7 @@ const TrainingEventList = ({
 
   const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
 
-  // Get user's organization ID
+  // Get user's organization ID (fallback for non-super-admins)
   const { data: userOrgId } = useQuery({
     queryKey: ['user-org-id', user?.id],
     queryFn: async () => {
@@ -55,22 +57,25 @@ const TrainingEventList = ({
         .maybeSingle();
 
       if (error) throw error;
-      return data?.workspaces?.organization_id;
+      return data?.workspaces?.organization_id || null;
     },
-    enabled: !!user,
+    enabled: !!user && !isSuperAdmin, // Only fetch if not super admin
   });
 
+  // Determine effective organization ID: use context for super admin, fallback for others
+  const effectiveOrgId = isSuperAdmin ? selectedOrganizationId : userOrgId;
+
   const { data: events, isLoading, error } = useQuery({
-    queryKey: ['training-events', showOnlyPublished, showOnlyRegistered, showAll, userOrgId, isSuperAdmin],
+    queryKey: ['training-events', showOnlyPublished, showOnlyRegistered, showAll, effectiveOrgId, isSuperAdmin],
     queryFn: async () => {
       let query = supabase
         .from('training_events')
         .select('*')
         .order('start_datetime', { ascending: true });
 
-      // For non-super-admin, filter by organization
-      if (!isSuperAdmin && userOrgId) {
-        query = query.eq('organization_id', userOrgId);
+      // Filter by organization if we have one
+      if (effectiveOrgId) {
+        query = query.eq('organization_id', effectiveOrgId);
       }
 
       // Filter by status

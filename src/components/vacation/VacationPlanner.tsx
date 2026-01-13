@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
@@ -40,6 +41,7 @@ interface VacationPlannerProps {
 
 const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: VacationPlannerProps) => {
   const { user } = useAuth();
+  const { organization: currentOrganization } = useOrganization();
   const queryClient = useQueryClient();
   const [selectedStaff, setSelectedStaff] = useState('');
   const [selectedVacationType, setSelectedVacationType] = useState('');
@@ -64,9 +66,9 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   });
 
   // Determine effective department ID and mode
-  const isStaff = currentUserRole?.role === 'staff';
+  const isStaff = currentUserRole?.role === 'staff' || currentUserRole?.role === 'intern';
   const isDepartmentHead = currentUserRole?.role === 'department_head';
-  const isSupervisor = ['facility_supervisor', 'workplace_supervisor'].includes(currentUserRole?.role);
+  const isSupervisor = ['facility_supervisor', 'workplace_supervisor', 'workspace_supervisor'].includes(currentUserRole?.role);
   const isSuperAdmin = currentUserRole?.role === 'super_admin' || currentUserRole?.role === 'organization_admin';
   const effectiveDepartmentId = departmentId || selectedDepartment || currentUserRole?.department_id;
   const effectiveStaffOnly = staffOnly || isStaff;
@@ -131,7 +133,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
         .from('user_roles')
         .select('user_id, role')
         .eq('department_id', effectiveDepartmentId)
-        .in('role', ['staff', 'department_head', 'facility_supervisor', 'workplace_supervisor']);
+        .in('role', ['staff', 'intern', 'department_head', 'facility_supervisor', 'workplace_supervisor', 'workspace_supervisor']);
 
       if (rolesError) throw rolesError;
       if (!roles || roles.length === 0) return [];
@@ -196,6 +198,21 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     });
   }
 
+  const { data: userBalances } = useQuery({
+    queryKey: ['user-leave-balances', user?.id, new Date().getFullYear()],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from('leave_balances')
+        .select('*')
+        .eq('staff_id', user.id)
+        .eq('year', new Date().getFullYear());
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id && currentOrganization?.vacation_mode === 'full',
+  });
+
   const createPlanMutation = useMutation({
     mutationFn: async (planData: any) => {
       // Use the effective department ID
@@ -205,24 +222,27 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
         throw new Error('No department ID available');
       }
 
-      // Check for same-user overlapping vacation plans
-      const targetStaffId = effectiveStaffOnly ? user?.id : planData.staff_id;
-      const { data: userOverlaps } = await supabase.rpc('check_user_vacation_overlap', {
-        _staff_id: targetStaffId,
-        _splits: planData.splits
-      });
+      // Check validation only if NOT in planning mode
+      if (currentOrganization?.vacation_mode !== 'planning') {
+        // Check for same-user overlapping vacation plans
+        const targetStaffId = effectiveStaffOnly ? user?.id : planData.staff_id;
+        const { data: userOverlaps } = await supabase.rpc('check_user_vacation_overlap', {
+          _staff_id: targetStaffId,
+          _splits: planData.splits
+        });
 
-      if (userOverlaps && Array.isArray(userOverlaps) && userOverlaps.length > 0) {
-        const overlap = userOverlaps[0] as any;
-        throw new Error(
-          `You already have a vacation request from ${format(new Date(overlap.start_date), 'PPP')} to ${format(new Date(overlap.end_date), 'PPP')} (${overlap.vacation_type}) that overlaps with this date range. Please modify your existing request or choose different dates.`
-        );
+        if (userOverlaps && Array.isArray(userOverlaps) && userOverlaps.length > 0) {
+          const overlap = userOverlaps[0] as any;
+          throw new Error(
+            `You already have a vacation request from ${format(new Date(overlap.start_date), 'PPP')} to ${format(new Date(overlap.end_date), 'PPP')} (${overlap.vacation_type}) that overlaps with this date range. Please modify your existing request or choose different dates.`
+          );
+        }
       }
 
       const { data: plan, error: planError } = await supabase
         .from('vacation_plans')
         .insert({
-          staff_id: targetStaffId,
+          staff_id: effectiveStaffOnly ? user?.id : planData.staff_id,
           department_id: targetDepartmentId,
           vacation_type_id: planData.vacation_type_id,
           total_days: planData.total_days,
@@ -334,6 +354,19 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
     const totalDays = splits.reduce((sum, split) => sum + split.days, 0);
 
+    // Balance check for 'full' mode
+    if (currentOrganization?.vacation_mode === 'full' && effectiveStaffOnly) {
+      const typeBalance = userBalances?.find((b: any) => b.vacation_type_id === selectedVacationType);
+      if (!typeBalance) {
+        toast.error('No leave balance found for this vacation type. Please contact administrator.');
+        return;
+      }
+      if (totalDays > typeBalance.balance) {
+        toast.error(`Insufficient leave balance. You are requesting ${totalDays} days, but only ${typeBalance.balance} days remain.`);
+        return;
+      }
+    }
+
     createPlanMutation.mutate({
       staff_id: selectedStaff,
       vacation_type_id: selectedVacationType,
@@ -351,6 +384,15 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     <Card>
       <CardHeader>
         <CardTitle>Create Vacation Plan</CardTitle>
+        {currentOrganization?.vacation_mode === 'planning' && (
+          <div className="bg-blue-50 text-blue-800 p-3 rounded-md flex items-start gap-2 text-sm mt-2">
+            <Info className="h-4 w-4 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-semibold">Planning Mode Active</p>
+              <p>Vacation requests will not deduct from your leave balance. This is for scheduling purposes only.</p>
+            </div>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">

@@ -1,17 +1,18 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { LoadingState } from '@/components/layout/LoadingState';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar, MapPin, Video, Users, Clock, ExternalLink } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, isSameDay, isSameMonth } from 'date-fns';
+import { Calendar as CalendarIcon, Clock, MapPin, Video, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 type EventType = 'training' | 'workshop' | 'seminar' | 'webinar' | 'meeting' | 'conference' | 'other';
 
@@ -31,13 +32,13 @@ interface TrainingEvent {
 }
 
 const eventTypeColors: Record<EventType, string> = {
-  training: 'bg-blue-500',
-  workshop: 'bg-emerald-500',
-  seminar: 'bg-amber-500',
-  webinar: 'bg-purple-500',
-  meeting: 'bg-rose-500',
-  conference: 'bg-cyan-500',
-  other: 'bg-gray-500',
+  training: '#3b82f6',
+  workshop: '#10b981',
+  seminar: '#f59e0b',
+  webinar: '#8b5cf6',
+  meeting: '#f43f5e',
+  conference: '#06b6d4',
+  other: '#6b7280',
 };
 
 const eventTypeLabels: Record<EventType, string> = {
@@ -53,7 +54,7 @@ const eventTypeLabels: Record<EventType, string> = {
 const TrainingCalendarView = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('published');
 
@@ -100,30 +101,12 @@ const TrainingCalendarView = () => {
     enabled: !!user,
   });
 
-  const days = useMemo(() => {
-    const start = startOfMonth(currentMonth);
-    const end = endOfMonth(currentMonth);
-    const allDays = eachDayOfInterval({ start, end });
-    
-    // Pad start to Sunday
-    const startDay = start.getDay();
-    const paddedStart = [];
-    for (let i = 0; i < startDay; i++) {
-      paddedStart.push(null);
-    }
-    
-    return [...paddedStart, ...allDays];
-  }, [currentMonth]);
-
-  const getEventsForDay = (day: Date | null) => {
-    if (!day || !events) return [];
-    return events.filter(event => 
+  const getEventsForDay = (day: Date) => {
+    if (!events) return [];
+    return events.filter(event =>
       isSameDay(new Date(event.start_datetime), day)
     );
   };
-
-  const handlePrevMonth = () => setCurrentMonth(prev => subMonths(prev, 1));
-  const handleNextMonth = () => setCurrentMonth(prev => addMonths(prev, 1));
 
   if (isLoading) {
     return <LoadingState message="Loading calendar..." />;
@@ -134,15 +117,9 @@ const TrainingCalendarView = () => {
       {/* Header with navigation and filters */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handlePrevMonth}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <h2 className="text-lg font-semibold min-w-[160px] text-center">
-            {format(currentMonth, 'MMMM yyyy')}
+          <h2 className="text-lg font-semibold min-w-[160px]">
+            Training Calendar
           </h2>
-          <Button variant="outline" size="icon" onClick={handleNextMonth}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
         </div>
 
         <div className="flex gap-2">
@@ -176,73 +153,114 @@ const TrainingCalendarView = () => {
       </div>
 
       {/* Calendar Grid */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-7 gap-1">
-            {/* Day headers */}
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
-                {day}
-              </div>
-            ))}
+      <Card className="border-2">
+        <CardContent className="p-3 sm:p-6 overflow-x-auto">
+          <div className="min-w-[320px]">
+            <Calendar
+              mode="single"
+              selected={currentMonth}
+              onSelect={(date) => date && setCurrentMonth(date)}
+              onMonthChange={setCurrentMonth}
+              month={currentMonth}
+              className="rounded-md w-full pointer-events-auto"
+              classNames={{
+                months: "flex flex-col gap-4 sm:gap-8 w-full justify-center",
+                month: "space-y-4 flex-1",
+                caption: "flex justify-center pt-1 relative items-center mb-4 sm:mb-8",
+                caption_label: "text-lg sm:text-2xl font-bold tracking-tight",
+                nav: "flex items-center",
+                nav_button: "h-10 w-10 bg-transparent p-0 opacity-60 hover:opacity-100 hover:bg-accent rounded-xl transition-all flex items-center justify-center z-20",
+                nav_button_previous: "absolute left-0 top-1/2 -translate-y-1/2",
+                nav_button_next: "absolute right-0 top-1/2 -translate-y-1/2",
+                table: "w-full border-collapse",
+                head_row: "flex w-full mb-4",
+                head_cell: "text-muted-foreground/60 rounded-md font-bold text-[0.65rem] sm:text-xs uppercase tracking-widest flex-1 text-center",
+                row: "flex w-full mt-2",
+                cell: "relative p-0.5 text-center focus-within:relative focus-within:z-20 flex-1 h-10 sm:h-16",
+                day: "h-full w-full p-0 font-normal hover:bg-accent/50 rounded-xl transition-all touch-manipulation",
+                day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground shadow-lg shadow-primary/20",
+                day_today: "bg-accent/30 text-accent-foreground font-bold ring-2 ring-primary/20 ring-offset-2",
+                day_outside: "text-muted-foreground opacity-20",
+                day_disabled: "text-muted-foreground opacity-20",
+                day_hidden: "invisible",
+              }}
+              components={{
+                Day: ({ date, displayMonth, ...props }: any) => {
+                  const dayEvents = getEventsForDay(date);
+                  const hasEvents = dayEvents.length > 0;
+                  const isCurrentMonth = isSameMonth(date, currentMonth);
+                  const isToday = isSameDay(date, new Date());
 
-            {/* Calendar days */}
-            {days.map((day, index) => {
-              const dayEvents = getEventsForDay(day);
-              const hasEvents = dayEvents.length > 0;
+                  return (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          {...props}
+                          className={cn(
+                            "h-full w-full p-2 font-normal rounded-xl transition-all relative group touch-manipulation flex flex-col items-center justify-center gap-1 overflow-hidden border-2",
+                            hasEvents && "bg-emerald-100 dark:bg-emerald-950 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-200 dark:hover:bg-emerald-900",
+                            !hasEvents && "border-transparent hover:bg-accent/50",
+                            !isCurrentMonth && "opacity-30"
+                          )}
+                        >
+                          <time
+                            dateTime={format(date, "yyyy-MM-dd")}
+                            className={cn(
+                              "text-sm sm:text-lg font-medium transition-colors w-full text-center",
+                              isToday ? "text-primary font-bold" : "text-foreground/70"
+                            )}
+                          >
+                            {format(date, "d")}
+                          </time>
 
-              return (
-                <div
-                  key={index}
-                  className={cn(
-                    "min-h-[100px] p-1 border rounded-md",
-                    !day && "bg-muted/30",
-                    day && isToday(day) && "border-primary border-2",
-                    day && !isSameMonth(day, currentMonth) && "bg-muted/50"
-                  )}
-                >
-                  {day && (
-                    <>
-                      <div className={cn(
-                        "text-sm font-medium mb-1",
-                        isToday(day) && "text-primary"
-                      )}>
-                        {format(day, 'd')}
-                      </div>
-                      
-                      <div className="space-y-1">
-                        {dayEvents.slice(0, 3).map(event => (
-                          <Popover key={event.id}>
-                            <PopoverTrigger asChild>
-                              <button
-                                className={cn(
-                                  "w-full text-left text-xs p-1 rounded truncate text-white",
-                                  eventTypeColors[event.event_type]
-                                )}
-                              >
-                                {event.title}
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80" align="start">
-                              <EventPopover 
-                                event={event} 
-                                isRegistered={registrations?.includes(event.id) || false}
-                                onJoin={() => navigate(`/meeting?eventId=${event.id}`)}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        ))}
-                        {dayEvents.length > 3 && (
-                          <div className="text-xs text-muted-foreground">
-                            +{dayEvents.length - 3} more
+                          {hasEvents && (
+                            <div className="w-full flex items-center justify-between">
+                              <div className={cn(
+                                "text-white text-[9px] sm:text-[10px] font-black rounded-lg px-1.5 py-0.5 flex items-center justify-center shadow-md z-10 border border-white/10 bg-emerald-500"
+                              )}>
+                                {dayEvents.length}
+                              </div>
+
+                              <div className="flex -space-x-1.5 overflow-hidden">
+                                {dayEvents.slice(0, 3).map((event: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="h-2 w-2 sm:h-3 sm:w-3 rounded-full border-2 border-background shadow-sm"
+                                    style={{ backgroundColor: eventTypeColors[event.event_type as EventType] || '#10b981' }}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </button>
+                      </PopoverTrigger>
+                      {hasEvents && (
+                        <PopoverContent className="w-80 p-3 sm:p-4 max-h-[60vh] overflow-y-auto" side="bottom" align="center">
+                          <div className="space-y-3">
+                            <h4 className="font-semibold text-lg border-b pb-2">
+                              {format(date, "MMMM d, yyyy")}
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                              {dayEvents.length} event{dayEvents.length > 1 ? 's' : ''} scheduled
+                            </p>
+                            <div className="space-y-2 max-h-96 overflow-y-auto">
+                              {dayEvents.map((event: any) => (
+                                <EventPopover
+                                  key={event.id}
+                                  event={event}
+                                  isRegistered={registrations?.includes(event.id) || false}
+                                  onJoin={() => navigate(`/meeting?eventId=${event.id}`)}
+                                />
+                              ))}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
+                        </PopoverContent>
+                      )}
+                    </Popover>
+                  );
+                }
+              }}
+            />
           </div>
         </CardContent>
       </Card>
@@ -256,7 +274,7 @@ const TrainingCalendarView = () => {
           <div className="flex flex-wrap gap-3">
             {Object.entries(eventTypeColors).map(([type, color]) => (
               <div key={type} className="flex items-center gap-1.5">
-                <div className={cn("w-3 h-3 rounded", color)} />
+                <div className="w-3 h-3 rounded" style={{ backgroundColor: color }} />
                 <span className="text-xs capitalize">{type}</span>
               </div>
             ))}
@@ -268,7 +286,7 @@ const TrainingCalendarView = () => {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
+            <CalendarIcon className="h-4 w-4" />
             Events This Month
           </CardTitle>
           <CardDescription>
@@ -287,10 +305,10 @@ const TrainingCalendarView = () => {
                   key={event.id}
                   className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                 >
-                  <div className={cn(
-                    "w-2 h-full min-h-[40px] rounded-full",
-                    eventTypeColors[event.event_type]
-                  )} />
+                  <div
+                    className="w-2 h-full min-h-[40px] rounded-full"
+                    style={{ backgroundColor: eventTypeColors[event.event_type] }}
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <h4 className="font-medium truncate">{event.title}</h4>
@@ -330,13 +348,13 @@ const TrainingCalendarView = () => {
   );
 };
 
-// Event popover component
-const EventPopover = ({ 
-  event, 
+// Event card for popover
+const EventPopover = ({
+  event,
   isRegistered,
-  onJoin 
-}: { 
-  event: TrainingEvent; 
+  onJoin
+}: {
+  event: TrainingEvent;
   isRegistered: boolean;
   onJoin: () => void;
 }) => {
@@ -345,60 +363,36 @@ const EventPopover = ({
   const isOngoing = new Date() >= startTime && new Date() <= endTime;
 
   return (
-    <div className="space-y-3">
-      <div>
-        <h4 className="font-semibold">{event.title}</h4>
-        <Badge variant="outline" className="mt-1">
+    <div className="flex items-start gap-3 rounded-lg border bg-card p-3 hover:bg-accent/50 transition-colors">
+      <div
+        className="w-3 h-10 rounded"
+        style={{ backgroundColor: eventTypeColors[event.event_type] }}
+      />
+      <div className="flex-1 min-w-0 space-y-1">
+        <p className="font-medium truncate">{event.title}</p>
+        <Badge variant="outline" className="text-xs">
           {eventTypeLabels[event.event_type]}
         </Badge>
         {event.registration_type === 'mandatory' && (
-          <Badge className="ml-1 bg-red-500 text-white">Mandatory</Badge>
+          <Badge className="ml-1 bg-red-500 text-white text-xs">Mandatory</Badge>
         )}
-      </div>
-
-      <div className="space-y-2 text-sm">
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-muted-foreground" />
-          <span>
-            {format(startTime, 'MMM d, yyyy')} · {format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}
-          </span>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Clock className="h-3 w-3" />
+          <span>{format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}</span>
         </div>
-
-        {event.location_type !== 'online' && (
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-            <span className="capitalize">{event.location_type}</span>
-          </div>
-        )}
-
-        {event.max_participants && (
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <span>Max {event.max_participants} participants</span>
-          </div>
-        )}
-      </div>
-
-      {event.description && (
-        <p className="text-sm text-muted-foreground line-clamp-2">
-          {event.description}
-        </p>
-      )}
-
-      <div className="flex gap-2 pt-2">
-        {isRegistered && event.enable_video_conference && isOngoing && (
-          <Button size="sm" onClick={onJoin}>
-            <Video className="h-4 w-4 mr-1" />
-            Join Meeting
-          </Button>
-        )}
-        {isRegistered ? (
-          <Badge className="bg-emerald-500 text-white">
-            ✓ Registered
-          </Badge>
-        ) : (
-          <Badge variant="outline">Not Registered</Badge>
-        )}
+        <div className="flex gap-2 pt-1">
+          {isRegistered && event.enable_video_conference && isOngoing && (
+            <Button size="sm" onClick={onJoin} className="h-7 text-xs">
+              <Video className="h-3 w-3 mr-1" />
+              Join
+            </Button>
+          )}
+          {isRegistered ? (
+            <Badge className="bg-emerald-500 text-white text-xs">✓ Registered</Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs">Not Registered</Badge>
+          )}
+        </div>
       </div>
     </div>
   );

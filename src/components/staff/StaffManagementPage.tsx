@@ -87,19 +87,6 @@ const StaffManagementPage = () => {
                 </Badge>
             ),
         },
-        {
-            key: 'department',
-            header: 'Department',
-            cell: (row) => (
-                row.department_name ? (
-                    <Badge variant="outline" className="bg-primary/10">
-                        {row.department_name}
-                    </Badge>
-                ) : (
-                    <span className="text-sm text-muted-foreground">Not Assigned</span>
-                )
-            ),
-        },
     ];
 
     return (

@@ -15,6 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 const workspaceSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name too long'),
@@ -38,9 +39,14 @@ const checkIsAtLimit = (max: number | null | undefined, current: number | undefi
 };
 
 const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, currentWorkspaceCount }: WorkspaceManagementProps = {}) => {
+  const { selectedOrganizationId } = useOrganization();
+
+  // Use prop if provided, otherwise use context
+  const effectiveOrgId = organizationId || selectedOrganizationId;
+
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
-  const [selectedOrgId, setSelectedOrgId] = useState(organizationId || '');
+  const [selectedOrgId, setSelectedOrgId] = useState(effectiveOrgId || '');
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
   const [manageDepartmentsOpen, setManageDepartmentsOpen] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState<any>(null);
@@ -76,7 +82,7 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
   });
 
   const { data: workspaces, isLoading } = useQuery({
-    queryKey: ['workspaces', organizationId, workspaceId],
+    queryKey: ['workspaces', effectiveOrgId, workspaceId],
     queryFn: async () => {
       let query = supabase
         .from('workspaces')
@@ -84,8 +90,8 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
         .order('created_at', { ascending: false });
 
       // Filter by organization if provided
-      if (organizationId) {
-        query = query.eq('organization_id', organizationId);
+      if (effectiveOrgId) {
+        query = query.eq('organization_id', effectiveOrgId);
       }
 
       // Filter by specific workspace if provided (Scoped View)

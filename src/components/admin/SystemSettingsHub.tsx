@@ -130,7 +130,7 @@ export function SystemSettingsHub() {
         supabase.from('notifications').select('*', { count: 'exact', head: true }),
         supabase.from('audit_logs').select('*', { count: 'exact', head: true }),
       ]);
-      
+
       return {
         profiles: profiles.count || 0,
         organizations: organizations.count || 0,
@@ -149,22 +149,27 @@ export function SystemSettingsHub() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-6">
-          <TabsTrigger value="jitsi" className="flex items-center gap-2">
-            <Video className="h-4 w-4" />
-            Video Conferencing
-          </TabsTrigger>
-          <TabsTrigger value="modules" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Modules
-          </TabsTrigger>
-          <TabsTrigger value="database" className="flex items-center gap-2">
-            <Database className="h-4 w-4" />
-            Database Stats
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide mb-6">
+          <TabsList className="inline-flex h-auto min-w-max gap-1 p-1">
+            <TabsTrigger value="jitsi" className="min-h-[44px] px-3 text-sm">
+              <Video className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+              <span className="hidden sm:inline">Video Conferencing</span>
+              <span className="sm:hidden">Video</span>
+            </TabsTrigger>
+            <TabsTrigger value="modules" className="min-h-[44px] px-3 text-sm">
+              <Settings className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+              <span className="hidden sm:inline">Modules</span>
+              <span className="sm:hidden">Mod</span>
+            </TabsTrigger>
+            <TabsTrigger value="database" className="min-h-[44px] px-3 text-sm">
+              <Database className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+              <span className="hidden sm:inline">Database Stats</span>
+              <span className="sm:hidden">DB</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Jitsi Configuration */}
         <TabsContent value="jitsi">
@@ -239,7 +244,7 @@ export function SystemSettingsHub() {
                 </div>
               </div>
 
-              <Button 
+              <Button
                 onClick={() => updateJitsiMutation.mutate(jitsiForm)}
                 disabled={updateJitsiMutation.isPending}
               >
@@ -265,8 +270,8 @@ export function SystemSettingsHub() {
             <CardContent>
               <div className="space-y-4">
                 {modules?.map(module => (
-                  <div 
-                    key={module.id} 
+                  <div
+                    key={module.id}
                     className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
                   >
                     <div className="flex items-center gap-3">

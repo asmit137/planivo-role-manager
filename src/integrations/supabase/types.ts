@@ -488,6 +488,7 @@ export type Database = {
           name: string
           owner_id: string | null
           updated_at: string
+          vacation_mode: 'planning' | 'full'
         }
         Insert: {
           created_at?: string
@@ -501,6 +502,7 @@ export type Database = {
           name: string
           owner_id?: string | null
           updated_at?: string
+          vacation_mode?: 'planning' | 'full'
         }
         Update: {
           created_at?: string
@@ -514,6 +516,7 @@ export type Database = {
           name?: string
           owner_id?: string | null
           updated_at?: string
+          vacation_mode?: 'planning' | 'full'
         }
         Relationships: [
           {

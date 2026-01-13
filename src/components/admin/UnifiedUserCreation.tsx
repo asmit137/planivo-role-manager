@@ -21,26 +21,27 @@ const userSchema = z.object({
   specialty_id: z.string().uuid().optional().nullable(),
   organization_id: z.string().uuid().optional().nullable(),
   workspace_id: z.string().uuid().optional().nullable(),
-  role: z.enum(['staff', 'department_head', 'facility_supervisor', 'workplace_supervisor', 'general_admin', 'organization_admin', 'custom']),
+  role: z.enum(['staff', 'intern', 'department_head', 'facility_supervisor', 'workplace_supervisor', 'workspace_supervisor', 'general_admin', 'organization_admin', 'custom']),
   custom_role_id: z.string().uuid().optional().nullable(),
 });
 
 interface UnifiedUserCreationProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialOrganizationId?: string;
 }
 
-const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) => {
+const UnifiedUserCreation = ({ open, onOpenChange, initialOrganizationId }: UnifiedUserCreationProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [organizationId, setOrganizationId] = useState('');
+  const [organizationId, setOrganizationId] = useState(initialOrganizationId || '');
   const [workspaceId, setWorkspaceId] = useState('');
   const [facilityId, setFacilityId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [specialtyId, setSpecialtyId] = useState('');
   const [customRoleId, setCustomRoleId] = useState('');
-  const [role, setRole] = useState<'staff' | 'department_head' | 'facility_supervisor' | 'workplace_supervisor' | 'general_admin' | 'organization_admin' | 'custom'>('staff');
+  const [role, setRole] = useState<'staff' | 'intern' | 'department_head' | 'facility_supervisor' | 'workplace_supervisor' | 'workspace_supervisor' | 'general_admin' | 'organization_admin' | 'custom'>('staff');
   const queryClient = useQueryClient();
 
   // Get current user's roles to determine permissions
@@ -55,9 +56,11 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       'organization_admin',
       'general_admin',
       'workplace_supervisor',
+      'workspace_supervisor',
       'facility_supervisor',
       'department_head',
-      'staff'
+      'staff',
+      'intern'
     ];
 
     for (const hierarchyRole of roleHierarchy) {
@@ -75,18 +78,18 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
   const getAvailableRoles = (): AppRole[] => {
     switch (highestRole) {
       case 'super_admin':
-        return ['organization_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'custom'];
+        return ['organization_admin', 'general_admin', 'workplace_supervisor', 'workspace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern', 'custom'];
       case 'organization_admin':
-      case 'general_admin':
-        return ['workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'];
+        return ['workplace_supervisor', 'workspace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern'];
       case 'workplace_supervisor':
-        return ['facility_supervisor', 'department_head', 'staff'];
+      case 'workspace_supervisor':
+        return ['facility_supervisor', 'department_head', 'staff', 'intern'];
       case 'facility_supervisor':
-        return ['department_head', 'staff'];
+        return ['department_head', 'staff', 'intern'];
       case 'department_head':
-        return ['staff'];
+        return ['staff', 'intern'];
       default:
-        return ['staff'];
+        return ['staff', 'intern'];
     }
   };
 
@@ -106,12 +109,19 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
         if (currentUserRole.organization_id) setOrganizationId(currentUserRole.organization_id);
         if (currentUserRole.workspace_id) setWorkspaceId(currentUserRole.workspace_id);
         if (currentUserRole.facility_id) setFacilityId(currentUserRole.facility_id);
-      } else if (highestRole === 'workplace_supervisor') {
+      } else if (highestRole === 'workplace_supervisor' || highestRole === 'workspace_supervisor') {
         if (currentUserRole.organization_id) setOrganizationId(currentUserRole.organization_id);
         if (currentUserRole.workspace_id) setWorkspaceId(currentUserRole.workspace_id);
       }
     }
   }, [currentUserRole, highestRole]);
+
+  // Sync with initial organization ID when dialog opens
+  useEffect(() => {
+    if (open && initialOrganizationId) {
+      setOrganizationId(initialOrganizationId);
+    }
+  }, [open, initialOrganizationId]);
 
   // DIAGNOSTIC CHECK: Verify schema exists on mount
   useEffect(() => {
@@ -527,7 +537,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
     setEmail('');
     setPassword('');
     setFullName('');
-    setOrganizationId('');
+    setOrganizationId(initialOrganizationId || '');
     setWorkspaceId('');
     setFacilityId('');
     setDepartmentId('');
@@ -573,16 +583,16 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
       setCustomRoleId('');
     }
     // Clear fields based on role requirements
-    if (['workplace_supervisor', 'facility_supervisor', 'general_admin', 'organization_admin'].includes(value)) {
+    if (['workplace_supervisor', 'workspace_supervisor', 'facility_supervisor', 'general_admin', 'organization_admin'].includes(value)) {
       setDepartmentId('');
       setSpecialtyId('');
     }
-    if (['workplace_supervisor', 'general_admin', 'organization_admin'].includes(value)) {
+    if (['workplace_supervisor', 'workspace_supervisor', 'general_admin', 'organization_admin'].includes(value)) {
       setFacilityId('');
     }
 
-    // Clear everything when role changes to ensure clean slate
-    setOrganizationId('');
+    // Clear everything except organizationId when role changes to ensure clean slate
+    // Preservation of organizationId is important for UX and correct scoping
     setWorkspaceId('');
     setFacilityId('');
     setDepartmentId('');
@@ -677,7 +687,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                     <SelectItem value="general_admin">General Admin</SelectItem>
                   )}
                   {availableRoles.includes('workplace_supervisor') && (
-                    <SelectItem value="workplace_supervisor">Workplace Supervisor</SelectItem>
+                    <SelectItem value="workplace_supervisor">Workspace Supervisor</SelectItem>
                   )}
                   {availableRoles.includes('facility_supervisor') && (
                     <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
@@ -687,6 +697,12 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                   )}
                   {availableRoles.includes('staff') && (
                     <SelectItem value="staff">Staff</SelectItem>
+                  )}
+                  {availableRoles.includes('intern') && (
+                    <SelectItem value="intern">Intern</SelectItem>
+                  )}
+                  {availableRoles.includes('workspace_supervisor') && (
+                    <SelectItem value="workspace_supervisor">Workspace Supervisor</SelectItem>
                   )}
                   {availableRoles.includes('custom') && customRoles?.map((cr) => (
                     <SelectItem key={cr.id} value={cr.id}>
@@ -702,6 +718,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                 {role === 'facility_supervisor' && 'Facility-level access - department not required'}
                 {role === 'department_head' && 'Department-level access - requires facility and department'}
                 {role === 'staff' && 'Staff member - requires facility and department'}
+                {role === 'intern' && 'Intern member - requires facility and department'}
                 {role === 'custom' && 'Dynamic role with custom module permissions'}
               </p>
             </div>
@@ -744,7 +761,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                 </div>
 
                 {/* Workspace - Required for Workplace Supervisor and below */}
-                {['workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'].includes(role) && (
+                {['workplace_supervisor', 'workspace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern'].includes(role) && (
                   <div className="space-y-2">
                     <Label htmlFor="workspace">Workspace *</Label>
                     <Select
@@ -768,7 +785,7 @@ const UnifiedUserCreation = ({ open, onOpenChange }: UnifiedUserCreationProps) =
                 )}
 
                 {/* Facility - Required for Facility Supervisor and below */}
-                {['facility_supervisor', 'department_head', 'staff'].includes(role) && (
+                {['facility_supervisor', 'department_head', 'staff', 'intern'].includes(role) && (
                   <div className="space-y-2">
                     <Label htmlFor="facility">Facility *</Label>
                     <Select

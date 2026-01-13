@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/collapsible';
 import {
   Sidebar,
+  SidebarHeader,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
@@ -51,6 +52,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { OrganizationSwitcher } from './OrganizationSwitcher';
 
 interface AppSidebarProps {
   hasAccess: (moduleKey: string) => boolean;
@@ -83,7 +85,6 @@ const developerModuleConfig = [
   { key: 'activity', label: 'Live Activity', icon: Activity, path: '/dashboard?tab=activity' },
   { key: 'security', label: 'Security', icon: Shield, path: '/dashboard?tab=security' },
   { key: 'validator', label: 'System Validator', icon: ShieldCheck, path: '/dashboard?tab=validator' },
-  { key: 'source-code', label: 'Source Code', icon: Code, path: '/dashboard?tab=source-code' },
 ];
 
 // Inner content component that uses sidebar context (must be rendered inside Sidebar)
@@ -108,14 +109,21 @@ function SidebarInnerContent({
   handleNavigation: (path: string) => void;
   isActive: (path: string) => boolean;
 }) {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === 'collapsed';
+
+  const handleSidebarNavigation = (path: string) => {
+    handleNavigation(path);
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   return (
     <>
-      <SidebarContent className="bg-sidebar">
+      <SidebarHeader className="bg-sidebar border-b border-sidebar-border p-0">
         {/* Branding with Toggle */}
-        <div className={`px-4 py-6 border-b border-sidebar-border bg-sidebar flex items-center justify-between ${collapsed ? 'flex-col gap-4' : ''}`}>
+        <div className={`px-4 py-6 flex items-center justify-between ${collapsed ? 'flex-col gap-4' : ''}`}>
           {!collapsed ? (
             <>
               <div>
@@ -132,6 +140,12 @@ function SidebarInnerContent({
           )}
         </div>
 
+        {/* Organization Switcher */}
+        <OrganizationSwitcher />
+      </SidebarHeader>
+
+      <SidebarContent className="bg-sidebar">
+
         {/* Main Navigation */}
         <SidebarGroup>
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
@@ -140,7 +154,7 @@ function SidebarInnerContent({
               {visibleModules.map((module) => (
                 <SidebarMenuItem key={module.key}>
                   <SidebarMenuButton
-                    onClick={() => handleNavigation(module.path)}
+                    onClick={() => handleSidebarNavigation(module.path)}
                     isActive={isActive(module.path)}
                     className="w-full"
                   >
@@ -162,7 +176,7 @@ function SidebarInnerContent({
                 {visibleSystemModules.map((module) => (
                   <SidebarMenuItem key={module.key}>
                     <SidebarMenuButton
-                      onClick={() => handleNavigation(module.path)}
+                      onClick={() => handleSidebarNavigation(module.path)}
                       isActive={isActive(module.path)}
                       className="w-full"
                     >
@@ -192,7 +206,7 @@ function SidebarInnerContent({
                           {visibleDeveloperModules.map((module) => (
                             <SidebarMenuSubItem key={module.key}>
                               <SidebarMenuSubButton
-                                onClick={() => handleNavigation(module.path)}
+                                onClick={() => handleSidebarNavigation(module.path)}
                                 isActive={isActive(module.path)}
                               >
                                 <module.icon size={16} />
@@ -255,7 +269,7 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
 
   const getPrimaryRole = () => {
     if (!roles || roles.length === 0) return null;
-    const roleHierarchy = ['super_admin', 'organization_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'custom'];
+    const roleHierarchy = ['super_admin', 'organization_admin', 'general_admin', 'workplace_supervisor', 'workspace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern', 'custom'];
     for (const role of roleHierarchy) {
       if (roles.some(r => r.role === role)) {
         return role;
@@ -290,7 +304,7 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
 
     // Hide Users tab for Workspace and Facility Supervisors
     if (module.key === 'user_management') {
-      if (primaryRole === 'workplace_supervisor' || primaryRole === 'facility_supervisor') {
+      if (['workplace_supervisor', 'workspace_supervisor', 'facility_supervisor'].includes(primaryRole || '')) {
         return false;
       }
     }

@@ -9,6 +9,10 @@ import { SchedulingDashboard } from './SchedulingDashboard';
 import { StaffScheduleView } from './StaffScheduleView';
 import { ScheduleDisplaySettings } from './ScheduleDisplaySettings';
 import { EmptyState } from '@/components/layout/EmptyState';
+import { ClinicHub } from '@/components/clinics/ClinicHub';
+import { ResponsiveTabsList } from '@/components/layout/ResponsiveTabsList';
+import { Stethoscope } from 'lucide-react';
+
 
 interface SchedulingHubProps {
   departmentId?: string;
@@ -50,24 +54,34 @@ export const SchedulingHub: React.FC<SchedulingHubProps> = ({ departmentId }) =>
   return (
     <ErrorBoundary>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-6">
-          <TabsTrigger value="assignments" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
+        <ResponsiveTabsList>
+          <TabsTrigger value="assignments" className="min-h-[44px] px-3 text-sm">
+            <Users className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Assign Staff</span>
+            <span className="sm:hidden">Staff</span>
           </TabsTrigger>
-          <TabsTrigger value="calendar" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
+          <TabsTrigger value="calendar" className="min-h-[44px] px-3 text-sm">
+            <Calendar className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Calendar</span>
+            <span className="sm:hidden">Cal</span>
           </TabsTrigger>
-          <TabsTrigger value="dashboard" className="flex items-center gap-2">
-            <LayoutDashboard className="h-4 w-4" />
+          <TabsTrigger value="clinics" className="min-h-[44px] px-3 text-sm">
+            <Stethoscope className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Clinics</span>
+            <span className="sm:hidden">Clinics</span>
+          </TabsTrigger>
+          <TabsTrigger value="dashboard" className="min-h-[44px] px-3 text-sm">
+            <LayoutDashboard className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Dashboard</span>
+            <span className="sm:hidden">Dash</span>
           </TabsTrigger>
-          <TabsTrigger value="display" className="flex items-center gap-2">
-            <Monitor className="h-4 w-4" />
+          <TabsTrigger value="display" className="min-h-[44px] px-3 text-sm">
+            <Monitor className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Display</span>
+            <span className="sm:hidden">LCD</span>
           </TabsTrigger>
-        </TabsList>
+        </ResponsiveTabsList>
+
 
         <TabsContent value="assignments">
           <InteractiveStaffCalendar departmentId={effectiveDepartmentId} />
@@ -77,9 +91,14 @@ export const SchedulingHub: React.FC<SchedulingHubProps> = ({ departmentId }) =>
           <ShiftCalendarView departmentId={effectiveDepartmentId} />
         </TabsContent>
 
+        <TabsContent value="clinics">
+          <ClinicHub departmentId={effectiveDepartmentId} />
+        </TabsContent>
+
         <TabsContent value="dashboard">
           <SchedulingDashboard departmentId={effectiveDepartmentId} />
         </TabsContent>
+
 
         <TabsContent value="display">
           <ScheduleDisplaySettings departmentId={effectiveDepartmentId} />

@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -59,6 +60,7 @@ interface TrainingEventFormProps {
 const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
   const { user } = useAuth();
   const { data: roles } = useUserRole();
+  const { selectedOrganizationId } = useOrganization();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -217,7 +219,7 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
       end_datetime: existingEvent?.end_datetime ? new Date(existingEvent.end_datetime).toISOString().slice(0, 16) : '',
       organization_id: existingEvent?.organization_id || userOrganization?.id || '',
       max_participants: existingEvent?.max_participants || null,
-      status: (existingEvent?.status as EventFormData['status']) || 'draft',
+      status: (existingEvent?.status as EventFormData['status']) || 'published',
       // Registration defaults
       registration_type: (existingEvent?.registration_type as EventFormData['registration_type']) || 'open',
       responsible_user_id: existingEvent?.responsible_user_id || null,
@@ -252,6 +254,31 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
       const jitsiRoomName = data.enable_video_conference
         ? `planivo-${Date.now()}-${Math.random().toString(36).substring(7)}`
         : null;
+
+      // Check availability for selected users
+      if (selectedUsers.length > 0) {
+        const { data: conflicts, error: conflictError } = await supabase
+          .from('vacation_splits')
+          .select('vacation_plans!inner(staff_id, status), start_date, end_date')
+          .in('vacation_plans.staff_id', selectedUsers)
+          .in('vacation_plans.status', ['approved', 'pending_approval'])
+          .lte('start_date', data.end_datetime)
+          .gte('end_date', data.start_datetime);
+
+        if (conflictError) throw conflictError;
+
+        if (conflicts && conflicts.length > 0) {
+          // Get names of conflicted users
+          const conflictedIds = [...new Set(conflicts.map((c: any) => c.vacation_plans.staff_id))];
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .in('id', conflictedIds);
+
+          const names = profiles?.map(p => p.full_name).join(', ') || 'Selected users';
+          throw new Error(`The following users are on vacation during this time: ${names}`);
+        }
+      }
 
       const eventData = {
         title: data.title,

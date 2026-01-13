@@ -163,9 +163,9 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         })
       );
 
-      // Filter by Visibility Rules (Parallel Workflow)
-      // 1. Supervisors (L1, L2, L3) should ONLY see plans from 'staff' role.
-      // 2. Super Admin (which uses scopeId='all' usually) sees everything.
+      // Filter by Visibility Rules (New Hierarchy)
+      // 1. Super Admin (which uses scopeId='all') sees everything.
+      // 2. Supervisors (L1, L2, L3) should ONLY see plans from 'staff' or 'intern' role.
       if (!scopeId || scopeId === 'all') {
         return extendedPlans;
       }
@@ -180,18 +180,11 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
           return true;
         }
 
-        if (approvalLevel === 1) {
-          // Dept Head (Level 1): Only see Staff vacations
-          return roleNames.includes('staff');
-        }
-        if (approvalLevel === 2) {
-          // Facility Supervisor (Level 2): See Staff and Dept Head vacations
-          return roleNames.includes('staff') || roleNames.includes('department_head');
-        }
-        if (approvalLevel === 3) {
-          // Workspace Supervisor (Level 3): See Staff, Dept Heads, and Facility Supervisors
-          return roleNames.includes('staff') || roleNames.includes('department_head') ||
-            roleNames.includes('facility_supervisor');
+        // Only Staff and Intern vacations go to supervisors
+        const isLowLevelEmployee = roleNames.includes('staff') || roleNames.includes('intern');
+
+        if (approvalLevel === 1 || approvalLevel === 2 || approvalLevel === 3) {
+          return isLowLevelEmployee;
         }
 
         return false;

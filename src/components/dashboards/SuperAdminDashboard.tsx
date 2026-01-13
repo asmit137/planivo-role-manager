@@ -19,7 +19,6 @@ import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { SourceCodeHub } from '@/components/admin/SourceCodeHub';
 import { FacilitySchedulingHub } from '@/components/scheduling';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import TrainingHub from '@/components/training/TrainingHub';
@@ -213,6 +212,7 @@ const SuperAdminDashboard = () => {
       approved: { label: 'Approved', className: 'bg-success text-success-foreground' },
       rejected: { label: 'Rejected', className: 'bg-destructive' },
       active: { label: 'Active', className: 'bg-primary' },
+      pending_approval: { label: 'Pending', className: 'bg-primary' },
       completed: { label: 'Completed', className: 'bg-success' },
     };
     const config = configs[status] || { label: status, className: 'bg-secondary' };
@@ -280,12 +280,6 @@ const SuperAdminDashboard = () => {
           description="View and manage system notifications"
         />
       )}
-      {activeTab === 'source-code' && (
-        <PageHeader
-          title="Source Code"
-          description="View project structure and access source code"
-        />
-      )}
       {activeTab === 'scheduling' && (
         <PageHeader
           title="Scheduling"
@@ -334,7 +328,7 @@ const SuperAdminDashboard = () => {
           description="Real-time view of all system events as they happen"
         />
       )}
-      {!['dashboard', 'modules', 'validator', 'organization', 'users', 'vacation', 'tasks', 'staff', 'messaging', 'notifications', 'source-code', 'scheduling', 'training', 'audit', 'security', 'analytics', 'settings', 'emails', 'activity'].includes(activeTab) && (
+      {!['dashboard', 'modules', 'validator', 'organization', 'users', 'vacation', 'tasks', 'staff', 'messaging', 'notifications', 'scheduling', 'training', 'audit', 'security', 'analytics', 'settings', 'emails', 'activity'].includes(activeTab) && (
         <PageHeader
           title="System Overview"
           description="Manage your entire system from one centralized dashboard"
@@ -474,17 +468,25 @@ const SuperAdminDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {recentActivity?.vacationPlans.map((plan: any) => (
-                      <div key={plan.id} className="flex items-center justify-between p-3 bg-secondary rounded-lg">
-                        <div>
-                          <p className="text-sm font-medium">{plan.vacation_types?.name || 'Unknown Type'}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {plan.total_days} days • {format(new Date(plan.created_at), 'MMM d, yyyy')}
-                          </p>
+                    {recentActivity?.vacationPlans.map((plan: any) => {
+                      const isPending = ['pending_approval', 'pending_approvals'].includes(plan.status);
+                      return (
+                        <div
+                          key={plan.id}
+                          className={`flex items-center justify-between p-3 rounded-lg transition-colors bg-secondary`}
+                        >
+                          <div>
+                            <p className={`text-sm font-medium`}>
+                              {plan.vacation_types?.name || 'Unknown Type'}
+                            </p>
+                            <p className={'text-xs text-muted-foreground'}>
+                              {plan.total_days} days • {format(new Date(plan.created_at), 'MMM d, yyyy')}
+                            </p>
+                          </div>
+                          {getStatusBadge(plan.status)}
                         </div>
-                        {getStatusBadge(plan.status)}
-                      </div>
-                    ))}
+                      );
+                    })}
                     {recentActivity?.vacationPlans.length === 0 && (
                       <p className="text-center text-muted-foreground py-4">No recent vacation plans</p>
                     )}
@@ -572,9 +574,6 @@ const SuperAdminDashboard = () => {
           <ModuleGuard moduleKey="messaging">
             <MessagingHub />
           </ModuleGuard>
-        )}
-        {activeTab === 'source-code' && (
-          <SourceCodeHub />
         )}
 
         {activeTab === 'scheduling' && (
