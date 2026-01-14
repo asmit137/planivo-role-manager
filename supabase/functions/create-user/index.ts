@@ -234,17 +234,62 @@ serve(async (req: Request) => {
     }
 
     /* =====================================================
-       6️⃣ ROLE ASSIGNMENT (UPSERT)
+       6️⃣ PARENT RESOLUTION & ROLE ASSIGNMENT (UPSERT)
     ===================================================== */
+    let resolvedFacilityId = facility_id;
+    let resolvedWorkspaceId = workspace_id;
+    let resolvedOrganizationId = organization_id;
+
+    // Resolve Hierarchy if needed
+    if (department_id && (!resolvedFacilityId || !resolvedWorkspaceId || !resolvedOrganizationId)) {
+      console.log("Resolving hierarchy from department_id:", department_id);
+      const { data: deptInfo } = await adminClient
+        .from("departments")
+        .select("facility_id, facilities(workspace_id, workspaces(organization_id))")
+        .eq("id", department_id)
+        .single();
+
+      if (deptInfo) {
+        resolvedFacilityId = resolvedFacilityId || deptInfo.facility_id;
+        resolvedWorkspaceId = resolvedWorkspaceId || (deptInfo as any).facilities?.workspace_id;
+        resolvedOrganizationId = resolvedOrganizationId || (deptInfo as any).facilities?.workspaces?.organization_id;
+      }
+    } else if (resolvedFacilityId && (!resolvedWorkspaceId || !resolvedOrganizationId)) {
+      console.log("Resolving hierarchy from facility_id:", resolvedFacilityId);
+      const { data: facInfo } = await adminClient
+        .from("facilities")
+        .select("workspace_id, workspaces(organization_id)")
+        .eq("id", resolvedFacilityId)
+        .single();
+
+      if (facInfo) {
+        resolvedWorkspaceId = resolvedWorkspaceId || facInfo.workspace_id;
+        resolvedOrganizationId = resolvedOrganizationId || (facInfo as any).workspaces?.organization_id;
+      }
+    } else if (resolvedWorkspaceId && !resolvedOrganizationId) {
+      console.log("Resolving hierarchy from workspace_id:", resolvedWorkspaceId);
+      const { data: wsInfo } = await adminClient
+        .from("workspaces")
+        .select("organization_id")
+        .eq("id", resolvedWorkspaceId)
+        .single();
+
+      if (wsInfo) {
+        resolvedOrganizationId = resolvedOrganizationId || wsInfo.organization_id;
+      }
+    }
+
+    console.log(`Final Hierarchy Scope: Org=${resolvedOrganizationId}, WS=${resolvedWorkspaceId}, Fac=${resolvedFacilityId}`);
+
     // For roles, we upsert based on user_id, workspace_id, and role (unique constraint)
     const { error: roleError } = await adminClient.from("user_roles").upsert({
       user_id: newUserId,
       role,
-      workspace_id,
-      facility_id,
+      workspace_id: resolvedWorkspaceId,
+      facility_id: resolvedFacilityId,
       department_id,
       specialty_id,
-      organization_id,
+      organization_id: resolvedOrganizationId,
       custom_role_id,
       created_by: requestingUser.id,
     }, { onConflict: 'user_id, role, workspace_id, facility_id, department_id, organization_id' });
@@ -259,6 +304,43 @@ serve(async (req: Request) => {
         }),
         { status: 400, headers: corsHeaders }
       );
+    }
+
+    /* =====================================================
+       7️⃣ INITIALIZE LEAVE BALANCES (New)
+    ===================================================== */
+    const finalOrgId = organization_id || roles.find((r: any) => r.organization_id)?.organization_id;
+
+    if (finalOrgId) {
+      console.log(`Initializing leave balances for org: ${finalOrgId}`);
+      const { data: vTypes } = await adminClient
+        .from("vacation_types")
+        .select("id")
+        .eq("organization_id", finalOrgId)
+        .eq("is_active", true);
+
+      if (vTypes && vTypes.length > 0) {
+        const currentYear = new Date().getFullYear();
+        const initialBalances = vTypes.map((vt: any) => ({
+          staff_id: newUserId,
+          vacation_type_id: vt.id,
+          organization_id: finalOrgId,
+          accrued: 0,
+          used: 0,
+          balance: 0,
+          year: currentYear
+        }));
+
+        const { error: balanceError } = await adminClient
+          .from("leave_balances")
+          .upsert(initialBalances, { onConflict: 'staff_id, vacation_type_id, year' });
+
+        if (balanceError) {
+          console.error("LEAVE BALANCE INITIALIZATION ERROR:", balanceError);
+        } else {
+          console.log(`Initialized ${vTypes.length} leave balances`);
+        }
+      }
     }
 
     return new Response(

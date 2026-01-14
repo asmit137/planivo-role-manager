@@ -9,9 +9,7 @@ import { SchedulingDashboard } from './SchedulingDashboard';
 import { StaffScheduleView } from './StaffScheduleView';
 import { ScheduleDisplaySettings } from './ScheduleDisplaySettings';
 import { EmptyState } from '@/components/layout/EmptyState';
-import { ClinicHub } from '@/components/clinics/ClinicHub';
 import { ResponsiveTabsList } from '@/components/layout/ResponsiveTabsList';
-import { Stethoscope } from 'lucide-react';
 
 
 interface SchedulingHubProps {
@@ -65,11 +63,6 @@ export const SchedulingHub: React.FC<SchedulingHubProps> = ({ departmentId }) =>
             <span className="hidden sm:inline">Calendar</span>
             <span className="sm:hidden">Cal</span>
           </TabsTrigger>
-          <TabsTrigger value="clinics" className="min-h-[44px] px-3 text-sm">
-            <Stethoscope className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Clinics</span>
-            <span className="sm:hidden">Clinics</span>
-          </TabsTrigger>
           <TabsTrigger value="dashboard" className="min-h-[44px] px-3 text-sm">
             <LayoutDashboard className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Dashboard</span>
@@ -89,10 +82,6 @@ export const SchedulingHub: React.FC<SchedulingHubProps> = ({ departmentId }) =>
 
         <TabsContent value="calendar">
           <ShiftCalendarView departmentId={effectiveDepartmentId} />
-        </TabsContent>
-
-        <TabsContent value="clinics">
-          <ClinicHub departmentId={effectiveDepartmentId} />
         </TabsContent>
 
         <TabsContent value="dashboard">

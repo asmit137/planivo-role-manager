@@ -33,7 +33,7 @@ interface UnifiedUserCreationProps {
 
 const UnifiedUserCreation = ({ open, onOpenChange, initialOrganizationId }: UnifiedUserCreationProps) => {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState('12345678');
   const [fullName, setFullName] = useState('');
   const [organizationId, setOrganizationId] = useState(initialOrganizationId || '');
   const [workspaceId, setWorkspaceId] = useState('');
@@ -467,6 +467,7 @@ const UnifiedUserCreation = ({ open, onOpenChange, initialOrganizationId }: Unif
       queryClient.invalidateQueries({ queryKey: ['unified-users'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['department-staff'] });
       handleReset();
       onOpenChange(false);
     },
@@ -519,6 +520,23 @@ const UnifiedUserCreation = ({ open, onOpenChange, initialOrganizationId }: Unif
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Role-specific validation
+    if (role === 'organization_admin') {
+      if (!organizationId) { toast.error('Organization is required'); return; }
+    } else if (role === 'workplace_supervisor' || role === 'workspace_supervisor') {
+      if (!organizationId) { toast.error('Organization is required'); return; }
+      if (!workspaceId) { toast.error('Workspace is required'); return; }
+    } else if (role === 'facility_supervisor') {
+      if (!organizationId) { toast.error('Organization is required'); return; }
+      if (!workspaceId) { toast.error('Workspace is required'); return; }
+      if (!facilityId) { toast.error('Facility is required'); return; }
+    } else if (['department_head', 'staff', 'intern'].includes(role)) {
+      if (!organizationId) { toast.error('Organization is required'); return; }
+      if (!workspaceId) { toast.error('Workspace is required'); return; }
+      if (!facilityId) { toast.error('Facility is required'); return; }
+      if (!departmentId) { toast.error('Department is required'); return; }
+    }
 
     createUserMutation.mutate({
       email: email.trim(),

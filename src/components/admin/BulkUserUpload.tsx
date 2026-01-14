@@ -116,6 +116,10 @@ const BulkUserUpload = ({ organizationId }: BulkUserUploadProps) => {
         throw new Error('No organization context found. Please select an organization first.');
       }
 
+      console.log("INVOKING bulk-upload-users - Row count:", users.length);
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log("Supabase Session active:", !!session);
+
       const { data, error } = await supabase.functions.invoke('bulk-upload-users', {
         body: {
           users,
@@ -123,7 +127,10 @@ const BulkUserUpload = ({ organizationId }: BulkUserUploadProps) => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("INVOKE ERROR:", error);
+        throw error;
+      }
       return data as BulkUploadResult;
     },
     onSuccess: (result) => {
