@@ -44,6 +44,7 @@ export function FooterSection() {
               <li>
                 {/* Scroll to pricing section if on home, or link to home#pricing */}
                 <a href="/#pricing" className="text-muted-foreground hover:text-primary transition-colors">Pricing</a>
+                <Link to="/contact-us" className="text-muted-foreground hover:text-primary transition-colors">Contact Support</Link>
               </li>
               <li>
                 <Link to="/contact-us" className="text-muted-foreground hover:text-primary transition-colors">Contact Support</Link>
