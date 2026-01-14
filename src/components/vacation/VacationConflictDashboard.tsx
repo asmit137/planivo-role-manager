@@ -28,7 +28,7 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
     queryKey: ['departments', scopeId],
     queryFn: async () => {
       let query = supabase.from('departments').select('id, name, facility_id, facilities(workspace_id)');
-      
+
       if (scopeType === 'facility' && scopeId) {
         query = query.eq('facility_id', scopeId);
       } else if (scopeType === 'workspace' && scopeId) {
@@ -39,7 +39,7 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
         const facilityIds = facilities?.map(f => f.id) || [];
         query = query.in('facility_id', facilityIds);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -52,7 +52,7 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
     queryFn: async () => {
       // Get department IDs based on scope
       let allowedDepartmentIds: string[] = [];
-      
+
       if (scopeType === 'facility' && scopeId) {
         // Facility Supervisor: only departments in their facility
         const { data: depts } = await supabase
@@ -67,7 +67,7 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
           .select('id')
           .eq('workspace_id', scopeId);
         const facilityIds = facilities?.map(f => f.id) || [];
-        
+
         const { data: depts } = await supabase
           .from('departments')
           .select('id')
@@ -328,30 +328,30 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
                   <CardContent className="space-y-4">
                     {conflict.plans.map((plan: any, idx: number) => (
                       <div key={plan.id}>
-                        <div className="flex items-start gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Users className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-semibold">
+                        <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+                          <div className="flex-1 w-full min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <span className="font-semibold truncate">
                                 {plan.profiles?.full_name || 'Unknown'}
                               </span>
-                              <Badge variant="outline">{plan.vacation_types?.name}</Badge>
+                              <Badge variant="outline" className="whitespace-nowrap">{plan.vacation_types?.name}</Badge>
                             </div>
-                            <div className="space-y-2 ml-6">
+                            <div className="space-y-2 ml-0 sm:ml-6">
                               {plan.vacation_splits?.map((split: any) => (
-                                <div key={split.id} className="flex items-center gap-2 text-sm">
-                                  <Calendar className="h-3 w-3 text-muted-foreground" />
-                                  <span>
+                                <div key={split.id} className="flex flex-wrap items-center gap-2 text-sm bg-muted/30 p-1.5 rounded">
+                                  <Calendar className="h-3 w-3 text-muted-foreground shrink-0" />
+                                  <span className="font-medium">
                                     {format(parseISO(split.start_date), 'MMM dd, yyyy')} -{' '}
                                     {format(parseISO(split.end_date), 'MMM dd, yyyy')}
                                   </span>
-                                  <span className="text-muted-foreground">({split.days} days)</span>
+                                  <span className="text-muted-foreground text-xs">({split.days} days)</span>
                                 </div>
                               ))}
                             </div>
                           </div>
                         </div>
-                        {idx === 0 && <Separator className="my-3" />}
+                        {idx === 0 && <Separator className="my-4" />}
                       </div>
                     ))}
 

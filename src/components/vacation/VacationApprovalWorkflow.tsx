@@ -645,14 +645,14 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                         <div
                           key={split.id}
                           className={cn(
-                            "flex items-start gap-3 p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer hover:shadow-md",
+                            "flex items-start gap-3 p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer hover:shadow-md",
                             isSelected
                               ? "bg-primary/5 border-primary shadow-sm"
                               : "bg-muted/50 border-transparent grayscale-[0.5] opacity-80"
                           )}
                           onClick={() => toggleSplitSelection(split.id)}
                         >
-                          <div className="pt-1">
+                          <div className="pt-1 shrink-0">
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={() => toggleSplitSelection(split.id)}
@@ -661,8 +661,8 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                               onClick={(e) => e.stopPropagation()}
                             />
                           </div>
-                          <div className="flex-1 space-y-1">
-                            <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
                               <label
                                 htmlFor={`split-${split.id}`}
                                 className="text-sm font-bold cursor-pointer transition-colors"
@@ -670,16 +670,16 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                                 Segment {index + 1}
                               </label>
                               {isSelected ? (
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
                                   Selected
                                 </span>
                               ) : (
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted px-2 py-0.5 rounded-full shrink-0">
                                   Excluded
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm font-medium">
+                            <p className="text-sm font-medium truncate sm:whitespace-normal">
                               {format(new Date(split.start_date), 'MMM dd, yyyy')} → {format(new Date(split.end_date), 'MMM dd, yyyy')}
                             </p>
                             <p className="text-xs text-muted-foreground font-medium">

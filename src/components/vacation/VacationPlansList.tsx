@@ -39,7 +39,7 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
   const { data: plans, isLoading } = useQuery({
     queryKey: ['vacation-plans-list', departmentId, scopeType, scopeId, staffView, user?.id],
     queryFn: async () => {
-      let query = supabase
+      let query: any = supabase
         .from('vacation_plans')
         .select(`
           *,
@@ -55,9 +55,9 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
       if (staffView) {
         query = query.eq('staff_id', user?.id);
       } else if (scopeType === 'facility' && scopeId) {
-        query = query.eq('facility_id', scopeId);
+        query = query.eq('facility_id', scopeId) as any;
       } else if (scopeType === 'workspace' && scopeId) {
-        query = query.eq('workspace_id', scopeId);
+        query = query.eq('workspace_id', scopeId) as any;
       } else if (scopeType === 'department' && (departmentId || scopeId)) {
         query = query.eq('department_id', departmentId || scopeId!);
       }
@@ -304,29 +304,48 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
                             <div
                               key={split.id}
                               className={cn(
-                                "flex items-center justify-between p-2 rounded",
+                                "flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded gap-2",
                                 split.status === 'approved' && "bg-success/10 border border-success",
                                 split.status === 'rejected' && "bg-destructive/10 border border-destructive",
                                 split.status === 'pending' && "bg-accent"
                               )}
                             >
-                              <span className="text-sm">Period {index + 1}</span>
-                              <span className="text-sm font-medium">
-                                {format(new Date(split.start_date), 'PPP')} →{' '}
-                                {format(new Date(split.end_date), 'PPP')}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm text-muted-foreground">
-                                  {split.days} days
-                                </span>
+                              <div className="flex items-center justify-between sm:justify-start gap-2">
+                                <span className="text-sm font-medium">Period {index + 1}</span>
+                                {/* Mobile-only Badge */}
                                 {split.status && split.status !== 'pending' && (
                                   <Badge className={cn(
+                                    "sm:hidden text-[10px] h-5 px-1.5",
                                     split.status === 'approved' && 'bg-success text-success-foreground',
                                     split.status === 'rejected' && 'bg-destructive text-destructive-foreground'
                                   )}>
-                                    {split.status === 'approved' ? '✓ Approved' : '✗ Rejected'}
+                                    {split.status === 'approved' ? 'Approved' : 'Rejected'}
                                   </Badge>
                                 )}
+                              </div>
+
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+                                <span className="text-sm font-medium">
+                                  {format(new Date(split.start_date), 'MMM d, yyyy')} →{' '}
+                                  {format(new Date(split.end_date), 'MMM d, yyyy')}
+                                </span>
+
+                                <div className="flex items-center justify-between sm:justify-end gap-2 mt-1 sm:mt-0">
+                                  <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
+                                    {split.days} days
+                                  </span>
+
+                                  {/* Desktop Badge */}
+                                  {split.status && split.status !== 'pending' && (
+                                    <Badge className={cn(
+                                      "hidden sm:inline-flex",
+                                      split.status === 'approved' && 'bg-success text-success-foreground',
+                                      split.status === 'rejected' && 'bg-destructive text-destructive-foreground'
+                                    )}>
+                                      {split.status === 'approved' ? '✓ Approved' : '✗ Rejected'}
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           ))}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Calendar, ClipboardList, LayoutDashboard, Clock, Send, Trash2, Filter, Monitor } from 'lucide-react';
+import { Plus, Calendar, ClipboardList, LayoutDashboard, Clock, Send, Trash2, Filter, Monitor, Edit, ArrowLeft, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { LoadingState } from '@/components/layout/LoadingState';
@@ -20,6 +20,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { ShiftCalendarView } from './ShiftCalendarView';
 import { SchedulingDashboard } from './SchedulingDashboard';
 import { ScheduleDisplaySettings } from './ScheduleDisplaySettings';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface FacilitySchedulingHubProps {
   facilityId?: string;
@@ -42,34 +43,57 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
   workspaceId: propWorkspaceId
 }) => {
   const [selectedFacilityId, setSelectedFacilityId] = useState<string>(propFacilityId || '');
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>(propWorkspaceId || '');
   const { user } = useAuth();
+  const { organization } = useOrganization();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('schedules');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [filterDepartmentId, setFilterDepartmentId] = useState<string>('all');
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+  const [editingSchedule, setEditingSchedule] = useState<any>(null);
 
   // Use the effective facility ID (prop or selected)
   const facilityId = propFacilityId || selectedFacilityId;
 
-  // Fetch all facilities for Super Admin / Workplace Supervisor facility selector
-  const { data: allFacilities } = useQuery({
-    queryKey: ['all-facilities', propWorkspaceId],
+  // Fetch workspaces for the active organization
+  const { data: workspaces, isLoading: workspacesLoading } = useQuery({
+    queryKey: ['workspaces', organization?.id],
     queryFn: async () => {
+      // If we have a propWorkspaceId, we might technically strictly use it, 
+      // but if we are in selector mode, we want choices.
       let query = supabase
-        .from('facilities')
-        .select('id, name, workspaces(name)')
+        .from('workspaces')
+        .select('id, name')
         .order('name');
 
-      if (propWorkspaceId) {
-        query = query.eq('workspace_id', propWorkspaceId);
+      if (organization?.id && organization.id !== 'all') {
+        query = query.eq('organization_id', organization.id);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
-    enabled: !propFacilityId, // Only fetch if no facility prop provided
+    enabled: !propWorkspaceId && !propFacilityId, // Only fetch if we are in selection mode
+  });
+
+  // Fetch facilities for the selected workspace
+  const { data: facilities } = useQuery({
+    queryKey: ['facilities', selectedWorkspaceId],
+    queryFn: async () => {
+      if (!selectedWorkspaceId) return [];
+
+      const { data, error } = await supabase
+        .from('facilities')
+        .select('id, name')
+        .eq('workspace_id', selectedWorkspaceId)
+        .order('name');
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedWorkspaceId, // Only fetch if workspace is selected
   });
 
   // Form state
@@ -154,10 +178,23 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
     return schedule.department_id === filterDepartmentId;
   }) || [];
 
+  // Check for duplicate names
+  const isDuplicateName = (scheduleName: string, excludeId?: string) => {
+    return schedules?.some((s: any) =>
+      s.name.trim().toLowerCase() === scheduleName.trim().toLowerCase() &&
+      s.facility_id === facilityId &&
+      s.id !== excludeId
+    );
+  };
+
   // Create schedule mutation
   const createSchedule = useMutation({
     mutationFn: async () => {
       if (!selectedDepartmentId) throw new Error('Please select a department');
+
+      if (isDuplicateName(name)) {
+        throw new Error('A schedule with this name already exists in this facility');
+      }
 
       // Get workspace from facility
       const { data: facility } = await supabase
@@ -214,6 +251,67 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
     },
   });
 
+  // Update schedule mutation
+  const updateSchedule = useMutation({
+    mutationFn: async () => {
+      if (!editingSchedule) throw new Error('No schedule selected for editing');
+      if (isDuplicateName(name, editingSchedule.id)) {
+        throw new Error('A schedule with this name already exists in this facility');
+      }
+
+      // Update schedule details
+      const { error: scheduleError } = await supabase
+        .from('schedules')
+        .update({
+          name,
+          department_id: selectedDepartmentId,
+          start_date: startDate,
+          end_date: endDate,
+          shift_count: shiftCount,
+        })
+        .eq('id', editingSchedule.id);
+
+      if (scheduleError) throw scheduleError;
+
+      // Delete existing shifts
+      const { error: deleteShiftsError } = await supabase
+        .from('shifts')
+        .delete()
+        .eq('schedule_id', editingSchedule.id);
+
+      if (deleteShiftsError) throw deleteShiftsError;
+
+      // Create new shifts
+      const shiftsToInsert = shifts.slice(0, shiftCount).map((shift, index) => ({
+        schedule_id: editingSchedule.id,
+        name: shift.name,
+        start_time: shift.startTime,
+        end_time: shift.endTime,
+        shift_order: index + 1,
+        required_staff: shift.requiredStaff,
+        color: shift.color,
+      }));
+
+      const { error: shiftsError } = await supabase
+        .from('shifts')
+        .insert(shiftsToInsert);
+
+      if (shiftsError) throw shiftsError;
+
+      return editingSchedule.id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['facility-schedules'] });
+      toast.success('Schedule updated successfully');
+      resetForm();
+      setIsCreateOpen(false);
+    },
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update schedule';
+      toast.error(errorMessage);
+    },
+  });
+
   // Publish schedule mutation
   const publishSchedule = useMutation({
     mutationFn: async (scheduleId: string) => {
@@ -261,6 +359,34 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
     setShiftCount(1);
     setSelectedDepartmentId('');
     setShifts([{ name: 'Morning Shift', startTime: '06:00', endTime: '14:00', requiredStaff: 1, color: '#3b82f6' }]);
+    setEditingSchedule(null);
+  };
+
+  const handleEditClick = (schedule: any) => {
+    setEditingSchedule(schedule);
+    setName(schedule.name);
+    setStartDate(schedule.start_date);
+    setEndDate(schedule.end_date);
+    setShiftCount(schedule.shift_count);
+    setSelectedDepartmentId(schedule.department_id);
+
+    // Map existing shifts to ShiftConfig format
+    if (schedule.shifts && schedule.shifts.length > 0) {
+      const mappedShifts = schedule.shifts
+        .sort((a: any, b: any) => a.shift_order - b.shift_order)
+        .map((s: any) => ({
+          name: s.name,
+          startTime: s.start_time,
+          endTime: s.end_time,
+          requiredStaff: s.required_staff,
+          color: s.color || DEFAULT_SHIFT_COLORS[0]
+        }));
+      setShifts(mappedShifts);
+    } else {
+      setShifts([{ name: 'Morning Shift', startTime: '06:00', endTime: '14:00', requiredStaff: 1, color: '#3b82f6' }]);
+    }
+
+    setIsCreateOpen(true);
   };
 
   const handleShiftCountChange = (value: string) => {
@@ -302,29 +428,69 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
 
   if (isLoading && facilityId) return <LoadingState message="Loading schedules..." />;
 
-  // If no facility selected and no prop, show facility selector
+  // Initial Selection Flow: Side-by-Side Selection
   if (!facilityId && !propFacilityId) {
     return (
-      <Card>
+      <Card className="w-full mt-6">
         <CardHeader>
-          <CardTitle>Select Facility</CardTitle>
-          <CardDescription>Choose a facility to manage schedules</CardDescription>
+          <CardTitle>Schedule Management</CardTitle>
+          <CardDescription>Select a workspace and facility to manage schedules</CardDescription>
         </CardHeader>
         <CardContent>
-          <Select value={selectedFacilityId} onValueChange={setSelectedFacilityId}>
-            <SelectTrigger className="w-full max-w-md">
-              <SelectValue placeholder="Select a facility..." />
-            </SelectTrigger>
-            <SelectContent>
-              {allFacilities?.map((facility: any) => (
-                <SelectItem key={facility.id} value={facility.id}>
-                  {facility.name} {facility.workspaces?.name ? `(${facility.workspaces.name})` : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {allFacilities?.length === 0 && (
-            <p className="text-muted-foreground mt-4">No facilities found. Please create a facility first.</p>
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Workspace Selection */}
+            <div className="space-y-2">
+              <Label>Workspace</Label>
+              {workspacesLoading ? (
+                <div className="h-10 w-full animate-pulse rounded-md border border-input bg-muted" />
+              ) : (
+                <Select
+                  value={selectedWorkspaceId}
+                  onValueChange={(value) => {
+                    setSelectedWorkspaceId(value);
+                    setSelectedFacilityId(''); // Reset facility when workspace changes
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a workspace..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workspaces?.map((ws: any) => (
+                      <SelectItem key={ws.id} value={ws.id}>
+                        {ws.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Facility Selection */}
+            <div className="space-y-2">
+              <Label>Facility</Label>
+              <Select
+                value={selectedFacilityId}
+                onValueChange={setSelectedFacilityId}
+                disabled={!selectedWorkspaceId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={!selectedWorkspaceId ? "Select workspace first" : "Select a facility..."} />
+                </SelectTrigger>
+                <SelectContent>
+                  {facilities?.map((f: any) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {(workspaces?.length === 0 && !workspacesLoading) && (
+            <div className="mt-4 p-4 bg-muted/50 rounded-lg text-sm text-muted-foreground text-center">
+              No workspaces found for your organization.
+            </div>
           )}
         </CardContent>
       </Card>
@@ -334,24 +500,27 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
   return (
     <ErrorBoundary>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        {/* Facility Selector for Super Admin */}
-        {!propFacilityId && allFacilities && allFacilities.length > 0 && (
-          <div className="mb-4">
-            <Select value={selectedFacilityId} onValueChange={setSelectedFacilityId}>
-              <SelectTrigger className="w-full max-w-xs">
-                <SelectValue placeholder="Select facility..." />
-              </SelectTrigger>
-              <SelectContent>
-                {allFacilities.map((facility: any) => (
-                  <SelectItem key={facility.id} value={facility.id}>
-                    {facility.name} {facility.workspaces?.name ? `(${facility.workspaces.name})` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {/* Top Bar with Facility/Workspace Context */}
+        {!propFacilityId && (
+          <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-muted/30 p-4 rounded-lg border border-border/50">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground">Current Context</h3>
+                <div className="flex items-center gap-1.5 text-foreground font-semibold">
+                  <span>{workspaces?.find((w: any) => w.id === selectedWorkspaceId)?.name || 'Unknown Workspace'}</span>
+                  <span className="text-muted-foreground">/</span>
+                  <span>{facilities?.find((f: any) => f.id === selectedFacilityId)?.name || 'Unknown Facility'}</span>
+                </div>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setSelectedFacilityId('')}>
+              Switch Facility
+            </Button>
           </div>
         )}
 
+        {/* ... Tab Navigation ... */}
         <div className="overflow-x-auto scrollbar-hide -mx-2 px-2 mb-6">
           <TabsList className="grid w-max min-w-full grid-cols-4 gap-1">
             <TabsTrigger value="schedules" className="flex items-center gap-2 min-h-[44px] px-3">
@@ -401,8 +570,11 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
                   </SelectContent>
                 </Select>
 
-                {/* Create Button */}
-                <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                {/* Create/Edit Modal */}
+                <Dialog open={isCreateOpen} onOpenChange={(open) => {
+                  setIsCreateOpen(open);
+                  if (!open) resetForm();
+                }}>
                   <DialogTrigger asChild>
                     <Button className="min-h-[44px]">
                       <Plus className="h-4 w-4 mr-2" />
@@ -412,7 +584,7 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
                   </DialogTrigger>
                   <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle>Create New Schedule</DialogTitle>
+                      <DialogTitle>{editingSchedule ? 'Edit Schedule' : 'Create New Schedule'}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-6 py-4">
                       {/* Department Selection */}
@@ -457,7 +629,7 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
                                   setEndDate(e.target.value);
                                 }
                               }}
-                              min={new Date().toISOString().split('T')[0]}
+                              min={!editingSchedule ? new Date().toISOString().split('T')[0] : undefined}
                             />
                           </div>
                           <div className="space-y-2">
@@ -556,10 +728,13 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
                           Cancel
                         </Button>
                         <Button
-                          onClick={() => createSchedule.mutate()}
-                          disabled={!name || !startDate || !endDate || !selectedDepartmentId || createSchedule.isPending}
+                          onClick={() => editingSchedule ? updateSchedule.mutate() : createSchedule.mutate()}
+                          disabled={!name || !startDate || !endDate || !selectedDepartmentId || createSchedule.isPending || updateSchedule.isPending}
                         >
-                          {createSchedule.isPending ? 'Creating...' : 'Create Schedule'}
+                          {editingSchedule
+                            ? (updateSchedule.isPending ? 'Updating...' : 'Update Schedule')
+                            : (createSchedule.isPending ? 'Creating...' : 'Create Schedule')
+                          }
                         </Button>
                       </div>
                     </div>
@@ -620,6 +795,14 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
                         <div className="flex gap-2 pt-2">
                           {schedule.status === 'draft' && (
                             <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditClick(schedule)}
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Edit
+                              </Button>
                               <Button
                                 size="sm"
                                 onClick={() => publishSchedule.mutate(schedule.id)}
@@ -683,7 +866,7 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
               <div className="flex items-center gap-2 p-4 bg-muted/50 rounded-lg">
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
-                  Select a department filter above to view its dashboard
+                  Select a department filter above to view its dashboard stats
                 </span>
               </div>
               <SchedulingDashboard departmentId={departments[0].id} />

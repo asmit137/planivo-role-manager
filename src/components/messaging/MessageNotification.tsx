@@ -11,7 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -36,7 +36,7 @@ const MessageNotification = () => {
     // Real-time subscriptions for live updates
     useRealtimeSubscription({
         table: 'messages',
-        invalidateQueries: ['user-conversations-summary'],
+        invalidateQueries: ['user-conversations-summary', 'discord-channels', 'discord-dms'],
     });
 
     useRealtimeSubscription({
@@ -47,6 +47,25 @@ const MessageNotification = () => {
     useRealtimeSubscription({
         table: 'conversation_participants',
         invalidateQueries: ['user-conversations-summary'],
+    });
+
+    // Mark as read mutation
+    const markAsReadMutation = useMutation({
+        mutationFn: async (conversationId: string) => {
+            if (!user) return;
+            const { error } = await supabase
+                .from('conversation_participants')
+                .update({ last_read_at: new Date().toISOString() })
+                .eq('conversation_id', conversationId)
+                .eq('user_id', user.id);
+
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['user-conversations-summary'] });
+            queryClient.invalidateQueries({ queryKey: ['discord-channels'] });
+            queryClient.invalidateQueries({ queryKey: ['discord-dms'] });
+        },
     });
 
     // Fetch conversations summary
@@ -111,7 +130,11 @@ const MessageNotification = () => {
                     // Check unread status using last_read_at
                     const lastRead = p.last_read_at ? new Date(p.last_read_at) : new Date(0);
                     const lastMsgTime = lastMessage?.created_at ? new Date(lastMessage.created_at) : new Date(0);
-                    const isUnread = lastMsgTime > lastRead;
+
+                    // Logic to determine unread:
+                    // 1. Time check: last message is newer than last read
+                    // 2. Sender check: last message was NOT sent by current user
+                    const isUnread = lastMsgTime > lastRead && lastMessage?.sender_id !== user.id;
 
                     return {
                         ...convo,
@@ -122,20 +145,21 @@ const MessageNotification = () => {
                 })
             );
 
-            const validConvos = convos.filter(c => c && c.last_message) as Conversation[];
+            const validConvos = convos.filter(c =>
+                c &&
+                c.last_message &&
+                c.last_message.sender_id !== user.id && // Only show received messages
+                c.unread_count > 0 // Only show unread messages
+            ) as Conversation[];
 
             return validConvos.sort((a, b) => {
-                const aUnread = (a.unread_count || 0) > 0;
-                const bUnread = (b.unread_count || 0) > 0;
-                if (aUnread && !bUnread) return -1;
-                if (!aUnread && bUnread) return 1;
                 return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
             }).slice(0, 5); // Only show top 5
         },
         enabled: !!user,
     });
 
-    const totalUnread = conversations.reduce((acc, curr) => acc + (curr.unread_count || 0), 0);
+    const totalUnread = conversations.length; // Since we filter for unread > 0, length is the count
 
     const getConversationTitle = (convo: Conversation) => {
         if (convo.title) return convo.title;
@@ -147,6 +171,8 @@ const MessageNotification = () => {
     };
 
     const handleConversationClick = (convoId: string) => {
+        // Mark as read immediately on click
+        markAsReadMutation.mutate(convoId);
         setOpen(false);
         navigate(`/dashboard?tab=messaging&convo=${convoId}`);
     };
@@ -172,7 +198,7 @@ const MessageNotification = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80 p-0 border-border bg-popover/95 backdrop-blur-xl">
                 <div className="flex items-center justify-between p-4 border-b border-border">
-                    <h3 className="font-semibold text-foreground">Messages</h3>
+                    <h3 className="font-semibold text-foreground">Unread Messages</h3>
                     <Button
                         variant="ghost"
                         size="sm"
@@ -190,7 +216,7 @@ const MessageNotification = () => {
                     {conversations.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-10 px-4 opacity-40">
                             <MessageSquare className="h-10 w-10 mb-2" />
-                            <p className="text-sm">No recent messages</p>
+                            <p className="text-sm">No new messages</p>
                         </div>
                     ) : (
                         <div className="divide-y divide-border">
@@ -200,8 +226,7 @@ const MessageNotification = () => {
                                     <div
                                         key={convo.id}
                                         className={cn(
-                                            "p-4 hover:bg-muted/50 transition-colors cursor-pointer flex gap-3 items-start",
-                                            convo.unread_count ? "bg-primary/5" : ""
+                                            "p-4 hover:bg-muted/50 transition-colors cursor-pointer flex gap-3 items-start bg-primary/5"
                                         )}
                                         onClick={() => handleConversationClick(convo.id)}
                                     >
@@ -212,10 +237,7 @@ const MessageNotification = () => {
                                         </Avatar>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center justify-between gap-2">
-                                                <h4 className={cn(
-                                                    "text-sm font-medium truncate",
-                                                    convo.unread_count ? "text-foreground font-semibold" : "text-muted-foreground"
-                                                )}>
+                                                <h4 className="text-sm font-semibold truncate text-foreground">
                                                     {title}
                                                 </h4>
                                                 {convo.last_message && (
@@ -226,14 +248,11 @@ const MessageNotification = () => {
                                             </div>
                                             {convo.last_message && (
                                                 <p className="text-xs text-muted-foreground/70 truncate mt-0.5">
-                                                    {convo.last_message.sender_id === user?.id ? 'You: ' : ''}
                                                     {convo.last_message.content}
                                                 </p>
                                             )}
                                         </div>
-                                        {convo.unread_count > 0 && (
-                                            <div className="h-2 w-2 rounded-full bg-primary mt-1.5 shrink-0" />
-                                        )}
+                                        <div className="h-2 w-2 rounded-full bg-primary mt-1.5 shrink-0" />
                                     </div>
                                 );
                             })}
