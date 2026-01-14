@@ -1,0 +1,15 @@
+{
+    "deno.enable": true,
+    "deno.enablePaths": [
+        "supabase/functions"
+    ],
+    "deno.lint": true,
+    "deno.unstable": true,
+    "deno.config": "supabase/functions/deno.json",
+    "deno.suggest.imports.hosts": {
+        "https://deno.land": true,
+        "https://esm.sh": true,
+        "https://x.nest.land": true
+    },
+    "typescript.tsdk": "node_modules/typescript/lib"
+}
