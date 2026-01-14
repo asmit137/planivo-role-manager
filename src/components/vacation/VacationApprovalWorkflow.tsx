@@ -45,6 +45,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
   const [showPreviousConflictDialog, setShowPreviousConflictDialog] = useState(false);
   const [selectedSplits, setSelectedSplits] = useState<Set<string>>(new Set());
   const [splitConflicts, setSplitConflicts] = useState<Map<string, any[]>>(new Map());
+  const [schedulingConflicts, setSchedulingConflicts] = useState<any[]>([]);
 
   // Fetch pending vacation plans based on level
   const { data: pendingPlans, isLoading } = useQuery({
@@ -180,11 +181,24 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
           return true;
         }
 
-        // Only Staff and Intern vacations go to supervisors
-        const isLowLevelEmployee = roleNames.includes('staff') || roleNames.includes('intern');
+        // Higher roles that ONLY Super Admin can approve
+        const higherRoles = [
+          'super_admin',
+          'organization_admin',
+          'general_admin',
+          'workplace_supervisor',
+          'facility_supervisor',
+          'workspace_supervisor',
+          'department_head'
+        ];
 
-        if (approvalLevel === 1 || approvalLevel === 2 || approvalLevel === 3) {
-          return isLowLevelEmployee;
+        const hasHigherRole = roleNames.some(role => higherRoles.includes(role));
+        const isStaffOrIntern = roleNames.includes('staff') || roleNames.includes('intern');
+
+        // Supervisors (L1, L2, L3) should ONLY see plans for pure staff/interns
+        // If they have ANY higher role, they must be approved by Super Admin
+        if (approvalLevel >= 1 && approvalLevel <= 3) {
+          return isStaffOrIntern && !hasHigherRole;
         }
 
         return false;
@@ -206,6 +220,8 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       conflictingPlans = [],
       selectedSplitIds = []
     }: any) => {
+      let effectiveAction = action;
+      let rejectionReason = '';
       // Check for conflicts before approval (only for Department Head level)
       if (action === 'approve' && approvalLevel === 1 && !hasConflict) {
         const { data: planData } = await supabase
@@ -215,14 +231,69 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
           .single();
 
         if (planData) {
+          // Check for vacation overlaps with OTHER users (existing logic)
           const { data: conflicts } = await supabase.rpc('check_vacation_conflicts', {
             _vacation_plan_id: planId,
             _department_id: planData.department_id
           });
 
-          if (conflicts && Array.isArray(conflicts) && conflicts.length > 0) {
-            // Return per-split conflicts
-            throw new Error('CONFLICTS_DETECTED:' + JSON.stringify(conflicts));
+          // Check for Shift Assignments
+          const { data: planWithSplits } = await supabase
+            .from('vacation_plans')
+            .select('staff_id, vacation_splits(start_date, end_date)')
+            .eq('id', planId)
+            .single();
+
+          const schedulingConflicts: any[] = [];
+          if (planWithSplits?.vacation_splits) {
+            for (const split of planWithSplits.vacation_splits) {
+              // Check for Shift Assignments
+              const { data: shifts } = await supabase
+                .from('shift_assignments')
+                .select('*, shifts(name, start_time, end_time)')
+                .eq('staff_id', planWithSplits.staff_id)
+                .gte('assignment_date', split.start_date)
+                .lte('assignment_date', split.end_date);
+
+              if (shifts && shifts.length > 0) {
+                shifts.forEach((s: any) => {
+                  schedulingConflicts.push({
+                    type: 'shift',
+                    name: s.shifts?.name,
+                    date: s.assignment_date,
+                    details: `${s.shifts?.start_time} - ${s.shifts?.end_time}`
+                  });
+                });
+              }
+
+              // Check for Training/Meeting Events
+              const { data: trainingTargets } = await supabase
+                .from('training_event_targets')
+                .select('*, training_events(title, event_type, start_datetime, end_datetime)')
+                .eq('user_id', planWithSplits.staff_id)
+                .eq('target_type', 'user')
+                .gte('training_events.start_datetime', `${split.start_date}T00:00:00`)
+                .lte('training_events.end_datetime', `${split.end_date}T23:59:59`);
+
+              if (trainingTargets && trainingTargets.length > 0) {
+                trainingTargets.forEach((t: any) => {
+                  if (t.training_events) {
+                    schedulingConflicts.push({
+                      type: t.training_events.event_type || 'training',
+                      name: t.training_events.title,
+                      date: format(new Date(t.training_events.start_datetime), 'yyyy-MM-dd'),
+                      details: `${format(new Date(t.training_events.start_datetime), 'HH:mm')} - ${format(new Date(t.training_events.end_datetime), 'HH:mm')}`
+                    });
+                  }
+                });
+              }
+            }
+          }
+
+          if ((conflicts && Array.isArray(conflicts) && conflicts.length > 0) || schedulingConflicts.length > 0) {
+            // STRICT REJECTION: If conflicts found, force action to 'reject'
+            effectiveAction = 'reject';
+            rejectionReason = comments || 'Auto-rejected due to scheduling/vacation conflicts.';
           }
         }
       }
@@ -248,9 +319,9 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         .eq('vacation_plan_id', planId);
 
       // Update split statuses based on selection
-      if (allSplits && selectedSplitIds.length > 0) {
+      if (allSplits) {
         for (const split of allSplits) {
-          const newSplitStatus = selectedSplitIds.includes(split.id) ? 'approved' : 'rejected';
+          const newSplitStatus = (effectiveAction === 'approve' && selectedSplitIds.includes(split.id)) ? 'approved' : 'rejected';
           await supabase
             .from('vacation_splits')
             .update({ status: newSplitStatus })
@@ -266,6 +337,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
           .from('vacation_plans')
           .update({ total_days: newTotalDays })
           .eq('id', planId);
+
       }
 
       // Create or update approval record
@@ -280,9 +352,9 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         vacation_plan_id: planId,
         approval_level: approvalLevel,
         approver_id: user?.id,
-        status: action === 'approve' ? 'approved' : 'rejected',
-        comments: comments || null,
-        has_conflict: hasConflict,
+        status: effectiveAction === 'approve' ? 'approved' : 'rejected',
+        comments: (effectiveAction === 'reject' && rejectionReason) ? rejectionReason : (comments || null),
+        has_conflict: effectiveAction === 'reject' && rejectionReason.includes('conflict') ? true : hasConflict,
         conflict_reason: conflictReason || null,
         conflicting_plans: (Array.isArray(conflictingPlans) && conflictingPlans.length > 0) ? conflictingPlans : null,
       };
@@ -297,7 +369,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       }
 
       // Update vacation plan status
-      const newStatus = action === 'approve' ? 'approved' : 'rejected';
+      const newStatus = effectiveAction === 'approve' ? 'approved' : 'rejected';
 
       const { error: updateError } = await supabase
         .from('vacation_plans')
@@ -314,10 +386,10 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         .single();
 
       if (planData) {
-        const { data: approverProfile } = await supabase
+        const { data: approverProfile } = await (supabase
           .from('profiles')
           .select('full_name')
-          .eq('id', user?.id)
+          .eq('id', user?.id) as any)
           .single();
 
         await sendVacationStatusNotification(
@@ -330,6 +402,8 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-vacation-plans'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-leave-balances'] });
+      queryClient.invalidateQueries({ queryKey: ['staff-leave-balances'] });
       toast.success(`Vacation plan ${approvalAction === 'approve' ? 'approved' : 'rejected'}`);
       setShowApprovalDialog(false);
       setShowConflictDialog(false);
@@ -341,20 +415,35 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       setSplitConflicts(new Map());
     },
     onError: (error: any) => {
-      if (error.message.startsWith('CONFLICTS_DETECTED:')) {
+      if (error.message.startsWith('STRICT_CONFLICT_DETECTED:')) {
+        // Auto-reject the plan if strict conflicts are found
+        const conflictsJson = error.message.replace('STRICT_CONFLICT_DETECTED:', '');
+        const allConflicts = JSON.parse(conflictsJson);
+
+        toast.error('Conflicts detected! Auto-rejecting vacation request.');
+
+        // Trigger rejection
+        approvalMutation.mutate({
+          planId: selectedPlan.id,
+          action: 'reject',
+          comments: 'Auto-rejected due to scheduling/vacation conflicts.',
+        });
+      } else if (error.message.startsWith('CONFLICTS_DETECTED:')) {
         const conflictsJson = error.message.replace('CONFLICTS_DETECTED:', '');
-        const conflicts = JSON.parse(conflictsJson);
+        const allConflicts = JSON.parse(conflictsJson);
+        const { vacationConflicts, schedulingConflicts } = allConflicts;
 
         // Build split conflicts map
         const conflictsMap = new Map<string, any[]>();
-        conflicts.forEach((item: any) => {
+        vacationConflicts.forEach((item: any) => {
           if (item.conflicts && item.conflicts.length > 0) {
             conflictsMap.set(item.split_id, item.conflicts);
           }
         });
 
         setSplitConflicts(conflictsMap);
-        setConflictData(conflicts);
+        setConflictData(vacationConflicts);
+        setSchedulingConflicts(schedulingConflicts || []);
         setShowApprovalDialog(false);
         setShowConflictDialog(true);
       } else if (error.message.startsWith('PREVIOUS_CONFLICTS:')) {
@@ -363,6 +452,9 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         setPreviousLevelConflicts(conflicts);
         setShowApprovalDialog(false);
         setShowPreviousConflictDialog(true);
+      } else if (error.message === 'INSUFFICIENT_BALANCE') {
+        toast.error('Insufficient leave balance for this user. Approval denied.');
+        setShowApprovalDialog(false);
       } else {
         toast.error('Failed to process approval');
       }
@@ -847,6 +939,22 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                                   <p className="font-bold text-foreground/80">{cp.staff_name}</p>
                                   <p className="text-[10px] font-medium">
                                     {format(new Date(cp.start_date), 'MMM dd')} - {format(new Date(cp.end_date), 'MMM dd, yyyy')} ({cp.days} days)
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {index === 0 && schedulingConflicts.length > 0 && (
+                          <div className="mt-3 p-3 bg-destructive/5 rounded-lg border border-destructive/20 shadow-inner">
+                            <p className="text-[10px] font-bold text-destructive uppercase tracking-tighter mb-2">Pre-existing Schedule Conflicts:</p>
+                            <div className="space-y-2">
+                              {schedulingConflicts.map((sc: any, scIdx: number) => (
+                                <div key={scIdx} className="text-xs text-muted-foreground pl-3 border-l-2 border-destructive/50">
+                                  <p className="font-bold text-foreground/80">{sc.name} ({sc.type})</p>
+                                  <p className="text-[10px] font-medium">
+                                    {format(new Date(sc.date), 'MMM dd, yyyy')}: {sc.details}
                                   </p>
                                 </div>
                               ))}

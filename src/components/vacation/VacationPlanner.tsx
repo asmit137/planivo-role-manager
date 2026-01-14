@@ -66,10 +66,10 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   });
 
   // Determine effective department ID and mode
-  const isStaff = currentUserRole?.role === 'staff' || currentUserRole?.role === 'intern';
-  const isDepartmentHead = currentUserRole?.role === 'department_head';
-  const isSupervisor = ['facility_supervisor', 'workplace_supervisor', 'workspace_supervisor'].includes(currentUserRole?.role);
-  const isSuperAdmin = currentUserRole?.role === 'super_admin' || currentUserRole?.role === 'organization_admin';
+  const isStaff = (currentUserRole?.role as any) === 'staff' || (currentUserRole?.role as any) === 'intern';
+  const isDepartmentHead = (currentUserRole?.role as any) === 'department_head';
+  const isSupervisor = ['facility_supervisor', 'workplace_supervisor', 'workspace_supervisor'].includes(currentUserRole?.role as any);
+  const isSuperAdmin = (currentUserRole?.role as any) === 'super_admin' || (currentUserRole?.role as any) === 'organization_admin';
   const effectiveDepartmentId = departmentId || selectedDepartment || currentUserRole?.department_id;
   const effectiveStaffOnly = staffOnly || isStaff;
 
@@ -133,7 +133,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
         .from('user_roles')
         .select('user_id, role')
         .eq('department_id', effectiveDepartmentId)
-        .in('role', ['staff', 'intern', 'department_head', 'facility_supervisor', 'workplace_supervisor', 'workspace_supervisor']);
+        .in('role', ['staff', 'intern', 'department_head', 'facility_supervisor', 'workplace_supervisor', 'workspace_supervisor'] as any[]);
 
       if (rolesError) throw rolesError;
       if (!roles || roles.length === 0) return [];
@@ -198,19 +198,21 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     });
   }
 
-  const { data: userBalances } = useQuery({
-    queryKey: ['user-leave-balances', user?.id, new Date().getFullYear()],
+  const targetStaffIdForBalance = effectiveStaffOnly ? user?.id : (selectedStaff || user?.id);
+
+  const { data: staffBalances } = useQuery({
+    queryKey: ['staff-leave-balances', targetStaffIdForBalance, new Date().getFullYear()],
     queryFn: async () => {
-      if (!user?.id) return [];
-      const { data, error } = await supabase
-        .from('leave_balances')
+      if (!targetStaffIdForBalance) return [];
+      const { data, error } = await (supabase
+        .from('leave_balances' as any) as any)
         .select('*')
-        .eq('staff_id', user.id)
+        .eq('staff_id', targetStaffIdForBalance)
         .eq('year', new Date().getFullYear());
       if (error) throw error;
       return data;
     },
-    enabled: !!user?.id && currentOrganization?.vacation_mode === 'full',
+    enabled: !!targetStaffIdForBalance && currentOrganization?.vacation_mode === 'full',
   });
 
   const createPlanMutation = useMutation({
@@ -234,8 +236,37 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
         if (userOverlaps && Array.isArray(userOverlaps) && userOverlaps.length > 0) {
           const overlap = userOverlaps[0] as any;
           throw new Error(
-            `You already have a vacation request from ${format(new Date(overlap.start_date), 'PPP')} to ${format(new Date(overlap.end_date), 'PPP')} (${overlap.vacation_type}) that overlaps with this date range. Please modify your existing request or choose different dates.`
+            `You already have a vacation request from ${format(new Date(overlap.start_date), 'PPP')} to ${format(new Date(overlap.end_date), 'PPP')} (${overlap.vacation_type}) that overlaps with this date range.`
           );
+        }
+
+        // Check for Shift Assignments
+        for (const split of planData.splits) {
+          const { data: shifts } = await supabase
+            .from('shift_assignments')
+            .select('*, shifts(name, start_time, end_time)')
+            .eq('staff_id', targetStaffId)
+            .gte('assignment_date', split.start_date)
+            .lte('assignment_date', split.end_date);
+
+          if (shifts && shifts.length > 0) {
+            const s = shifts[0] as any;
+            throw new Error(`Conflict with shift: ${s.shifts?.name} on ${format(new Date(s.assignment_date), 'PPP')}. Please resolve the schedule conflict first.`);
+          }
+
+          // Check for Training/Meeting Events
+          const { data: trainingTargets } = await supabase
+            .from('training_event_targets')
+            .select('*, training_events(title, event_type, start_datetime, end_datetime)')
+            .eq('user_id', targetStaffId)
+            .eq('target_type', 'user')
+            .gte('training_events.start_datetime', `${split.start_date}T00:00:00`)
+            .lte('training_events.end_datetime', `${split.end_date}T23:59:59`);
+
+          if (trainingTargets && trainingTargets.length > 0) {
+            const t = trainingTargets[0] as any;
+            throw new Error(`Conflict with ${t.training_events?.event_type || 'training'}: ${t.training_events?.title} on ${format(new Date(t.training_events?.start_datetime), 'PPP')}.`);
+          }
         }
       }
 
@@ -355,14 +386,14 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     const totalDays = splits.reduce((sum, split) => sum + split.days, 0);
 
     // Balance check for 'full' mode
-    if (currentOrganization?.vacation_mode === 'full' && effectiveStaffOnly) {
-      const typeBalance = userBalances?.find((b: any) => b.vacation_type_id === selectedVacationType);
+    if (currentOrganization?.vacation_mode === 'full') {
+      const typeBalance = (staffBalances as any)?.find((b: any) => b.vacation_type_id === selectedVacationType);
       if (!typeBalance) {
-        toast.error('No leave balance found for this vacation type. Please contact administrator.');
+        toast.error('No leave balance found for this vacation type for the selected staff.');
         return;
       }
-      if (totalDays > typeBalance.balance) {
-        toast.error(`Insufficient leave balance. You are requesting ${totalDays} days, but only ${typeBalance.balance} days remain.`);
+      if ((typeBalance as any).balance !== undefined && totalDays > (typeBalance as any).balance) {
+        toast.error(`Insufficient leave balance. You are requesting ${totalDays} days, but only ${(typeBalance as any).balance} days remain.`);
         return;
       }
     }

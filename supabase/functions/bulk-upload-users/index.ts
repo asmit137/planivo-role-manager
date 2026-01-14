@@ -102,11 +102,30 @@ serve(async (req: Request) => {
   }
 
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+  const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-  console.log("ENV STATUS - URL:", !!SUPABASE_URL, "Key:", !!SUPABASE_SERVICE_ROLE_KEY);
+  console.log("ENV STATUS - URL:", !!SUPABASE_URL, "Anon:", !!SUPABASE_ANON_KEY, "Service:", !!SUPABASE_SERVICE_ROLE_KEY);
 
   try {
+    // 1. Parse request body for health check
+    const rawBody = await req.json();
+
+    if (rawBody.type === "health") {
+      return new Response(
+        JSON.stringify({
+          status: "ok",
+          message: "Function reached successfully",
+          config: {
+            supabaseUrl: SUPABASE_URL,
+            hasAnonKey: !!SUPABASE_ANON_KEY,
+            hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY,
+            authHeaderPresent: !!req.headers.get("Authorization"),
+          }
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     const supabaseAdmin = createClient(
       SUPABASE_URL ?? '',
       SUPABASE_SERVICE_ROLE_KEY ?? '',
@@ -118,7 +137,7 @@ serve(async (req: Request) => {
       }
     );
 
-    // Verify the requesting user is authenticated and authorized
+    // Verify the requesting user is authenticated (using ANON client for verification like create-user)
     const authHeader = req.headers.get("Authorization");
     const token = authHeader?.replace("Bearer ", "");
 
@@ -126,17 +145,32 @@ serve(async (req: Request) => {
       console.error("Missing authorization token");
       return new Response(
         JSON.stringify({ error: "No authorization token provided" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { data: { user: requestingUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
+    const { data: { user: requestingUser }, error: authError } = await authClient.auth.getUser(token);
 
     if (authError || !requestingUser) {
       console.error("AUTH ERROR:", authError?.message || "User not found");
       return new Response(
-        JSON.stringify({ error: "Unauthorized", details: authError?.message }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          error: "Unauthorized_from_code",
+          details: authError?.message || "Invalid or expired token",
+          diagnostic: {
+            tokenReceived: !!token,
+            tokenLength: token?.length,
+            error: authError
+          }
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -166,8 +200,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // Parse and validate request body
-    const rawBody = await req.json();
+    // Use validation results (already parsed type:health check above, now validate for real work)
     const validationResult = bulkUploadSchema.safeParse(rawBody);
 
     if (!validationResult.success) {
@@ -196,109 +229,157 @@ serve(async (req: Request) => {
       errors: [],
     };
 
+    // Cache for resolved IDs to avoid redundant DB calls
+    const orgCache = new Map<string, string>();
+    const workspaceCache = new Map<string, string>();
+    const facilityCache = new Map<string, string>();
+    const departmentCache = new Map<string, string>();
+    const specialtyCache = new Map<string, string>();
+    const vTypesCache = new Map<string, any[]>();
+
     for (let i = 0; i < users.length; i++) {
       const user = users[i];
       const rowNumber = i + 2;
 
       try {
         console.log(`[Row ${rowNumber}] Processing ${user.email}`);
+
+        // Normalize role (handle common typos/confusions)
+        let userRole = user.role;
+        if (userRole === 'workspace_supervisor' as any) {
+          userRole = 'workspace_supervisor'; // Already in schema, just being explicit
+        }
+
         let rowOrganizationId = organizationId;
         let workspaceId: string | null = null;
         let facilityId: string | null = null;
         let departmentId: string | null = null;
         let specialtyId: string | null = null;
 
-        // Resolve Organization if provided
+        // 1. Resolve Organization
         if (user.organization_name) {
-          const { data: org, error: orgE } = await supabaseAdmin
-            .from('organizations')
-            .select('id')
-            .eq('name', user.organization_name)
-            .single();
+          const orgName = user.organization_name.trim();
+          if (orgCache.has(orgName)) {
+            rowOrganizationId = orgCache.get(orgName)!;
+          } else {
+            const { data: org, error: orgE } = await supabaseAdmin
+              .from('organizations')
+              .select('id')
+              .eq('name', orgName)
+              .maybeSingle();
 
-          if (orgE || !org) {
-            throw new Error(`Organization "${user.organization_name}" not found`);
+            if (orgE || !org) {
+              throw new Error(`Organization "${orgName}" not found`);
+            }
+            orgCache.set(orgName, org.id);
+            rowOrganizationId = org.id;
           }
 
           const isSuperAdmin = roles.some((r: any) => r.role === 'super_admin');
-          if (!isSuperAdmin && org.id !== organizationId) {
-            throw new Error(`Unauthorized: You cannot upload to organization "${user.organization_name}"`);
+          if (!isSuperAdmin && rowOrganizationId !== organizationId) {
+            throw new Error(`Unauthorized: You cannot upload to organization "${orgName}"`);
           }
-
-          rowOrganizationId = org.id;
         }
 
-        // Scoping Logic
-        if (user.role !== 'organization_admin' && user.role !== 'general_admin') {
-          // Resolve Workspace
-          if (user.workspace_name) {
+        // 2. Resolve Workspace
+        if (user.workspace_name && !['organization_admin', 'general_admin'].includes(userRole)) {
+          const wsKey = `${rowOrganizationId}:${user.workspace_name.trim()}`;
+          if (workspaceCache.has(wsKey)) {
+            workspaceId = workspaceCache.get(wsKey)!;
+          } else {
             const { data: workspace, error: wsError } = await supabaseAdmin
               .from('workspaces')
               .select('id')
-              .eq('name', user.workspace_name)
+              .eq('name', user.workspace_name.trim())
               .eq('organization_id', rowOrganizationId)
-              .single();
+              .maybeSingle();
 
             if (wsError || !workspace) {
               throw new Error(`Workspace "${user.workspace_name}" not found in this organization`);
             }
+            workspaceCache.set(wsKey, workspace.id);
             workspaceId = workspace.id;
           }
+        }
 
-          // Resolve Facility
-          if (['facility_supervisor', 'department_head', 'staff', 'intern'].includes(user.role)) {
-            if (!user.facility_name) {
-              throw new Error(`Facility Name is required for role "${user.role}"`);
-            }
+        // 3. Resolve Facility
+        const facilityRoles = ['facility_supervisor', 'department_head', 'staff', 'intern'];
+        if (facilityRoles.includes(userRole)) {
+          if (!user.facility_name) {
+            throw new Error(`Facility Name is required for role "${userRole}"`);
+          }
 
+          const facName = user.facility_name.trim();
+          const facKey = `${workspaceId || 'any'}:${facName}`;
+
+          if (facilityCache.has(facKey)) {
+            facilityId = facilityCache.get(facKey)!;
+          } else {
             let facilityQuery = supabaseAdmin
               .from('facilities')
               .select('id, workspace_id, workspaces!inner(organization_id)')
-              .eq('name', user.facility_name)
+              .eq('name', facName)
               .eq('workspaces.organization_id', rowOrganizationId);
 
             if (workspaceId) {
               facilityQuery = facilityQuery.eq('workspace_id', workspaceId);
             }
 
-            const { data: facility, error: facilityError } = await facilityQuery.single();
+            const { data: facility, error: facilityError } = await facilityQuery.maybeSingle();
 
             if (facilityError || !facility) {
-              throw new Error(`Facility "${user.facility_name}" not found in this organization${user.workspace_name ? ` within workspace "${user.workspace_name}"` : ''}`);
+              throw new Error(`Facility "${facName}" not found in this organization${user.workspace_name ? ` within workspace "${user.workspace_name}"` : ''}`);
+            }
+            facilityCache.set(facKey, facility.id);
+            facilityId = facility.id;
+            // Back-fill workspaceId if it wasn't provided but facility was found
+            if (!workspaceId) workspaceId = facility.workspace_id;
+          }
+
+          // 4. Resolve Department
+          const deptRoles = ['department_head', 'staff', 'intern'];
+          if (deptRoles.includes(userRole)) {
+            if (!user.department_name) {
+              throw new Error(`Department Name is required for role "${userRole}"`);
             }
 
-            facilityId = facility.id;
-            workspaceId = facility.workspace_id;
+            const deptName = user.department_name.trim();
+            const deptKey = `${facilityId}:${deptName}`;
 
-            // Resolve Department
-            if (['department_head', 'staff', 'intern'].includes(user.role)) {
-              if (!user.department_name) {
-                throw new Error(`Department Name is required for role "${user.role}"`);
-              }
-
+            if (departmentCache.has(deptKey)) {
+              departmentId = departmentCache.get(deptKey)!;
+            } else {
               const { data: department, error: deptError } = await supabaseAdmin
                 .from('departments')
                 .select('id')
-                .eq('name', user.department_name)
+                .eq('name', deptName)
                 .eq('facility_id', facilityId)
-                .single();
+                .maybeSingle();
 
               if (deptError || !department) {
-                throw new Error(`Department "${user.department_name}" not found in facility "${user.facility_name}"`);
+                throw new Error(`Department "${deptName}" not found in facility "${user.facility_name}"`);
               }
-
+              departmentCache.set(deptKey, department.id);
               departmentId = department.id;
+            }
 
-              // Resolve Specialty
-              if (user.specialty_name) {
+            // 5. Resolve Specialty
+            if (user.specialty_name) {
+              const specName = user.specialty_name.trim();
+              const specKey = `${departmentId}:${specName}`;
+
+              if (specialtyCache.has(specKey)) {
+                specialtyId = specialtyCache.get(specKey)!;
+              } else {
                 const { data: specialty, error: specialtyError } = await supabaseAdmin
                   .from('departments')
                   .select('id')
-                  .eq('name', user.specialty_name)
+                  .eq('name', specName)
                   .eq('parent_department_id', departmentId)
-                  .single();
+                  .maybeSingle();
 
                 if (specialty) {
+                  specialtyCache.set(specKey, specialty.id);
                   specialtyId = specialty.id;
                 }
               }
@@ -306,52 +387,37 @@ serve(async (req: Request) => {
           }
         }
 
-        console.log(`[Row ${rowNumber}] IDs resolved: Org=${rowOrganizationId}, WS=${workspaceId}, Fac=${facilityId}, Dept=${departmentId}`);
-
-        // Create/Get auth user
+        // 6. Create/Get auth user
         let newUserId: string | null = null;
+        const lowEmail = user.email.toLowerCase().trim();
 
-        // OPTIMIZATION: Check if user already exists in profiles (Fastest way)
-        const { data: existingProfileByEmail } = await supabaseAdmin
+        // Check profiles first (Fastest)
+        const { data: existingProfile } = await supabaseAdmin
           .from('profiles')
           .select('id')
-          .eq('email', user.email.toLowerCase())
+          .eq('email', lowEmail)
           .maybeSingle();
 
-        if (existingProfileByEmail) {
-          console.log(`[Row ${rowNumber}] User found in profiles: ${existingProfileByEmail.id}`);
-          newUserId = existingProfileByEmail.id;
-        }
-
-        if (!newUserId) {
-          // Not in profiles, try to create in Auth
+        if (existingProfile) {
+          newUserId = existingProfile.id;
+        } else {
+          // Try to create in Auth
           const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-            email: user.email,
-            password: '123456',
+            email: lowEmail,
+            password: '12345678', // Default password
             email_confirm: true,
-            user_metadata: {
-              full_name: user.full_name,
-            },
+            user_metadata: { full_name: user.full_name },
           });
 
           if (authError) {
             if (authError.message?.includes("already registered") || authError.status === 422) {
-              console.log(`[Row ${rowNumber}] User already exists in Auth (but not profiles?), fetching ID...`);
-              // Fetch more users to increase chance of finding the existing one. 
-              const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-
-              if (listError) {
-                console.error(`[Row ${rowNumber}] List users error:`, listError);
-                throw new Error(`Database error finding users: ${listError.message}`);
-              }
-              const existingUser = existingUsers.users.find((u: any) => u.email?.toLowerCase() === user.email.toLowerCase());
-
-              if (!existingUser) {
-                throw new Error(`User ${user.email} exists in Auth but was not found. Please contact support.`);
-              }
-              newUserId = existingUser.id;
+              // User exists in auth but not profile, go find them
+              const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+              if (listError) throw listError;
+              const foundUser = listData.users.find((u: any) => u.email?.toLowerCase() === lowEmail);
+              if (!foundUser) throw new Error(`User exists in Auth but could not be found`);
+              newUserId = foundUser.id;
             } else {
-              console.error(`[Row ${rowNumber}] Auth creation failed:`, authError);
               throw new Error(`Auth creation failed: ${authError.message}`);
             }
           } else {
@@ -359,27 +425,24 @@ serve(async (req: Request) => {
           }
         }
 
-        console.log(`[Row ${rowNumber}] Auth ID: ${newUserId}`);
+        if (!newUserId) throw new Error("Failed to establish target user ID");
 
-        // Profile Handling: Atomic RPC Upsert
-        const { error: rpcError } = await supabaseAdmin.rpc('upsert_profile_safe', {
+        // 7. Profile Upsert (Atomic)
+        const { error: profileError } = await supabaseAdmin.rpc('upsert_profile_safe', {
           _id: newUserId,
-          _email: user.email,
+          _email: lowEmail,
           _full_name: user.full_name,
           _created_by: requestingUser.id
         });
 
-        if (rpcError) {
-          console.error(`[Row ${rowNumber}] Profile RPC error:`, rpcError);
-          throw new Error(`Profile creation failed (RPC): ${rpcError.message}`);
-        }
+        if (profileError) throw new Error(`Profile sync failed: ${profileError.message}`);
 
-        // Upsert user role
-        const { error: roleInsertError } = await supabaseAdmin
+        // 8. Role Upsert
+        const { error: roleError } = await supabaseAdmin
           .from('user_roles')
           .upsert({
             user_id: newUserId,
-            role: user.role,
+            role: userRole,
             workspace_id: workspaceId,
             facility_id: facilityId,
             department_id: departmentId,
@@ -388,26 +451,55 @@ serve(async (req: Request) => {
             created_by: requestingUser.id,
           }, { onConflict: 'user_id, role, workspace_id, facility_id, department_id, organization_id' });
 
-        if (roleInsertError) {
-          console.error(`[Row ${rowNumber}] Role upsert error:`, roleInsertError);
-          throw new Error(`Role assignment failed: ${roleInsertError.message}`);
+        if (roleError) throw new Error(`Role assignment failed: ${roleError.message}`);
+
+        // 9. Leave Balances Initialization
+        if (rowOrganizationId) {
+          let vTypes = vTypesCache.get(rowOrganizationId);
+          if (!vTypes) {
+            const { data } = await supabaseAdmin
+              .from("vacation_types")
+              .select("id")
+              .eq("organization_id", rowOrganizationId)
+              .eq("is_active", true);
+            const resolvedTypes = data || [];
+            vTypesCache.set(rowOrganizationId, resolvedTypes);
+            vTypes = resolvedTypes;
+          }
+
+          if (vTypes && vTypes.length > 0) {
+            const currentYear = new Date().getFullYear();
+            const initialBalances = vTypes.map((vt: any) => ({
+              staff_id: newUserId,
+              vacation_type_id: vt.id,
+              organization_id: rowOrganizationId,
+              accrued: 0,
+              used: 0,
+              balance: 0,
+              year: currentYear
+            }));
+
+            await supabaseAdmin
+              .from("leave_balances")
+              .upsert(initialBalances, { onConflict: 'staff_id, vacation_type_id, year' });
+          }
         }
 
-        console.log(`[Row ${rowNumber}] Success`);
         result.success++;
+        console.log(`[Row ${rowNumber}] Success for ${lowEmail}`);
 
-      } catch (error: any) {
-        console.error(`[Row ${rowNumber}] Failed:`, error.message);
+      } catch (err: any) {
+        console.error(`[Row ${rowNumber}] Failed:`, err.message);
         result.failed++;
         result.errors.push({
           row: rowNumber,
           email: user.email,
-          error: error.message || 'Unknown error',
+          error: err.message || 'Unknown error',
         });
       }
     }
 
-    console.log(`Bulk upload finished. Success: ${result.success}, Failed: ${result.failed}`);
+    console.log(`Bulk upload finished. Total: ${users.length}, Success: ${result.success}, Failed: ${result.failed}`);
     return new Response(
       JSON.stringify(result),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
