@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
+import { useUserRole, type AppRole } from '@/hooks/useUserRole';
 
 interface UserEditDialogProps {
   open: boolean;
@@ -41,6 +42,12 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
       setNewRole(value);
       setNewCustomRoleId('');
     }
+
+    // Clear scope fields when role changes to ensure clean state
+    setNewWorkspaceId('');
+    setNewFacilityId('');
+    setNewDepartmentId('');
+    setNewSpecialtyId('');
   };
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [editRoleDepartmentId, setEditRoleDepartmentId] = useState('');
@@ -52,6 +59,78 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
   const [scopedSpecialtyId, setScopedSpecialtyId] = useState('');
 
   const queryClient = useQueryClient();
+
+  // Get current user's roles to determine permissions
+  const { data: currentUserRoles } = useUserRole();
+
+  // Determine highest role and scope
+  const getHighestRole = (): AppRole | null => {
+    if (!currentUserRoles || currentUserRoles.length === 0) return null;
+
+    const roleHierarchy: AppRole[] = [
+      'super_admin',
+      'organization_admin',
+      'general_admin',
+      'workplace_supervisor',
+      'workspace_supervisor',
+      'facility_supervisor',
+      'department_head',
+      'staff',
+      'intern'
+    ];
+
+    for (const hierarchyRole of roleHierarchy) {
+      if (currentUserRoles.some(r => r.role === hierarchyRole)) {
+        return hierarchyRole;
+      }
+    }
+    return null;
+  };
+
+  const highestRole = getHighestRole();
+  const currentUserRole = currentUserRoles?.[0]; // Get first role for scope info
+
+  // Determine available roles based on creator's role
+  const getAvailableRoles = (): AppRole[] => {
+    switch (highestRole) {
+      case 'super_admin':
+        return ['super_admin', 'organization_admin', 'general_admin', 'workplace_supervisor', 'workspace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern', 'custom'];
+      case 'organization_admin':
+        return ['general_admin', 'workplace_supervisor', 'workspace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern', 'custom'];
+      case 'workplace_supervisor':
+      case 'workspace_supervisor':
+        return ['facility_supervisor', 'department_head', 'staff', 'intern', 'custom'];
+      case 'facility_supervisor':
+        return ['department_head', 'staff', 'intern', 'custom'];
+      case 'department_head':
+        return ['staff', 'intern', 'custom'];
+      default:
+        return ['staff', 'intern', 'custom'];
+    }
+  };
+
+  const availableRoles = getAvailableRoles();
+
+  // Auto-scope fields based on current user's role
+  useEffect(() => {
+    if (currentUserRole && open) {
+      if (highestRole === 'organization_admin') {
+        if (currentUserRole.organization_id) setNewOrganizationId(currentUserRole.organization_id);
+      } else if (highestRole === 'workplace_supervisor' || highestRole === 'workspace_supervisor') {
+        if (currentUserRole.organization_id) setNewOrganizationId(currentUserRole.organization_id);
+        if (currentUserRole.workspace_id) setNewWorkspaceId(currentUserRole.workspace_id);
+      } else if (highestRole === 'facility_supervisor') {
+        if (currentUserRole.organization_id) setNewOrganizationId(currentUserRole.organization_id);
+        if (currentUserRole.workspace_id) setNewWorkspaceId(currentUserRole.workspace_id);
+        if (currentUserRole.facility_id) setNewFacilityId(currentUserRole.facility_id);
+      } else if (highestRole === 'department_head') {
+        if (currentUserRole.organization_id) setNewOrganizationId(currentUserRole.organization_id);
+        if (currentUserRole.workspace_id) setNewWorkspaceId(currentUserRole.workspace_id);
+        if (currentUserRole.facility_id) setNewFacilityId(currentUserRole.facility_id);
+        if (currentUserRole.department_id) setNewDepartmentId(currentUserRole.department_id);
+      }
+    }
+  }, [currentUserRole, highestRole, open]);
 
   useEffect(() => {
     if (user) {
@@ -602,7 +681,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
       }
     }
 
-    // Build hierarchy/labels if needed
+    // Build hierarchy/labels
     const processed = finalDepts.map(d => {
       if (d.parent_department_id) {
         const parent = finalDepts.find(p => p.id === d.parent_department_id) ||
@@ -639,10 +718,10 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit User</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader className="mb-4">
+          <DialogTitle className="text-xl sm:text-2xl">Edit User</DialogTitle>
+          <DialogDescription className="text-sm">
             Update user information, roles, and view module permissions
           </DialogDescription>
         </DialogHeader>
@@ -651,31 +730,34 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
           <div className="space-y-6">
             {/* Basic Info Section */}
             <form onSubmit={handleUpdateSubmit} className="space-y-4" autoComplete="off" data-form-type="other">
-              <div className="space-y-2">
-                <Label htmlFor="full-name">Full Name</Label>
-                <Input
-                  id="full-name"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                  autoComplete="off"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="full-name" className="text-sm">Full Name</Label>
+                  <Input
+                    id="full-name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                    autoComplete="off"
+                    className="h-10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={user.email}
+                    disabled
+                    className="bg-muted h-10"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={user.email}
-                  disabled
-                  className="bg-muted"
-                  autoComplete="off"
-                />
-              </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
                 <div className="space-y-0.5">
-                  <Label htmlFor="is-active">Active Status</Label>
-                  <p className="text-sm text-muted-foreground">
+                  <Label htmlFor="is-active" className="text-sm">Active Status</Label>
+                  <p className="text-xs text-muted-foreground">
                     Enable or disable user access
                   </p>
                 </div>
@@ -900,49 +982,84 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                   )}
                 </div>
 
-                <div className="space-y-3 border-t pt-4">
+                <div className="space-y-4 border-t pt-4">
                   <h3 className="font-semibold">Add New Role</h3>
 
                   <div className="space-y-2">
-                    <Label>Role</Label>
-                    <Select value={newCustomRoleId || newRole} onValueChange={handleNewRoleChange}>
-                      <SelectTrigger>
+                    <Label htmlFor="new-role">Role *</Label>
+                    <Select value={newCustomRoleId || newRole} onValueChange={handleNewRoleChange} required>
+                      <SelectTrigger id="new-role">
                         <SelectValue placeholder="Select a role" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="super_admin">Super Admin</SelectItem>
-                        <SelectItem value="organization_admin">Organization Admin</SelectItem>
-                        <SelectItem value="general_admin">General Admin</SelectItem>
-                        <SelectItem value="workplace_supervisor">Workspace Supervisor</SelectItem>
-                        <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
-                        <SelectItem value="department_head">Department Head</SelectItem>
-                        <SelectItem value="staff">Staff</SelectItem>
-                        {customRoles?.map((cr) => (
+                        {availableRoles.includes('super_admin') && (
+                          <SelectItem value="super_admin">Super Admin</SelectItem>
+                        )}
+                        {availableRoles.includes('organization_admin') && (
+                          <SelectItem value="organization_admin">Organization Admin</SelectItem>
+                        )}
+                        {availableRoles.includes('general_admin') && (
+                          <SelectItem value="general_admin">General Admin</SelectItem>
+                        )}
+                        {availableRoles.includes('workplace_supervisor') && (
+                          <SelectItem value="workplace_supervisor">Workspace Supervisor</SelectItem>
+                        )}
+                        {availableRoles.includes('workspace_supervisor') && (
+                          <SelectItem value="workspace_supervisor">Workspace Supervisor</SelectItem>
+                        )}
+                        {availableRoles.includes('facility_supervisor') && (
+                          <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
+                        )}
+                        {availableRoles.includes('department_head') && (
+                          <SelectItem value="department_head">Department Head</SelectItem>
+                        )}
+                        {availableRoles.includes('staff') && (
+                          <SelectItem value="staff">Staff</SelectItem>
+                        )}
+                        {availableRoles.includes('intern') && (
+                          <SelectItem value="intern">Intern</SelectItem>
+                        )}
+                        {availableRoles.includes('custom') && customRoles?.map((cr) => (
                           <SelectItem key={cr.id} value={cr.id}>
                             {cr.name} (Custom)
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {newRole === 'organization_admin' && 'Organization-level access - manages workspaces, facilities, and users'}
+                      {newRole === 'general_admin' && 'General admin access - manages the workspace'}
+                      {newRole === 'workplace_supervisor' && 'Workspace-level access - no facility/department required'}
+                      {newRole === 'facility_supervisor' && 'Facility-level access - department not required'}
+                      {newRole === 'department_head' && 'Department-level access - requires facility and department'}
+                      {newRole === 'staff' && 'Staff member - requires facility and department'}
+                      {newRole === 'intern' && 'Intern member - requires facility and department'}
+                      {newRole === 'custom' && 'Dynamic role with custom module permissions'}
+                    </p>
                   </div>
 
-                  {newRole !== 'super_admin' && newRole !== 'general_admin' && (
+                  {newRole !== 'super_admin' && (
                     <div className="space-y-4 pt-2">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground border-t pt-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold border-t pt-4">
                         <Building2 className="h-4 w-4" />
                         Organization & Scope Assignment
                       </div>
 
                       <div className="space-y-2">
-                        <Label>Organization *</Label>
-                        <Select value={newOrganizationId} onValueChange={(val) => {
-                          setNewOrganizationId(val);
-                          setNewWorkspaceId('');
-                          setNewFacilityId('');
-                          setNewDepartmentId('');
-                          setNewSpecialtyId('');
-                        }}>
-                          <SelectTrigger>
+                        <Label htmlFor="new-organization">Organization *</Label>
+                        <Select
+                          value={newOrganizationId}
+                          onValueChange={(val) => {
+                            setNewOrganizationId(val);
+                            setNewWorkspaceId('');
+                            setNewFacilityId('');
+                            setNewDepartmentId('');
+                            setNewSpecialtyId('');
+                          }}
+                          required
+                          disabled={!!currentUserRole?.organization_id}
+                        >
+                          <SelectTrigger id="new-organization">
                             <SelectValue placeholder="Select organization" />
                           </SelectTrigger>
                           <SelectContent>
@@ -953,49 +1070,54 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                             ))}
                           </SelectContent>
                         </Select>
+                        {currentUserRole?.organization_id && (
+                          <p className="text-[10px] text-muted-foreground italic">Restricted to your current organization</p>
+                        )}
                       </div>
 
-                      {['workplace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern', 'workspace_supervisor', 'custom'].includes(newRole) && (
+                      {['workplace_supervisor', 'workspace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern', 'custom'].includes(newRole) && (
                         <div className="space-y-2">
-                          <Label>Workspace *</Label>
-                          <Select value={newWorkspaceId} onValueChange={(val) => {
-                            setNewWorkspaceId(val);
-                            setNewFacilityId('');
-                            setNewDepartmentId('');
-                            setNewSpecialtyId('');
-                          }} disabled={!newOrganizationId && newRole !== 'general_admin'}>
-                            <SelectTrigger>
-                              <SelectValue placeholder={!newOrganizationId && newRole !== 'general_admin' ? "Select organization first" : "Select workspace"} />
+                          <Label htmlFor="new-workspace">Workspace *</Label>
+                          <Select
+                            value={newWorkspaceId}
+                            onValueChange={(val) => {
+                              setNewWorkspaceId(val);
+                              setNewFacilityId('');
+                              setNewDepartmentId('');
+                              setNewSpecialtyId('');
+                            }}
+                            required
+                            disabled={!newOrganizationId || !!currentUserRole?.workspace_id}
+                          >
+                            <SelectTrigger id="new-workspace">
+                              <SelectValue placeholder={!newOrganizationId ? "Select organization first" : "Select workspace"} />
                             </SelectTrigger>
                             <SelectContent>
-                              {newRole === 'general_admin' ? (
-                                workspaces?.map((workspace) => (
-                                  <SelectItem key={workspace.id} value={workspace.id}>
-                                    {workspace.name}
-                                  </SelectItem>
-                                ))
-                              ) : (
-                                getFilteredWorkspaces().map((workspace) => (
-                                  <SelectItem key={workspace.id} value={workspace.id}>
-                                    {workspace.name}
-                                  </SelectItem>
-                                ))
-                              )}
+                              {getFilteredWorkspaces().map((workspace) => (
+                                <SelectItem key={workspace.id} value={workspace.id}>
+                                  {workspace.name}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
                       )}
 
-                      {newWorkspaceId && ['facility_supervisor', 'department_head', 'staff', 'custom'].includes(newRole) && (
+                      {['facility_supervisor', 'department_head', 'staff', 'intern', 'custom'].includes(newRole) && (
                         <div className="space-y-2">
-                          <Label>Facility *</Label>
-                          <Select value={newFacilityId} onValueChange={(val) => {
-                            setNewFacilityId(val);
-                            setNewDepartmentId('');
-                            setNewSpecialtyId('');
-                          }}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select facility" />
+                          <Label htmlFor="new-facility">Facility *</Label>
+                          <Select
+                            value={newFacilityId}
+                            onValueChange={(val) => {
+                              setNewFacilityId(val);
+                              setNewDepartmentId('');
+                              setNewSpecialtyId('');
+                            }}
+                            required
+                            disabled={!newWorkspaceId || !!currentUserRole?.facility_id}
+                          >
+                            <SelectTrigger id="new-facility">
+                              <SelectValue placeholder={!newWorkspaceId ? "Select workspace first" : "Select facility"} />
                             </SelectTrigger>
                             <SelectContent>
                               {getFilteredFacilities().map((facility) => (
@@ -1008,15 +1130,20 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                         </div>
                       )}
 
-                      {newFacilityId && ['facility_supervisor', 'department_head', 'staff', 'intern', 'custom'].includes(newRole) && (
+                      {['department_head', 'staff', 'intern', 'custom'].includes(newRole) && (
                         <div className="space-y-2">
-                          <Label>Department {['facility_supervisor'].includes(newRole) ? '(Optional)' : '*'}</Label>
-                          <Select value={newDepartmentId} onValueChange={(val) => {
-                            setNewDepartmentId(val);
-                            setNewSpecialtyId('');
-                          }}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select department" />
+                          <Label htmlFor="new-department">Department *</Label>
+                          <Select
+                            value={newDepartmentId}
+                            onValueChange={(val) => {
+                              setNewDepartmentId(val);
+                              setNewSpecialtyId('');
+                            }}
+                            required
+                            disabled={!newFacilityId || !!currentUserRole?.department_id}
+                          >
+                            <SelectTrigger id="new-department">
+                              <SelectValue placeholder={!newFacilityId ? "Select facility first" : "Select department"} />
                             </SelectTrigger>
                             <SelectContent>
                               {getFilteredDepartments().map((dept) => (
@@ -1029,11 +1156,11 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                         </div>
                       )}
 
-                      {newDepartmentId && specialties && specialties.length > 0 && ['staff', 'intern', 'custom'].includes(newRole) && (
+                      {['staff', 'intern', 'custom'].includes(newRole) && newDepartmentId && specialties && specialties.length > 0 && (
                         <div className="space-y-2">
-                          <Label>Specialty (Optional)</Label>
+                          <Label htmlFor="new-specialty">Specialty (Optional)</Label>
                           <Select value={newSpecialtyId} onValueChange={setNewSpecialtyId}>
-                            <SelectTrigger>
+                            <SelectTrigger id="new-specialty">
                               <SelectValue placeholder="Select specialty" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1144,7 +1271,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
           </div>
         )}
       </DialogContent>
-    </Dialog >
+    </Dialog>
   );
 };
 

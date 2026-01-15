@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
 
 /**
  * Send notification when vacation plan status changes
@@ -7,7 +8,8 @@ export const sendVacationStatusNotification = async (
   vacationPlanId: string,
   newStatus: string,
   staffId: string,
-  approverName?: string
+  approverName?: string,
+  comment?: string
 ) => {
   try {
     // Get vacation plan details
@@ -22,22 +24,55 @@ export const sendVacationStatusNotification = async (
     const vacationType = plan.vacation_types?.name || 'Vacation';
     const totalDays = plan.total_days;
 
-    let title = '';
-    let message = '';
-    let notifyUserId = staffId;
+    // Calculate date range
+    let dateRange = '';
+    if (plan.vacation_splits && plan.vacation_splits.length > 0) {
+      const sortedSplits = plan.vacation_splits.sort((a: any, b: any) =>
+        new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+      );
+
+      const startD = new Date(sortedSplits[0].start_date);
+      const endD = new Date(sortedSplits[sortedSplits.length - 1].end_date);
+
+      if (!isNaN(startD.getTime()) && !isNaN(endD.getTime())) {
+        const startDate = format(startD, 'MMM d, yyyy');
+        const endDate = format(endD, 'MMM d, yyyy');
+        dateRange = ` (${startDate} - ${endDate})`;
+      }
+    }
 
     // Notification based on status
     if (newStatus === 'approved') {
-      title = '✅ Vacation Approved';
-      message = `Your ${vacationType} request for ${totalDays} days has been fully approved${approverName ? ` by ${approverName}` : ''}.`;
-      notifyUserId = staffId;
+      let title = '✅ Vacation Approved';
+      let message = `Your ${vacationType} request for ${totalDays} days${dateRange} has been fully approved${approverName ? ` by ${approverName}` : ''}.`;
+      if (comment) message += ` Note: ${comment}`;
+
+      await supabase.functions.invoke('create-notification', {
+        body: {
+          user_id: staffId,
+          title,
+          message,
+          type: 'vacation',
+          related_id: vacationPlanId,
+        },
+      });
     } else if (newStatus === 'rejected') {
-      title = '❌ Vacation Rejected';
-      message = `Your ${vacationType} request for ${totalDays} days has been rejected${approverName ? ` by ${approverName}` : ''}.`;
-      notifyUserId = staffId;
+      let title = '❌ Vacation Rejected';
+      let message = `Your ${vacationType} request for ${totalDays} days${dateRange} has been rejected${approverName ? ` by ${approverName}` : ''}.`;
+      if (comment) message += ` Reason: ${comment}`;
+
+      await supabase.functions.invoke('create-notification', {
+        body: {
+          user_id: staffId,
+          title,
+          message,
+          type: 'vacation',
+          related_id: vacationPlanId,
+        },
+      });
     } else if (newStatus === 'pending_approval' || newStatus === 'department_pending' || newStatus === 'facility_pending' || newStatus === 'workspace_pending') {
-      title = '📋 New Vacation Request';
-      message = `${vacationType} request for ${totalDays} days needs your approval.`;
+      let title = '📋 New Vacation Request';
+      let message = `${vacationType} request for ${totalDays} days needs your approval.`;
 
       // Get all relevant supervisors for parallel notification
       const { data: dept } = await supabase
@@ -93,23 +128,7 @@ export const sendVacationStatusNotification = async (
             },
           });
         }
-
-        // Return early as we've handled multiple notifications
-        return;
       }
-    }
-
-    // Create notification
-    if (title && message && notifyUserId) {
-      await supabase.functions.invoke('create-notification', {
-        body: {
-          user_id: notifyUserId,
-          title,
-          message,
-          type: 'vacation',
-          related_id: vacationPlanId,
-        },
-      });
     }
   } catch (error) {
     console.error('Error sending vacation notification:', error);

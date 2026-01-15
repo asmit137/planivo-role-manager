@@ -94,21 +94,22 @@ export const ShiftCalendarView: React.FC<ShiftCalendarViewProps> = ({ department
   return (
     <div className="space-y-4">
       {/* Controls */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold min-w-[160px]">
+          <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
+          <h2 className="text-sm sm:text-lg font-semibold truncate leading-none">
             Schedule Calendar
           </h2>
         </div>
 
         <Select value={selectedScheduleId} onValueChange={setSelectedScheduleId}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full xs:w-[180px] sm:w-[220px] h-9 sm:h-10 text-xs sm:text-sm">
             <SelectValue placeholder="Filter by schedule" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Schedules</SelectItem>
+            <SelectItem value="all" className="text-xs sm:text-sm">All Schedules</SelectItem>
             {schedules?.map((schedule: any) => (
-              <SelectItem key={schedule.id} value={schedule.id}>
+              <SelectItem key={schedule.id} value={schedule.id} className="text-xs sm:text-sm">
                 {schedule.name}
               </SelectItem>
             ))}
@@ -117,30 +118,30 @@ export const ShiftCalendarView: React.FC<ShiftCalendarViewProps> = ({ department
       </div>
 
       <Card className="border-2">
-        <CardContent className="p-3 sm:p-6 overflow-x-auto">
-          <div className="min-w-[320px]">
+        <CardContent className="p-0 sm:p-6 overflow-hidden">
+          <div className="w-full">
             <Calendar
               mode="single"
               selected={currentMonth}
               onSelect={(date) => date && setCurrentMonth(date)}
               onMonthChange={setCurrentMonth}
               month={currentMonth}
-              className="rounded-md w-full pointer-events-auto"
+              className="p-0 pointer-events-auto w-full"
               classNames={{
-                months: "flex flex-col gap-4 sm:gap-8 w-full justify-center",
-                month: "space-y-4 flex-1",
-                caption: "flex justify-center pt-1 relative items-center mb-4 sm:mb-8",
-                caption_label: "text-lg sm:text-2xl font-bold tracking-tight",
+                months: "flex flex-col gap-2 sm:gap-8 w-full justify-center",
+                month: "space-y-2 sm:space-y-4 flex-1",
+                caption: "flex justify-center pt-1 relative items-center mb-2 sm:mb-8 h-8 sm:h-12",
+                caption_label: "text-sm sm:text-2xl font-bold tracking-tight",
                 nav: "flex items-center",
-                nav_button: "h-10 w-10 bg-transparent p-0 opacity-60 hover:opacity-100 hover:bg-accent rounded-xl transition-all flex items-center justify-center z-20",
+                nav_button: "h-7 w-7 sm:h-10 sm:w-10 bg-transparent p-0 opacity-60 hover:opacity-100 hover:bg-accent rounded-md sm:rounded-xl transition-all flex items-center justify-center z-20",
                 nav_button_previous: "absolute left-0 top-1/2 -translate-y-1/2",
                 nav_button_next: "absolute right-0 top-1/2 -translate-y-1/2",
                 table: "w-full border-collapse",
-                head_row: "flex w-full mb-4",
-                head_cell: "text-muted-foreground/60 rounded-md font-bold text-[0.65rem] sm:text-xs uppercase tracking-widest flex-1 text-center",
-                row: "flex w-full mt-2",
-                cell: "relative p-0.5 text-center focus-within:relative focus-within:z-20 flex-1 h-10 sm:h-16",
-                day: "h-full w-full p-0 font-normal hover:bg-accent/50 rounded-xl transition-all touch-manipulation",
+                head_row: "flex w-full mb-1 sm:mb-4",
+                head_cell: "text-muted-foreground/60 rounded-md font-bold text-[0.6rem] sm:text-xs uppercase tracking-widest flex-1 min-w-0 text-center",
+                row: "flex w-full mt-1 sm:mt-2",
+                cell: "relative p-0.5 text-center focus-within:relative focus-within:z-20 flex-1 min-w-0 min-h-[44px] xs:min-h-[50px] sm:min-h-[64px]",
+                day: "h-full w-full p-0 font-normal hover:bg-accent/50 rounded-lg sm:rounded-xl transition-all touch-manipulation",
                 day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground shadow-lg shadow-primary/20",
                 day_today: "bg-accent/30 text-accent-foreground font-bold ring-2 ring-primary/20 ring-offset-2",
                 day_outside: "text-muted-foreground opacity-20",
@@ -163,7 +164,7 @@ export const ShiftCalendarView: React.FC<ShiftCalendarViewProps> = ({ department
                         <button
                           {...props}
                           className={cn(
-                            "h-full w-full p-2 font-normal rounded-xl transition-all relative group touch-manipulation flex flex-col items-center justify-center gap-1 overflow-hidden border-2",
+                            "h-full w-full p-1 sm:p-2 font-normal rounded-lg sm:rounded-xl transition-all relative group touch-manipulation flex flex-col items-center justify-center gap-0.5 sm:gap-1 overflow-hidden border-2",
                             hasAssignments && "bg-emerald-100 dark:bg-emerald-950 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-200 dark:hover:bg-emerald-900",
                             !hasAssignments && "border-transparent hover:bg-accent/50",
                             !isCurrentMonth && "opacity-30"
@@ -172,7 +173,7 @@ export const ShiftCalendarView: React.FC<ShiftCalendarViewProps> = ({ department
                           <time
                             dateTime={format(date, "yyyy-MM-dd")}
                             className={cn(
-                              "text-sm sm:text-lg font-medium transition-colors w-full text-center",
+                              "text-[10px] xs:text-xs sm:text-lg font-medium transition-colors w-full text-center",
                               isToday ? "text-primary font-bold" : "text-foreground/70"
                             )}
                           >
@@ -180,9 +181,9 @@ export const ShiftCalendarView: React.FC<ShiftCalendarViewProps> = ({ department
                           </time>
 
                           {hasAssignments && (
-                            <div className="w-full flex items-center justify-between">
+                            <div className="w-full flex items-center justify-between mt-auto">
                               <div className={cn(
-                                "text-white text-[9px] sm:text-[10px] font-black rounded-lg px-1.5 py-0.5 flex items-center justify-center shadow-md z-10 border border-white/10",
+                                "text-white text-[7px] sm:text-[10px] font-black rounded-sm sm:rounded-lg px-0.5 sm:px-1.5 py-0 sm:py-0.5 flex items-center justify-center shadow-md z-10 border border-white/10",
                                 totalAssigned >= dayAssignments.reduce((sum, item) => sum + (item.shift.required_staff || 0), 0)
                                   ? "bg-emerald-500"
                                   : "bg-amber-500"
@@ -190,7 +191,7 @@ export const ShiftCalendarView: React.FC<ShiftCalendarViewProps> = ({ department
                                 {totalAssigned}
                               </div>
 
-                              <div className="flex -space-x-1.5 overflow-hidden">
+                              <div className="hidden sm:flex -space-x-1.5 overflow-hidden">
                                 {dayAssignments.slice(0, 3).map((item: any, idx: number) => (
                                   <div
                                     key={idx}
@@ -204,7 +205,7 @@ export const ShiftCalendarView: React.FC<ShiftCalendarViewProps> = ({ department
                         </button>
                       </PopoverTrigger>
                       {hasAssignments && (
-                        <PopoverContent className="w-80 p-3 sm:p-4 max-h-[60vh] overflow-y-auto" side="bottom" align="center">
+                        <PopoverContent className="w-[90vw] max-w-[340px] sm:w-80 p-3 sm:p-4 max-h-[60vh] overflow-y-auto" side="bottom" align="center">
                           <div className="space-y-3">
                             <h4 className="font-semibold text-lg border-b pb-2">
                               {format(date, "MMMM d, yyyy")}
@@ -251,19 +252,19 @@ export const ShiftCalendarView: React.FC<ShiftCalendarViewProps> = ({ department
 
       {/* Legend */}
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Shift Legend</CardTitle>
+        <CardHeader className="p-3 sm:pb-2">
+          <CardTitle className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-muted-foreground">Shift Legend</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
+        <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+          <div className="flex flex-wrap gap-1.5 sm:gap-3">
             {schedules?.flatMap((schedule: any) =>
               schedule.shifts?.map((shift: any) => (
-                <div key={shift.id} className="flex items-center gap-2">
+                <div key={shift.id} className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md bg-muted/50 border">
                   <div
-                    className="w-3 h-3 rounded"
+                    className="w-2 h-2 sm:w-3 sm:h-3 rounded-full"
                     style={{ backgroundColor: shift.color }}
                   />
-                  <span className="text-sm">{shift.name}</span>
+                  <span className="text-[10px] sm:text-xs font-medium truncate max-w-[100px] sm:max-w-none">{shift.name}</span>
                 </div>
               ))
             )}

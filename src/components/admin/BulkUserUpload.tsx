@@ -245,15 +245,17 @@ const BulkUserUpload = ({ organizationId }: BulkUserUploadProps) => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
-            <Input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileSelect}
-              disabled={uploadMutation.isPending}
-              className="min-h-[44px]"
-            />
+            <div className="flex-1">
+              <Input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileSelect}
+                disabled={uploadMutation.isPending}
+                className="min-h-[40px] file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+              />
+            </div>
             {file && (
-              <Badge variant="secondary" className="whitespace-nowrap py-2 justify-center">
+              <Badge variant="secondary" className="whitespace-nowrap py-1.5 justify-center sm:h-9 text-[10px] sm:text-xs">
                 {file.name}
               </Badge>
             )}
@@ -268,7 +270,25 @@ const BulkUserUpload = ({ organizationId }: BulkUserUploadProps) => {
                 </AlertDescription>
               </Alert>
 
-              <div className="border rounded-lg overflow-x-auto">
+              {/* Mobile Card Preview */}
+              <div className="block sm:hidden space-y-3">
+                {parsedData.slice(0, 5).map((user, idx) => (
+                  <div key={idx} className="p-3 border rounded-lg bg-muted/30 space-y-2">
+                    <div className="flex justify-between items-start">
+                      <div className="font-mono text-[10px] truncate max-w-[150px]">{user.email}</div>
+                      <Badge variant="outline" className="text-[10px]">{user.role}</Badge>
+                    </div>
+                    <div className="text-xs font-semibold">{user.full_name}</div>
+                    <div className="text-[10px] text-muted-foreground flex flex-wrap gap-x-2">
+                      {user.workspace_name && <span>WS: {user.workspace_name}</span>}
+                      {user.facility_name && <span>Fac: {user.facility_name}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table Preview */}
+              <div className="hidden sm:block border rounded-lg overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -299,12 +319,13 @@ const BulkUserUpload = ({ organizationId }: BulkUserUploadProps) => {
                     ))}
                   </TableBody>
                 </Table>
-                {parsedData.length > 5 && (
-                  <div className="p-2 text-center text-sm text-muted-foreground bg-muted">
-                    ... and {parsedData.length - 5} more users
-                  </div>
-                )}
               </div>
+
+              {parsedData.length > 5 && (
+                <div className="p-2 text-center text-xs text-muted-foreground bg-muted/50 rounded-b-lg">
+                  ... and {parsedData.length - 5} more users
+                </div>
+              )}
 
               <div className="flex gap-2">
                 <Button
@@ -367,7 +388,21 @@ const BulkUserUpload = ({ organizationId }: BulkUserUploadProps) => {
                   </AlertDescription>
                 </Alert>
 
-                <div className="border rounded-lg overflow-hidden">
+                {/* Mobile Results Cards */}
+                <div className="block sm:hidden divide-y border rounded-lg">
+                  {uploadResult.errors.map((err, idx) => (
+                    <div key={idx} className="p-3 space-y-1">
+                      <div className="flex justify-between text-[10px]">
+                        <span className="font-mono text-muted-foreground">Row {err.row}</span>
+                        <span className="font-mono truncate max-w-[150px]">{err.email}</span>
+                      </div>
+                      <div className="text-xs text-destructive">{err.error}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Results Table */}
+                <div className="hidden sm:block border rounded-lg overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow>

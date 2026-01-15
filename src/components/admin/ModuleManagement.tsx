@@ -7,15 +7,15 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from '@/components/ui/table';
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -34,13 +34,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { 
-  Lock, 
-  Unlock, 
-  Settings, 
-  Eye, 
-  Edit, 
-  Trash2, 
+import {
+  Lock,
+  Unlock,
+  Settings,
+  Eye,
+  Edit,
+  Trash2,
   Shield,
   Loader2,
   AlertCircle,
@@ -48,6 +48,7 @@ import {
   Users,
   UserCog
 } from 'lucide-react';
+import { ResponsiveTabsList } from '@/components/layout/ResponsiveTabsList';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import UserModuleAccess from './UserModuleAccess';
@@ -103,7 +104,7 @@ const ModuleManagement = () => {
         .from('module_definitions')
         .select('*')
         .order('name');
-      
+
       if (error) throw error;
       return data as Module[];
     },
@@ -113,12 +114,12 @@ const ModuleManagement = () => {
     queryKey: ['role-module-access', selectedModule?.id],
     queryFn: async () => {
       if (!selectedModule) return [];
-      
+
       const { data, error } = await supabase
         .from('role_module_access')
         .select('*')
         .eq('module_id', selectedModule.id);
-      
+
       if (error) throw error;
       return data as RoleModuleAccess[];
     },
@@ -131,7 +132,7 @@ const ModuleManagement = () => {
         .from('module_definitions')
         .update({ is_active: isActive })
         .eq('id', moduleId);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -144,18 +145,18 @@ const ModuleManagement = () => {
   });
 
   const updatePermissionsMutation = useMutation({
-    mutationFn: async ({ 
-      accessId, 
-      permissions 
-    }: { 
-      accessId: string; 
-      permissions: Partial<RoleModuleAccess> 
+    mutationFn: async ({
+      accessId,
+      permissions
+    }: {
+      accessId: string;
+      permissions: Partial<RoleModuleAccess>
     }) => {
       const { error } = await supabase
         .from('role_module_access')
         .update(permissions)
         .eq('id', accessId);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -169,11 +170,11 @@ const ModuleManagement = () => {
 
   const checkDependencies = (module: Module): string[] => {
     if (!modules) return [];
-    
+
     return modules
-      .filter((m) => 
-        m.is_active && 
-        m.depends_on && 
+      .filter((m) =>
+        m.is_active &&
+        m.depends_on &&
         m.depends_on.includes(module.key)
       )
       .map((m) => m.name);
@@ -187,7 +188,7 @@ const ModuleManagement = () => {
         return;
       }
     }
-    
+
     toggleModuleMutation.mutate({ moduleId: module.id, isActive: checked });
   };
 
@@ -218,199 +219,221 @@ const ModuleManagement = () => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="modules" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="modules" className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Role-Based Access
+        <ResponsiveTabsList>
+          <TabsTrigger value="modules" className="flex items-center gap-2 px-3 sm:px-4">
+            <Shield className="h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">Role-Based Access</span>
+            <span className="sm:hidden text-xs">Roles</span>
           </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <UserCog className="h-4 w-4" />
-            User-Specific Access
+          <TabsTrigger value="users" className="flex items-center gap-2 px-3 sm:px-4">
+            <UserCog className="h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">User-Specific Access</span>
+            <span className="sm:hidden text-xs">Users</span>
           </TabsTrigger>
-        </TabsList>
+        </ResponsiveTabsList>
 
         <TabsContent value="modules">
           <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            System Modules
-          </CardTitle>
-          <CardDescription>
-            Manage system modules and their availability across roles
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Alert className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Disabling a module will prevent all users from accessing that feature, regardless of their role. 
-              The Core module cannot be disabled as it contains essential authentication features.
-            </AlertDescription>
-          </Alert>
-
-          <div className="space-y-4">
-            {modules?.map((module) => (
-              <Card key={module.id} className="border-2">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold">{module.name}</h3>
-                        <Badge variant={module.is_active ? 'default' : 'secondary'}>
-                          {module.is_active ? (
-                            <>
-                              <Unlock className="h-3 w-3 mr-1" />
-                              Active
-                            </>
-                          ) : (
-                            <>
-                              <Lock className="h-3 w-3 mr-1" />
-                              Disabled
-                            </>
-                          )}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {module.description || 'No description available'}
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <code className="px-2 py-1 bg-muted rounded">{module.key}</code>
-                        {module.depends_on && module.depends_on.length > 0 && (
-                          <span>
-                            Depends on: {module.depends_on.join(', ')}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenPermissions(module)}
-                      >
-                        <Settings className="h-4 w-4 mr-2" />
-                        Configure Roles
-                      </Button>
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor={`module-${module.id}`} className="cursor-pointer">
-                          {module.is_active ? 'Enabled' : 'Disabled'}
-                        </Label>
-                        <Switch
-                          id={`module-${module.id}`}
-                          checked={module.is_active}
-                          onCheckedChange={(checked) => handleModuleToggle(module, checked)}
-                          disabled={module.key === 'core'}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Permissions Dialog */}
-      <Dialog open={permissionsDialogOpen} onOpenChange={setPermissionsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Role Permissions: {selectedModule?.name}</DialogTitle>
-            <DialogDescription>
-              Configure which roles can view, edit, delete, and administrate this module
-            </DialogDescription>
-          </DialogHeader>
-
-          {accessLoading ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Role</TableHead>
-                    <TableHead className="text-center">
-                      <Eye className="h-4 w-4 mx-auto" />
-                      <span className="text-xs">View</span>
-                    </TableHead>
-                    <TableHead className="text-center">
-                      <Edit className="h-4 w-4 mx-auto" />
-                      <span className="text-xs">Edit</span>
-                    </TableHead>
-                    <TableHead className="text-center">
-                      <Trash2 className="h-4 w-4 mx-auto" />
-                      <span className="text-xs">Delete</span>
-                    </TableHead>
-                    <TableHead className="text-center">
-                      <Shield className="h-4 w-4 mx-auto" />
-                      <span className="text-xs">Admin</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {roleAccess?.map((access) => (
-                    <TableRow key={access.id}>
-                      <TableCell>
-                        <Badge className={roleColors[access.role]}>
-                          {roleLabels[access.role] || access.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Checkbox
-                          checked={access.can_view}
-                          onCheckedChange={(checked) =>
-                            handlePermissionChange(access.id, 'can_view', checked as boolean)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Checkbox
-                          checked={access.can_edit}
-                          onCheckedChange={(checked) =>
-                            handlePermissionChange(access.id, 'can_edit', checked as boolean)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Checkbox
-                          checked={access.can_delete}
-                          onCheckedChange={(checked) =>
-                            handlePermissionChange(access.id, 'can_delete', checked as boolean)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Checkbox
-                          checked={access.can_admin}
-                          onCheckedChange={(checked) =>
-                            handlePermissionChange(access.id, 'can_admin', checked as boolean)
-                          }
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              <Alert>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                System Modules
+              </CardTitle>
+              <CardDescription>
+                Manage system modules and their availability across roles
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Alert className="mb-4">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Permission Levels:</strong>
-                  <ul className="mt-2 space-y-1 text-sm">
-                    <li><strong>View:</strong> Can see and access the module</li>
-                    <li><strong>Edit:</strong> Can create and modify items within the module</li>
-                    <li><strong>Delete:</strong> Can remove items from the module</li>
-                    <li><strong>Admin:</strong> Can configure module settings and permissions</li>
-                  </ul>
+                  Disabling a module will prevent all users from accessing that feature, regardless of their role.
+                  The Core module cannot be disabled as it contains essential authentication features.
                 </AlertDescription>
               </Alert>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+
+              <div className="space-y-4">
+                {modules?.map((module) => (
+                  <Card key={module.id} className="border-2">
+                    <CardContent className="pt-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <h3 className="text-lg font-semibold">{module.name}</h3>
+                            <Badge variant={module.is_active ? 'default' : 'secondary'} className="text-[10px] h-5">
+                              {module.is_active ? (
+                                <div className="flex items-center">
+                                  <Unlock className="h-3 w-3 mr-1" />
+                                  Active
+                                </div>
+                              ) : (
+                                <div className="flex items-center">
+                                  <Lock className="h-3 w-3 mr-1" />
+                                  Disabled
+                                </div>
+                              )}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {module.description || 'No description available'}
+                          </p>
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground flex-wrap">
+                            <code className="px-1.5 py-0.5 bg-muted rounded truncate max-w-[150px]">{module.key}</code>
+                            {module.depends_on && module.depends_on.length > 0 && (
+                              <span className="truncate">
+                                Depends: {module.depends_on.join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-3 pt-3 sm:pt-0 border-t sm:border-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenPermissions(module)}
+                            className="h-8 text-xs shrink-0"
+                          >
+                            <Settings className="h-3.5 w-3.5 mr-2" />
+                            <span className="hidden xs:inline">Configure Roles</span>
+                            <span className="xs:hidden">Roles</span>
+                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor={`module-${module.id}`} className="cursor-pointer text-xs font-medium">
+                              {module.is_active ? 'Enabled' : 'Disabled'}
+                            </Label>
+                            <Switch
+                              id={`module-${module.id}`}
+                              checked={module.is_active}
+                              onCheckedChange={(checked) => handleModuleToggle(module, checked)}
+                              disabled={module.key === 'core'}
+                              className="scale-90"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Permissions Dialog */}
+          <Dialog open={permissionsDialogOpen} onOpenChange={setPermissionsDialogOpen}>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Role Permissions: {selectedModule?.name}</DialogTitle>
+                <DialogDescription>
+                  Configure which roles can view, edit, delete, and administrate this module
+                </DialogDescription>
+              </DialogHeader>
+
+              {accessLoading ? (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Desktop Table */}
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Role</TableHead>
+                          <TableHead className="text-center">View</TableHead>
+                          <TableHead className="text-center">Edit</TableHead>
+                          <TableHead className="text-center">Delete</TableHead>
+                          <TableHead className="text-center">Admin</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {roleAccess?.map((access) => (
+                          <TableRow key={access.id}>
+                            <TableCell>
+                              <Badge className={roleColors[access.role]}>
+                                {roleLabels[access.role] || access.role}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={access.can_view}
+                                onCheckedChange={(checked) => handlePermissionChange(access.id, 'can_view', checked as boolean)}
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={access.can_edit}
+                                onCheckedChange={(checked) => handlePermissionChange(access.id, 'can_edit', checked as boolean)}
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={access.can_delete}
+                                onCheckedChange={(checked) => handlePermissionChange(access.id, 'can_delete', checked as boolean)}
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={access.can_admin}
+                                onCheckedChange={(checked) => handlePermissionChange(access.id, 'can_admin', checked as boolean)}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Mobile Card List */}
+                  <div className="md:hidden divide-y divide-border/60">
+                    {roleAccess?.map((access) => (
+                      <div key={access.id} className="py-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <Badge className={`${roleColors[access.role]} text-[10px] sm:text-xs h-5 sm:h-6`}>
+                            {roleLabels[access.role] || access.role}
+                          </Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 xs:grid-cols-4 gap-3">
+                          {[
+                            { label: 'View', icon: Eye, field: 'can_view' },
+                            { label: 'Edit', icon: Edit, field: 'can_edit' },
+                            { label: 'Delete', icon: Trash2, field: 'can_delete' },
+                            { label: 'Admin', icon: Shield, field: 'can_admin' }
+                          ].map((perm) => (
+                            <div key={perm.label} className="flex items-center gap-2 bg-muted/30 p-2 rounded-md justify-between">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <perm.icon className="h-3 w-3 text-muted-foreground shrink-0" />
+                                <span className="text-[10px] font-medium truncate">{perm.label}</span>
+                              </div>
+                              <Checkbox
+                                checked={(access as any)[perm.field]}
+                                onCheckedChange={(checked) => handlePermissionChange(access.id, perm.field as any, checked as boolean)}
+                                className="scale-90"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Alert className="mt-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-[11px] sm:text-xs">
+                      <strong>Permission Levels:</strong>
+                      <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                        <div><strong>View:</strong> Access module</div>
+                        <div><strong>Edit:</strong> Create/Modify</div>
+                        <div><strong>Delete:</strong> Remove items</div>
+                        <div><strong>Admin:</strong> Settings</div>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
 
         </TabsContent>
 

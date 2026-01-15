@@ -269,91 +269,72 @@ const CustomRoleManagement = () => {
                             Create New Role
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
-                        <DialogHeader className="p-6 pb-2">
-                            <DialogTitle>Create Custom Role</DialogTitle>
-                            <DialogDescription>
-                                Set the role name and configure module permissions before saving.
+                    <DialogContent className="max-w-4xl max-h-[96vh] sm:max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                        <DialogHeader className="p-4 sm:p-6 pb-2">
+                            <DialogTitle className="text-xl">Create Custom Role</DialogTitle>
+                            <DialogDescription className="text-xs sm:text-sm">
+                                Set the role name and configure module permissions.
                             </DialogDescription>
                         </DialogHeader>
 
-                        <div className="p-6 pt-0 space-y-6 overflow-hidden flex flex-col">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="roleName">Role Name</Label>
+                        <div className="px-4 sm:px-6 space-y-4 overflow-hidden flex flex-col min-h-0">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="roleName" className="text-xs font-semibold">Role Name</Label>
                                     <Input
                                         id="roleName"
                                         placeholder="e.g. Intern"
                                         value={newRoleName}
                                         onChange={(e) => setNewRoleName(e.target.value)}
+                                        className="h-9 sm:h-10 text-sm"
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="roleDesc">Description (Optional)</Label>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="roleDesc" className="text-xs font-semibold">Description (Optional)</Label>
                                     <Input
                                         id="roleDesc"
                                         placeholder="Briefly describe this role"
                                         value={newRoleDescription}
                                         onChange={(e) => setNewRoleDescription(e.target.value)}
+                                        className="h-9 sm:h-10 text-sm"
                                     />
                                 </div>
                             </div>
 
                             <Separator />
 
-                            <div className="flex-1 overflow-hidden">
-                                <Label className="mb-4 block text-base font-semibold">Module Permissions</Label>
-                                <ScrollArea className="h-[400px] pr-4">
-                                    <div className="space-y-4 pb-4">
+                            <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                                <Label className="mb-2 block text-sm font-semibold">Module Permissions</Label>
+                                <ScrollArea className="flex-1 pr-2 sm:pr-4">
+                                    <div className="space-y-3 pb-4">
                                         {modules?.map((module) => (
                                             <Card key={module.id} className="bg-muted/30 border-muted-foreground/20">
-                                                <CardContent className="p-4 space-y-4">
+                                                <CardContent className="p-3 sm:p-4 space-y-3">
                                                     <div>
                                                         <h4 className="font-semibold text-sm">{module.name}</h4>
-                                                        <p className="text-xs text-muted-foreground">{getModuleDescription(module.key)}</p>
+                                                        <p className="text-[10px] sm:text-xs text-muted-foreground">{getModuleDescription(module.key)}</p>
                                                     </div>
 
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                                        <div className="flex items-center justify-between sm:justify-start space-x-3">
-                                                            <Switch
-                                                                id={`new-view-${module.id}`}
-                                                                checked={pendingPermissions[module.id]?.can_view || false}
-                                                                onCheckedChange={(checked) => handlePermissionChange(module.id, 'can_view', checked)}
-                                                            />
-                                                            <Label htmlFor={`new-view-${module.id}`} className="text-sm font-medium cursor-pointer flex items-center gap-2">
-                                                                <Eye className="h-4 w-4 text-primary" /> View
-                                                            </Label>
-                                                        </div>
-                                                        <div className="flex items-center justify-between sm:justify-start space-x-3">
-                                                            <Switch
-                                                                id={`new-edit-${module.id}`}
-                                                                checked={pendingPermissions[module.id]?.can_edit || false}
-                                                                onCheckedChange={(checked) => handlePermissionChange(module.id, 'can_edit', checked)}
-                                                            />
-                                                            <Label htmlFor={`new-edit-${module.id}`} className="text-sm font-medium cursor-pointer flex items-center gap-2">
-                                                                <Edit className="h-4 w-4 text-primary" /> Edit
-                                                            </Label>
-                                                        </div>
-                                                        <div className="flex items-center justify-between sm:justify-start space-x-3">
-                                                            <Switch
-                                                                id={`new-delete-${module.id}`}
-                                                                checked={pendingPermissions[module.id]?.can_delete || false}
-                                                                onCheckedChange={(checked) => handlePermissionChange(module.id, 'can_delete', checked)}
-                                                            />
-                                                            <Label htmlFor={`new-delete-${module.id}`} className="text-sm font-medium cursor-pointer flex items-center gap-2">
-                                                                <Trash2 className="h-4 w-4 text-primary" /> Delete
-                                                            </Label>
-                                                        </div>
-                                                        <div className="flex items-center justify-between sm:justify-start space-x-3">
-                                                            <Switch
-                                                                id={`new-admin-${module.id}`}
-                                                                checked={pendingPermissions[module.id]?.can_admin || false}
-                                                                onCheckedChange={(checked) => handlePermissionChange(module.id, 'can_admin', checked)}
-                                                            />
-                                                            <Label htmlFor={`new-admin-${module.id}`} className="text-sm font-medium cursor-pointer flex items-center gap-2">
-                                                                <ShieldCheck className="h-4 w-4 text-primary" /> Admin
-                                                            </Label>
-                                                        </div>
+                                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                                        {[
+                                                            { label: 'View', icon: Eye, field: 'can_view', id: `new-view-${module.id}` },
+                                                            { label: 'Edit', icon: Edit, field: 'can_edit', id: `new-edit-${module.id}` },
+                                                            { label: 'Delete', icon: Trash2, field: 'can_delete', id: `new-delete-${module.id}` },
+                                                            { label: 'Admin', icon: ShieldCheck, field: 'can_admin', id: `new-admin-${module.id}` }
+                                                        ].map((perm) => (
+                                                            <div key={perm.id} className="flex items-center justify-between bg-card p-2 rounded-md border border-border/40">
+                                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                                    <perm.icon className="h-3 w-3 text-primary shrink-0" />
+                                                                    <span className="text-[10px] font-medium">{perm.label}</span>
+                                                                </div>
+                                                                <Switch
+                                                                    id={perm.id}
+                                                                    checked={(pendingPermissions[module.id] as any)?.[perm.field] || false}
+                                                                    onCheckedChange={(checked) => handlePermissionChange(module.id, perm.field as any, checked)}
+                                                                    className="scale-75 origin-right"
+                                                                />
+                                                            </div>
+                                                        ))}
                                                     </div>
                                                 </CardContent>
                                             </Card>
@@ -363,16 +344,18 @@ const CustomRoleManagement = () => {
                             </div>
                         </div>
 
-                        <DialogFooter className="p-6 bg-muted/50 border-t">
+                        <DialogFooter className="p-4 sm:p-6 bg-muted/50 border-t flex-row gap-3">
                             <Button
                                 variant="outline"
                                 onClick={() => setIsCreateDialogOpen(false)}
+                                className="flex-1 h-9 sm:h-10 text-xs sm:text-sm"
                             >
                                 Cancel
                             </Button>
                             <Button
                                 onClick={() => createRoleMutation.mutate()}
                                 disabled={createRoleMutation.isPending || !newRoleName.trim()}
+                                className="flex-1 h-9 sm:h-10 text-xs sm:text-sm"
                             >
                                 {createRoleMutation.isPending ? (
                                     <>
@@ -457,58 +440,37 @@ const CustomRoleManagement = () => {
                                         <Loader2 className="h-6 w-6 animate-spin" />
                                     </div>
                                 ) : (
-                                    <div className="space-y-4">
+                                    <div className="space-y-3">
                                         {modules?.map((module) => {
                                             const perm = rolePermissions?.find(p => p.module_id === module.id);
                                             return (
                                                 <Card key={module.id} className="bg-muted/30 border-muted-foreground/20">
-                                                    <CardContent className="p-4 space-y-4">
+                                                    <CardContent className="p-3 sm:p-4 space-y-3">
                                                         <div>
                                                             <h4 className="font-semibold text-sm">{module.name}</h4>
-                                                            <p className="text-xs text-muted-foreground">{getModuleDescription(module.key)}</p>
+                                                            <p className="text-[10px] sm:text-xs text-muted-foreground">{getModuleDescription(module.key)}</p>
                                                         </div>
 
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                                            <div className="flex items-center justify-between sm:justify-start space-x-3">
-                                                                <Switch
-                                                                    id={`view-${module.id}`}
-                                                                    checked={perm?.can_view || false}
-                                                                    onCheckedChange={(checked) => handlePermissionChange(module.id, 'can_view', checked)}
-                                                                />
-                                                                <Label htmlFor={`view-${module.id}`} className="text-sm font-medium cursor-pointer flex items-center gap-2">
-                                                                    <Eye className="h-4 w-4 text-primary" /> View
-                                                                </Label>
-                                                            </div>
-                                                            <div className="flex items-center justify-between sm:justify-start space-x-3">
-                                                                <Switch
-                                                                    id={`edit-${module.id}`}
-                                                                    checked={perm?.can_edit || false}
-                                                                    onCheckedChange={(checked) => handlePermissionChange(module.id, 'can_edit', checked)}
-                                                                />
-                                                                <Label htmlFor={`edit-${module.id}`} className="text-sm font-medium cursor-pointer flex items-center gap-2">
-                                                                    <Edit className="h-4 w-4 text-primary" /> Edit
-                                                                </Label>
-                                                            </div>
-                                                            <div className="flex items-center justify-between sm:justify-start space-x-3">
-                                                                <Switch
-                                                                    id={`delete-${module.id}`}
-                                                                    checked={perm?.can_delete || false}
-                                                                    onCheckedChange={(checked) => handlePermissionChange(module.id, 'can_delete', checked)}
-                                                                />
-                                                                <Label htmlFor={`delete-${module.id}`} className="text-sm font-medium cursor-pointer flex items-center gap-2">
-                                                                    <Trash2 className="h-4 w-4 text-primary" /> Delete
-                                                                </Label>
-                                                            </div>
-                                                            <div className="flex items-center justify-between sm:justify-start space-x-3">
-                                                                <Switch
-                                                                    id={`admin-${module.id}`}
-                                                                    checked={perm?.can_admin || false}
-                                                                    onCheckedChange={(checked) => handlePermissionChange(module.id, 'can_admin', checked)}
-                                                                />
-                                                                <Label htmlFor={`admin-${module.id}`} className="text-sm font-medium cursor-pointer flex items-center gap-2">
-                                                                    <ShieldCheck className="h-4 w-4 text-primary" /> Admin
-                                                                </Label>
-                                                            </div>
+                                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                                            {[
+                                                                { label: 'View', icon: Eye, field: 'can_view', id: `view-${module.id}` },
+                                                                { label: 'Edit', icon: Edit, field: 'can_edit', id: `edit-${module.id}` },
+                                                                { label: 'Delete', icon: Trash2, field: 'can_delete', id: `delete-${module.id}` },
+                                                                { label: 'Admin', icon: ShieldCheck, field: 'can_admin', id: `admin-${module.id}` }
+                                                            ].map((p) => (
+                                                                <div key={p.id} className="flex items-center justify-between bg-card p-2 rounded-md border border-border/40">
+                                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                                        <p.icon className="h-3 w-3 text-primary shrink-0" />
+                                                                        <span className="text-[10px] font-medium">{p.label}</span>
+                                                                    </div>
+                                                                    <Switch
+                                                                        id={p.id}
+                                                                        checked={(perm as any)?.[p.field] || false}
+                                                                        onCheckedChange={(checked) => handlePermissionChange(module.id, p.field as any, checked)}
+                                                                        className="scale-75 origin-right"
+                                                                    />
+                                                                </div>
+                                                            ))}
                                                         </div>
                                                     </CardContent>
                                                 </Card>

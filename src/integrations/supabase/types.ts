@@ -299,6 +299,67 @@ export type Database = {
           },
         ]
       }
+      leave_balances: {
+        Row: {
+          accrued: number
+          balance: number
+          created_at: string
+          id: string
+          organization_id: string
+          staff_id: string
+          updated_at: string
+          used: number
+          vacation_type_id: string
+          year: number
+        }
+        Insert: {
+          accrued: number
+          balance: number
+          created_at?: string
+          id?: string
+          organization_id: string
+          staff_id: string
+          updated_at?: string
+          used: number
+          vacation_type_id: string
+          year: number
+        }
+        Update: {
+          accrued?: number
+          balance?: number
+          created_at?: string
+          id?: string
+          organization_id?: string
+          staff_id?: string
+          updated_at?: string
+          used?: number
+          vacation_type_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_balances_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_balances_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_balances_vacation_type_id_fkey"
+            columns: ["vacation_type_id"]
+            isOneToOne: false
+            referencedRelation: "vacation_types"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       messages: {
         Row: {
           content: string

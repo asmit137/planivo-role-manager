@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { LoadingState } from '@/components/layout/LoadingState';
 import { ErrorState } from '@/components/layout/ErrorState';
-import { format, addDays, isWithinInterval, isSameDay, parseISO } from 'date-fns';
+import { format, addDays, isWithinInterval, isSameDay, parseISO, isToday } from 'date-fns';
 import { CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -67,7 +67,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
           ),
           vacation_types(id, name),
           vacation_splits(id, start_date, end_date, days)
-        `);
+        `) as any;
 
       // Apply status filter - ensure 'pending_approval' is included
       if (statusFilter === 'approved') {
@@ -194,13 +194,13 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <Card className="border-2">
-        <CardHeader className="space-y-3 sm:space-y-4 px-4 sm:px-6">
+      <Card className="border-2 overflow-hidden">
+        <CardHeader className="space-y-2 sm:space-y-4 px-2 sm:px-6 py-3 sm:py-6">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
             <div className="min-w-0">
-              <CardTitle className="text-xl sm:text-2xl">Vacation Calendar</CardTitle>
-              <CardDescription className="mt-1 text-sm">
+              <CardTitle className="text-lg sm:text-2xl truncate">Vacation Calendar</CardTitle>
+              <CardDescription className="mt-0.5 text-xs sm:text-sm truncate">
                 {statusFilter === 'approved' ? 'Approved only' :
                   statusFilter === 'pending' ? 'Pending only' :
                     'All vacations'}
@@ -209,16 +209,16 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
           </div>
 
           {/* Filter Controls */}
-          <div className="flex flex-col gap-3 pt-2">
+          <div className="flex flex-col gap-3 pt-1 sm:pt-2">
             {/* Status Filters Row */}
-            <div className="flex flex-col xs:flex-row xs:items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground shrink-0">Status:</span>
-              <div className="flex flex-wrap gap-1.5 sm:gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+              <span className="text-[9px] sm:text-sm font-semibold uppercase tracking-wider text-muted-foreground shrink-0 w-10 sm:w-auto">Status</span>
+              <div className="flex flex-wrap gap-1 sm:gap-2">
                 <Button
                   variant={statusFilter === 'approved' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setStatusFilter('approved')}
-                  className="min-h-[40px] px-3 text-xs sm:text-sm"
+                  className="h-6 sm:h-9 px-1.5 sm:px-3 text-[9px] sm:text-sm min-w-[60px] sm:min-w-0"
                 >
                   Approved
                 </Button>
@@ -226,7 +226,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                   variant={statusFilter === 'pending' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setStatusFilter('pending')}
-                  className="min-h-[40px] px-3 text-xs sm:text-sm"
+                  className="h-6 sm:h-9 px-1.5 sm:px-3 text-[9px] sm:text-sm min-w-[60px] sm:min-w-0"
                 >
                   Pending
                 </Button>
@@ -234,7 +234,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                   variant={statusFilter === 'all' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setStatusFilter('all')}
-                  className="min-h-[40px] px-3 text-xs sm:text-sm"
+                  className="h-6 sm:h-9 px-1.5 sm:px-3 text-[9px] sm:text-sm min-w-[40px] sm:min-w-0"
                 >
                   All
                 </Button>
@@ -242,14 +242,14 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
             </div>
 
             {/* Time Range Filters Row */}
-            <div className="flex flex-col xs:flex-row xs:items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground shrink-0">Range:</span>
-              <div className="flex flex-wrap gap-1.5 sm:gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+              <span className="text-[9px] sm:text-sm font-semibold uppercase tracking-wider text-muted-foreground shrink-0 w-10 sm:w-auto">Range</span>
+              <div className="flex flex-wrap gap-1 sm:gap-2">
                 <Button
                   variant={timeFilter === '30' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setTimeFilter('30')}
-                  className="min-h-[40px] px-2 sm:px-3 text-xs sm:text-sm"
+                  className="h-6 sm:h-9 px-1.5 sm:px-3 text-[9px] sm:text-sm min-w-[40px] sm:min-w-0"
                 >
                   30d
                 </Button>
@@ -257,7 +257,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                   variant={timeFilter === '60' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setTimeFilter('60')}
-                  className="min-h-[40px] px-2 sm:px-3 text-xs sm:text-sm"
+                  className="h-6 sm:h-9 px-1.5 sm:px-3 text-[9px] sm:text-sm min-w-[40px] sm:min-w-0"
                 >
                   60d
                 </Button>
@@ -265,7 +265,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                   variant={timeFilter === '90' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setTimeFilter('90')}
-                  className="min-h-[40px] px-2 sm:px-3 text-xs sm:text-sm"
+                  className="h-6 sm:h-9 px-1.5 sm:px-3 text-[9px] sm:text-sm min-w-[40px] sm:min-w-0"
                 >
                   90d
                 </Button>
@@ -273,7 +273,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                   variant={timeFilter === 'all' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setTimeFilter('all')}
-                  className="min-h-[40px] px-2 sm:px-3 text-xs sm:text-sm"
+                  className="h-6 sm:h-9 px-1.5 sm:px-3 text-[9px] sm:text-sm min-w-[40px] sm:min-w-0"
                 >
                   All
                 </Button>
@@ -281,29 +281,29 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-3 sm:p-6 overflow-x-auto">
-          <div className="min-w-[320px]">
+        <CardContent className="p-0 sm:p-6 overflow-hidden">
+          <div className="w-full">
             <Calendar
               mode="single"
               selected={selectedDate}
               onSelect={setSelectedDate}
               numberOfMonths={1}
-              className="rounded-md w-full pointer-events-auto"
+              className="p-0 pointer-events-auto w-full"
               classNames={{
-                months: "flex flex-col gap-4 sm:gap-8 w-full justify-center",
-                month: "space-y-4 flex-1",
-                caption: "flex justify-center pt-1 relative items-center mb-4 sm:mb-8",
-                caption_label: "text-lg sm:text-2xl font-bold tracking-tight",
+                months: "flex flex-col gap-2 sm:gap-8 w-full justify-center",
+                month: "space-y-2 sm:space-y-4 flex-1",
+                caption: "flex justify-center pt-1 relative items-center mb-1 sm:mb-8 h-8 sm:h-12",
+                caption_label: "text-sm sm:text-2xl font-bold tracking-tight",
                 nav: "flex items-center",
-                nav_button: "h-10 w-10 bg-transparent p-0 opacity-60 hover:opacity-100 hover:bg-accent rounded-xl transition-all flex items-center justify-center z-20",
+                nav_button: "h-7 w-7 sm:h-10 sm:w-10 bg-transparent p-0 opacity-60 hover:opacity-100 hover:bg-accent rounded-lg sm:rounded-xl transition-all flex items-center justify-center z-20",
                 nav_button_previous: "absolute left-0 top-1/2 -translate-y-1/2",
                 nav_button_next: "absolute right-0 top-1/2 -translate-y-1/2",
                 table: "w-full border-collapse",
-                head_row: "flex w-full mb-4",
-                head_cell: "text-muted-foreground/60 rounded-md font-bold text-[0.65rem] sm:text-xs uppercase tracking-widest flex-1 text-center",
-                row: "flex w-full mt-2",
-                cell: "relative p-0.5 text-center focus-within:relative focus-within:z-20 flex-1 h-10 sm:h-16",
-                day: "h-full w-full p-0 font-normal hover:bg-accent/50 rounded-xl transition-all touch-manipulation",
+                head_row: "flex w-full mb-1 sm:mb-4",
+                head_cell: "text-muted-foreground/60 rounded-md font-bold text-[0.45rem] sm:text-xs uppercase tracking-widest flex-1 min-w-0 text-center",
+                row: "flex w-full mt-0.5 sm:mt-2",
+                cell: "relative p-0.5 text-center focus-within:relative focus-within:z-20 flex-1 min-w-0 min-h-[40px] sm:min-h-[64px]",
+                day: "h-full w-full p-0 font-normal hover:bg-accent/50 rounded-lg sm:rounded-xl transition-all touch-manipulation",
                 day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground shadow-lg shadow-primary/20",
                 day_today: "bg-accent/30 text-accent-foreground font-bold ring-2 ring-primary/20 ring-offset-2",
                 day_outside: "text-muted-foreground opacity-20",
@@ -321,7 +321,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                         <button
                           {...props}
                           className={cn(
-                            "h-full w-full p-2 font-normal hover:bg-accent/50 rounded-xl transition-all relative group touch-manipulation flex flex-col items-center justify-center gap-1 overflow-hidden",
+                            "h-full w-full p-0.5 sm:p-2 font-normal hover:bg-accent/50 rounded-lg sm:rounded-xl transition-all relative group touch-manipulation flex flex-col items-center justify-center gap-0.5 sm:gap-1 overflow-hidden",
                             hasVacations && `font-bold border-2 ${getVacationStatusColor(vacationsOnDay)}`,
                             !hasVacations && "border border-transparent"
                           )}
@@ -329,23 +329,23 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                           <time
                             dateTime={format(date, "yyyy-MM-dd")}
                             className={cn(
-                              "text-sm sm:text-lg font-medium transition-colors w-full text-center",
-                              isSameDay(date, new Date()) ? "text-primary font-bold" : "text-foreground/70"
+                              "text-[10px] sm:text-lg font-medium transition-colors w-full text-center",
+                              isToday(date) ? "text-primary font-bold" : "text-foreground/70"
                             )}
                           >
                             {format(date, "d")}
                           </time>
 
                           {hasVacations && (
-                            <div className="w-full flex items-center justify-between">
+                            <div className="w-full flex items-center justify-between mt-auto">
                               <div className={cn(
-                                "text-white text-[9px] sm:text-[10px] font-black rounded-lg px-1.5 py-0.5 flex items-center justify-center shadow-md z-10 border border-white/10",
+                                "text-white text-[6px] sm:text-[10px] font-black rounded-sm sm:rounded-lg px-0.5 sm:px-1.5 py-0 sm:py-0.5 flex items-center justify-center shadow-md z-10 border border-white/10",
                                 vacationsOnDay.some((v: any) => v.status === 'approved') ? "bg-emerald-500" : "bg-amber-500"
                               )}>
                                 {vacationsOnDay.length}
                               </div>
 
-                              <div className="flex -space-x-1.5 overflow-hidden">
+                              <div className="hidden sm:flex -space-x-1.5 overflow-hidden">
                                 {vacationsOnDay.slice(0, 3).map((v: any, idx: number) => (
                                   <div
                                     key={idx}
@@ -419,26 +419,26 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
           </div>
 
           {/* Legend */}
-          <div className="mt-8 pt-6 border-t">
-            <h4 className="text-sm font-semibold mb-4">Legend</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-md border-2 border-success bg-success/10 flex-shrink-0" />
-                <span className="text-sm font-medium">Approved Vacation</span>
+          <div className="mt-4 sm:mt-8 pt-4 sm:pt-6 border-t">
+            <h4 className="text-[10px] sm:text-sm font-semibold mb-2 sm:mb-4 uppercase tracking-wider text-muted-foreground">Legend</h4>
+            <div className="flex flex-wrap gap-x-3 gap-y-2">
+              <div className="flex items-center gap-1.5 sm:gap-3">
+                <div className="h-4 w-4 sm:h-8 sm:w-8 rounded-md border-2 border-emerald-500 bg-emerald-500/10 flex-shrink-0" />
+                <span className="text-[10px] sm:text-sm font-medium">Approved</span>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-md border-2 border-warning bg-warning/10 flex-shrink-0" />
-                <span className="text-sm font-medium">Pending Vacation</span>
+              <div className="flex items-center gap-1.5 sm:gap-3">
+                <div className="h-4 w-4 sm:h-8 sm:w-8 rounded-md border-2 border-amber-500 bg-amber-500/10 flex-shrink-0" />
+                <span className="text-[10px] sm:text-sm font-medium">Pending</span>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-md border-2 border-accent bg-accent/10 flex-shrink-0" />
-                <span className="text-sm font-medium">Mixed Status</span>
+              <div className="flex items-center gap-1.5 sm:gap-3">
+                <div className="h-4 w-4 sm:h-8 sm:w-8 rounded-md border-2 border-purple-500 bg-purple-500/10 flex-shrink-0" />
+                <span className="text-[10px] sm:text-sm font-medium">Mixed</span>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="h-6 w-6 rounded-full bg-success text-success-foreground text-[11px] font-bold flex items-center justify-center shadow-md flex-shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-3">
+                <div className="h-4 w-4 sm:h-8 sm:w-8 rounded-full bg-emerald-500 text-white text-[8px] sm:text-[11px] font-bold flex items-center justify-center shadow-md flex-shrink-0">
                   3
                 </div>
-                <span className="text-sm font-medium">Staff Count</span>
+                <span className="text-[10px] sm:text-sm font-medium">Staff Count</span>
               </div>
             </div>
           </div>

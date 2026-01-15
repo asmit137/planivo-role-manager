@@ -97,10 +97,10 @@ export function EmailManagement() {
   const sendBroadcastMutation = useMutation({
     mutationFn: async (form: typeof broadcastForm) => {
       if (!users) return;
-      
+
       let targetUsers = users;
       if (form.targetRole !== 'all') {
-        targetUsers = users.filter(u => 
+        targetUsers = users.filter(u =>
           u.user_roles?.some(r => r.role === form.targetRole)
         );
       }
@@ -159,65 +159,65 @@ export function EmailManagement() {
     { value: 'staff', label: 'Staff' },
   ];
 
-  const targetCount = broadcastForm.targetRole === 'all' 
+  const targetCount = broadcastForm.targetRole === 'all'
     ? users?.length || 0
     : users?.filter(u => u.user_roles?.some(r => r.role === broadcastForm.targetRole)).length || 0;
 
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <Card className="bg-card border-border">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-primary/10">
-                <Mail className="h-6 w-6 text-primary" />
+          <CardContent className="p-3 sm:pt-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+              <div className="p-2 sm:p-3 rounded-lg bg-primary/10">
+                <Mail className="h-4 w-4 sm:h-6 sm:w-6 text-primary" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Notifications</p>
-                <p className="text-2xl font-bold">{notificationStats?.total || 0}</p>
+                <p className="text-[10px] sm:text-sm text-muted-foreground">Total</p>
+                <p className="text-lg sm:text-2xl font-bold">{notificationStats?.total || 0}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-card border-border">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-yellow-500/10">
-                <Clock className="h-6 w-6 text-yellow-500" />
+          <CardContent className="p-3 sm:pt-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+              <div className="p-2 sm:p-3 rounded-lg bg-yellow-500/10">
+                <Clock className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Unread</p>
-                <p className="text-2xl font-bold">{notificationStats?.unread || 0}</p>
+                <p className="text-[10px] sm:text-sm text-muted-foreground">Unread</p>
+                <p className="text-lg sm:text-2xl font-bold">{notificationStats?.unread || 0}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-card border-border">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-green-500/10">
-                <Send className="h-6 w-6 text-green-500" />
+          <CardContent className="p-3 sm:pt-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+              <div className="p-2 sm:p-3 rounded-lg bg-green-500/10">
+                <Send className="h-4 w-4 sm:h-6 sm:w-6 text-green-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Sent Today</p>
-                <p className="text-2xl font-bold">{notificationStats?.todaySent || 0}</p>
+                <p className="text-[10px] sm:text-sm text-muted-foreground">Today</p>
+                <p className="text-lg sm:text-2xl font-bold">{notificationStats?.todaySent || 0}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-card border-border">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-blue-500/10">
-                <Users className="h-6 w-6 text-blue-500" />
+          <CardContent className="p-3 sm:pt-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+              <div className="p-2 sm:p-3 rounded-lg bg-blue-500/10">
+                <Users className="h-4 w-4 sm:h-6 sm:w-6 text-blue-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Active Users</p>
-                <p className="text-2xl font-bold">{users?.length || 0}</p>
+                <p className="text-[10px] sm:text-sm text-muted-foreground">Users</p>
+                <p className="text-lg sm:text-2xl font-bold">{users?.length || 0}</p>
               </div>
             </div>
           </CardContent>
@@ -234,20 +234,20 @@ export function EmailManagement() {
             </span>
             <Dialog open={broadcastOpen} onOpenChange={setBroadcastOpen}>
               <DialogTrigger asChild>
-                <Button>
-                  <Send className="h-4 w-4 mr-2" />
-                  New Broadcast
+                <Button size="sm" className="sm:h-10">
+                  <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                  <span className="text-[11px] sm:text-sm">New <span className="hidden xs:inline">Broadcast</span></span>
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="sm:max-w-[500px] w-[95vw] rounded-xl">
                 <DialogHeader>
                   <DialogTitle>Send System Broadcast</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Target Audience</Label>
-                    <Select 
-                      value={broadcastForm.targetRole} 
+                    <Select
+                      value={broadcastForm.targetRole}
                       onValueChange={(v) => setBroadcastForm(f => ({ ...f, targetRole: v }))}
                     >
                       <SelectTrigger>
@@ -287,7 +287,7 @@ export function EmailManagement() {
                   <Button variant="outline" onClick={() => setBroadcastOpen(false)}>
                     Cancel
                   </Button>
-                  <Button 
+                  <Button
                     onClick={() => sendBroadcastMutation.mutate(broadcastForm)}
                     disabled={!broadcastForm.title || !broadcastForm.message || sendBroadcastMutation.isPending}
                   >
@@ -316,36 +316,68 @@ export function EmailManagement() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[400px]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Timestamp</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Message</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentNotifications?.length === 0 ? (
+          <ScrollArea className="h-[400px] -mx-4 sm:mx-0">
+            {/* Mobile List View - Visible on small screens */}
+            <div className="divide-y block sm:hidden">
+              {recentNotifications?.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No notifications sent yet
+                </div>
+              ) : (
+                recentNotifications?.map(notification => (
+                  <div key={notification.id} className="p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        {format(new Date(notification.created_at), 'MMM d, HH:mm')}
+                      </span>
+                      {getTypeBadge(notification.type)}
+                    </div>
+                    <p className="font-semibold text-sm">{notification.title}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      {notification.message}
+                    </p>
+                    <div className="flex justify-end pt-1">
+                      {notification.is_read ? (
+                        <Badge variant="outline" className="text-[10px] py-0 h-5 border-green-500/50 text-green-500">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Read
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] py-0 h-5 border-yellow-500/50 text-yellow-500">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Pending
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop Table View - Hidden on small screens */}
+            <div className="hidden sm:block">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      No notifications sent yet
-                    </TableCell>
+                    <TableHead className="w-[120px]">Timestamp</TableHead>
+                    <TableHead className="w-[130px]">Type</TableHead>
+                    <TableHead className="min-w-[150px]">Title</TableHead>
+                    <TableHead className="min-w-[200px]">Message</TableHead>
+                    <TableHead className="text-right">Status</TableHead>
                   </TableRow>
-                ) : (
-                  recentNotifications?.map(notification => (
+                </TableHeader>
+                <TableBody>
+                  {recentNotifications?.map(notification => (
                     <TableRow key={notification.id}>
-                      <TableCell className="font-mono text-xs">
+                      <TableCell className="font-mono text-xs whitespace-nowrap">
                         {format(new Date(notification.created_at), 'MMM d, HH:mm')}
                       </TableCell>
                       <TableCell>{getTypeBadge(notification.type)}</TableCell>
                       <TableCell className="font-medium">{notification.title}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                      <TableCell className="text-sm text-muted-foreground max-w-[300px] truncate">
                         {notification.message}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">
                         {notification.is_read ? (
                           <Badge className="bg-green-500/20 text-green-400">
                             <CheckCircle className="h-3 w-3 mr-1" />
@@ -359,10 +391,10 @@ export function EmailManagement() {
                         )}
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </ScrollArea>
         </CardContent>
       </Card>

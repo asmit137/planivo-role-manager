@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Building2, Trash2, FolderTree, Settings, Building, Edit } from 'lucide-react';
+import { Plus, Building2, Trash2, FolderTree, Settings, Building, Edit, Settings2, MapPin, Clock } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -46,7 +46,8 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
-  const [selectedOrgId, setSelectedOrgId] = useState(effectiveOrgId || '');
+  // Initialize with empty string if 'all' is selected (forcing explicit selection for creation)
+  const [selectedOrgId, setSelectedOrgId] = useState(effectiveOrgId === 'all' ? '' : (effectiveOrgId || ''));
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
   const [manageDepartmentsOpen, setManageDepartmentsOpen] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState<any>(null);
@@ -89,8 +90,8 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
         .select('*, organizations(id, name)')
         .order('created_at', { ascending: false });
 
-      // Filter by organization if provided
-      if (effectiveOrgId) {
+      // Filter by organization if provided and not 'all'
+      if (effectiveOrgId && effectiveOrgId !== 'all') {
         query = query.eq('organization_id', effectiveOrgId);
       }
 
@@ -171,6 +172,18 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
     mutationFn: async ({ name, organizationId }: { name: string; organizationId: string }) => {
       const validated = workspaceSchema.parse({ name, organization_id: organizationId });
 
+      // Check for duplicate name in this organization
+      const { data: existing } = await supabase
+        .from('workspaces')
+        .select('id')
+        .eq('organization_id', validated.organization_id)
+        .ilike('name', validated.name)
+        .maybeSingle();
+
+      if (existing) {
+        throw new Error('A workspace with this name already exists in this organization');
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
@@ -205,6 +218,28 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
 
   const editMutation = useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      // Get current workspace details to check organization scope
+      const { data: current } = await supabase
+        .from('workspaces')
+        .select('organization_id')
+        .eq('id', id)
+        .single();
+
+      if (!current) throw new Error('Workspace not found');
+
+      // Check for duplicate name in the same organization
+      const { data: existing } = await supabase
+        .from('workspaces')
+        .select('id')
+        .eq('organization_id', current.organization_id)
+        .ilike('name', name)
+        .neq('id', id)
+        .maybeSingle();
+
+      if (existing) {
+        throw new Error('A workspace with this name already exists in this organization');
+      }
+
       const { error } = await supabase
         .from('workspaces')
         .update({ name })
@@ -403,15 +438,15 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
   const workspaceAtLimit = checkIsAtLimit(maxWorkspaces, currentWorkspaceCount);
 
   return (
-    <Card className="border-2">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Workspaces</CardTitle>
-            <CardDescription>
+    <Card className="border-none shadow-none sm:border-2 sm:shadow-sm">
+      <CardHeader className="px-3 sm:px-6 pt-0 sm:pt-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight">Workspaces</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
               Manage {workspaceId ? 'this workspace' : 'all system workspaces'}
               {maxWorkspaces !== null && maxWorkspaces !== undefined && (
-                <span className="ml-2 text-muted-foreground">
+                <span className="block sm:inline sm:ml-2 text-muted-foreground mt-1 sm:mt-0 font-medium">
                   ({currentWorkspaceCount || 0} / {maxWorkspaces} workspaces)
                 </span>
               )}
@@ -423,7 +458,7 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button
-                  className="bg-gradient-primary"
+                  className="bg-gradient-primary w-full sm:w-auto h-11 sm:h-10 text-xs sm:text-sm"
                   disabled={workspaceAtLimit}
                   title={workspaceAtLimit ? 'Workspace limit reached' : undefined}
                 >
@@ -473,7 +508,7 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
           )}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-3 sm:px-6 py-0 sm:py-6">
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
@@ -481,76 +516,83 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
             ))}
           </div>
         ) : workspaces && workspaces.length > 0 ? (
-          <div className="space-y-3">
+          <div className="space-y-3 sm:space-y-4">
             {workspaces.map((workspace) => (
               <div
                 key={workspace.id}
-                className="flex items-center justify-between p-4 border-2 rounded-lg hover:border-primary/20 transition-colors"
+                className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border-2 rounded-lg bg-card/50 hover:border-primary/20 transition-all duration-200 gap-3"
               >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
+                <div className="flex items-start sm:items-center gap-3 min-w-0">
+                  <div className="p-2 rounded-lg bg-primary/10 shrink-0">
                     <Building2 className="h-5 w-5 text-primary" />
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold">{workspace.name}</h3>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-semibold text-base sm:text-lg leading-tight truncate">{workspace.name}</h3>
                       {(workspace as any).organizations && (
-                        <Badge variant="outline" className="text-xs">
-                          <Building className="h-3 w-3 mr-1" />
-                          {(workspace as any).organizations.name}
+                        <Badge variant="secondary" className="text-[10px] sm:text-xs h-5 sm:h-auto font-medium">
+                          <Building className="h-3 w-3 mr-1.5 shrink-0" />
+                          <span className="truncate">{(workspace as any).organizations.name}</span>
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
+                      <Clock className="h-3 w-3 shrink-0" />
                       Created {new Date(workspace.created_at).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-2">
+
+                {/* Scoped view for actions on mobile and desktop */}
+                <div className="flex flex-wrap gap-2 pt-3 sm:pt-0 border-t sm:border-0 w-full sm:w-auto">
                   <Button
                     variant="outline"
                     size="sm"
+                    className="flex-1 sm:flex-none h-8 sm:h-9 text-[11px] sm:text-xs"
                     onClick={() => {
                       setSelectedWorkspace(workspace);
                       setNewName(workspace.name);
                       setEditNameOpen(true);
                     }}
                   >
-                    <Edit className="h-4 w-4 mr-2" />
+                    <Edit className="h-3.5 w-3.5 mr-1.5" />
                     Edit
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
+                    className="flex-1 sm:flex-none h-8 sm:h-9 text-[11px] sm:text-xs"
                     onClick={() => {
                       setSelectedWorkspace(workspace);
                       setManageCategoriesOpen(true);
                     }}
                   >
-                    <FolderTree className="h-4 w-4 mr-2" />
+                    <FolderTree className="h-3.5 w-3.5 mr-1.5" />
                     Categories
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
+                    className="flex-1 sm:flex-none h-8 sm:h-9 text-[11px] sm:text-xs"
                     onClick={() => {
                       setSelectedWorkspace(workspace);
                       setManageDepartmentsOpen(true);
                     }}
                   >
-                    <Settings className="h-4 w-4 mr-2" />
-                    Departments
+                    <Settings className="h-3.5 w-3.5 mr-1.5" />
+                    Depts
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
+                    className="h-8 w-8 sm:h-9 sm:w-9 p-0 shrink-0"
                     onClick={() => {
                       setSelectedWorkspace(workspace);
                       setMaxVacationSplits(workspace.max_vacation_splits || 6);
                       setSettingsOpen(true);
                     }}
                   >
-                    <Settings className="h-4 w-4" />
+                    <Settings className="h-3.5 w-3.5" />
                   </Button>
 
                   {/* Only show delete if NOT in scoped mode */}
@@ -558,6 +600,7 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="h-8 w-8 sm:h-9 sm:w-9 p-0 ml-auto sm:ml-0"
                       onClick={() => deleteMutation.mutate(workspace.id)}
                       disabled={deleteMutation.isPending}
                     >

@@ -110,7 +110,7 @@ const WorkspaceModuleManagement = () => {
 
   const checkDependencies = (module: Module): string[] => {
     if (!modules) return [];
-    
+
     return modules
       .filter((m) => {
         const mStatus = getModuleStatusRaw(m.id, m.is_active || false);
@@ -171,18 +171,21 @@ const WorkspaceModuleManagement = () => {
           const status = getModuleStatus(module.id, module.is_active || false);
           return (
             <Card key={module.id}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
+              <CardHeader className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
-                    <CardTitle className="text-lg">{module.name}</CardTitle>
-                    <CardDescription>{module.description}</CardDescription>
+                    <CardTitle className="text-base sm:text-lg">{module.name}</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">{module.description}</CardDescription>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant={status.color as any}>{status.label}</Badge>
+                  <div className="flex items-center justify-between sm:justify-end gap-3 pt-3 sm:pt-0 border-t sm:border-0">
+                    <Badge variant={status.color as any} className="text-[10px] sm:text-xs">
+                      {status.label}
+                    </Badge>
                     <Switch
                       checked={status.enabled}
                       disabled={!status.canToggle}
                       onCheckedChange={(checked) => handleModuleToggle(module, checked)}
+                      className="scale-90 sm:scale-100"
                     />
                   </div>
                 </div>

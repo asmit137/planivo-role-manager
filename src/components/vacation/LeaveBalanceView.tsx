@@ -2,15 +2,20 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LoadingState } from '@/components/layout/LoadingState';
-import { Calendar, AlertCircle } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useUserRole } from '@/hooks/useUserRole';
 
 export function LeaveBalanceView() {
     const { user } = useAuth();
     const { organization: currentOrganization } = useOrganization();
+    const { data: roles } = useUserRole();
     const currentYear = new Date().getFullYear();
+
+    const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
+    const isOrgAdmin = roles?.some(r => r.role === 'organization_admin');
 
     const { data: balances, isLoading } = useQuery({
         queryKey: ['leave-balances', user?.id, currentYear],
@@ -24,27 +29,17 @@ export function LeaveBalanceView() {
             if (error) throw error;
             return data;
         },
-        enabled: !!user?.id && currentOrganization?.vacation_mode === 'full',
+        enabled: !!user?.id,
     });
 
-    if (currentOrganization?.vacation_mode !== 'full') {
+    if (isSuperAdmin || isOrgAdmin) {
         return null;
     }
 
     if (isLoading) return <LoadingState />;
 
     if (!balances || balances.length === 0) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                        <Calendar className="h-5 w-5 text-primary" />
-                        Leave Balances
-                    </CardTitle>
-                    <CardDescription>No leave balances allocated for {currentYear}.</CardDescription>
-                </CardHeader>
-            </Card>
-        );
+        return null;
     }
 
     return (
@@ -52,37 +47,31 @@ export function LeaveBalanceView() {
             <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                     <Calendar className="h-5 w-5 text-primary" />
-                    Your Leave Balances ({currentYear})
+                    My Leave Balances ({currentYear})
                 </CardTitle>
-                <CardDescription>Track your available and used vacation days.</CardDescription>
+                <CardDescription>View your available and used vacation days.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-                {balances.map((item: any) => {
-                    const percentage = item.accrued > 0 ? (item.used / item.accrued) * 100 : 0;
-                    return (
-                        <div key={item.id} className="space-y-2">
-                            <div className="flex justify-between items-end">
-                                <div>
-                                    <p className="font-medium">{item.vacation_types?.name}</p>
-                                    <p className="text-sm text-muted-foreground">
-                                        {item.used} used / {item.accrued} total
-                                    </p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-2xl font-bold">{item.balance}</p>
-                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Remaining</p>
-                                </div>
-                            </div>
-                            <Progress value={percentage} className="h-2" />
-                            {item.balance <= 0 && (
-                                <p className="text-xs text-destructive flex items-center gap-1">
-                                    <AlertCircle className="h-3 w-3" />
-                                    No remaining balance for this type.
-                                </p>
-                            )}
-                        </div>
-                    );
-                })}
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Vacation Type</TableHead>
+                            <TableHead className="text-center">Total Allocated</TableHead>
+                            <TableHead className="text-center">Used</TableHead>
+                            <TableHead className="text-right">Remaining</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {balances.map((item: any) => (
+                            <TableRow key={item.id}>
+                                <TableCell className="font-medium">{item.vacation_types?.name}</TableCell>
+                                <TableCell className="text-center">{item.accrued}</TableCell>
+                                <TableCell className="text-center">{item.used}</TableCell>
+                                <TableCell className="text-right font-bold text-primary">{item.balance}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
             </CardContent>
         </Card>
     );

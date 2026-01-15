@@ -152,6 +152,17 @@ const OrganizationManagement = () => {
     }) => {
       const validated = organizationSchema.parse({ name: params.name, description: params.description });
 
+      // Check for duplicate name
+      const { data: existing } = await supabase
+        .from('organizations')
+        .select('id')
+        .ilike('name', validated.name)
+        .maybeSingle();
+
+      if (existing) {
+        throw new Error('An organization with this name already exists');
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
@@ -219,6 +230,18 @@ const OrganizationManagement = () => {
       vacationMode?: 'planning' | 'full';
     }) => {
       const validated = organizationSchema.parse({ name: params.name, description: params.description });
+
+      // Check for duplicate name (excluding current org)
+      const { data: existing } = await supabase
+        .from('organizations')
+        .select('id')
+        .ilike('name', validated.name)
+        .neq('id', params.id)
+        .maybeSingle();
+
+      if (existing) {
+        throw new Error('An organization with this name already exists');
+      }
 
       let ownerId: string | null | undefined = undefined; // undefined = no change
 
@@ -397,25 +420,25 @@ const OrganizationManagement = () => {
     state: LimitState;
     onChange: (state: LimitState) => void;
   }) => (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <div className="flex items-center gap-3">
+    <div className="space-y-3">
+      <Label className="text-sm font-medium">{label}</Label>
+      <div className="flex flex-wrap items-center gap-3">
         <Input
           type="number"
           min={1}
           value={state.value}
           onChange={(e) => onChange({ ...state, value: parseInt(e.target.value) || 1 })}
           disabled={state.unlimited}
-          className="w-24"
+          className="w-full xs:w-24 h-9"
         />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-md">
           <Checkbox
             id={`${label}-unlimited`}
             checked={state.unlimited}
             onCheckedChange={(checked) => onChange({ ...state, unlimited: !!checked })}
           />
-          <Label htmlFor={`${label}-unlimited`} className="text-sm flex items-center gap-1 cursor-pointer">
-            <Infinity className="h-4 w-4" /> Unlimited
+          <Label htmlFor={`${label}-unlimited`} className="text-xs sm:text-sm flex items-center gap-1 cursor-pointer font-normal">
+            <Infinity className="h-3.5 w-3.5" /> Unlimited
           </Label>
         </div>
       </div>
@@ -572,10 +595,10 @@ const OrganizationManagement = () => {
               return (
                 <Collapsible key={org.id} open={isExpanded} onOpenChange={() => toggleExpanded(org.id)}>
                   <div className="border-2 rounded-lg hover:border-primary/20 transition-colors">
-                    <div className="flex items-center justify-between p-4">
-                      <div className="flex items-center gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 gap-4">
+                      <div className="flex items-start gap-3 min-w-0">
                         <CollapsibleTrigger asChild>
-                          <Button variant="ghost" size="sm" className="p-0 h-auto">
+                          <Button variant="ghost" size="sm" className="p-0 h-8 w-8 shrink-0 mt-1">
                             {isExpanded ? (
                               <ChevronDown className="h-5 w-5 text-muted-foreground" />
                             ) : (
@@ -583,42 +606,42 @@ const OrganizationManagement = () => {
                             )}
                           </Button>
                         </CollapsibleTrigger>
-                        <div className="p-2 rounded-lg bg-primary/10">
+                        <div className="p-2 rounded-lg bg-primary/10 shrink-0 mt-0.5">
                           <Building className="h-5 w-5 text-primary" />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-semibold">{org.name}</h3>
-                            <Badge variant="secondary" className="text-xs">
-                              {orgWorkspaces.length} workspace{orgWorkspaces.length !== 1 ? 's' : ''}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-semibold text-base sm:text-lg line-clamp-1">{org.name}</h3>
+                            <Badge variant="secondary" className="text-[10px] sm:text-xs h-5 sm:h-auto">
+                              {orgWorkspaces.length} Workspace{orgWorkspaces.length !== 1 ? 's' : ''}
                             </Badge>
                           </div>
                           {org.description && (
-                            <p className="text-sm text-muted-foreground">{org.description}</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1 sm:line-clamp-2 mt-0.5">{org.description}</p>
                           )}
                           {owner && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              <User className="h-3 w-3 inline mr-1" />
-                              Owner: {owner.full_name} ({owner.email})
+                            <p className="text-[10px] sm:text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
+                              <User className="h-3 w-3 shrink-0" />
+                              <span className="truncate">Owner: {owner.full_name} ({owner.email})</span>
                             </p>
                           )}
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            <Badge variant="outline" className="text-xs">
+                          <div className="flex flex-wrap gap-1.5 mt-2.5">
+                            <Badge variant="outline" className="text-[10px] px-1.5 h-5 flex items-center gap-1">
                               Workspaces: {formatLimit(org.max_workspaces)}
                             </Badge>
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-[10px] px-1.5 h-5 flex items-center gap-1">
                               Facilities: {formatLimit(org.max_facilities)}
                             </Badge>
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-[10px] px-1.5 h-5 flex items-center gap-1">
                               Users: {formatLimit(org.max_users)}
                             </Badge>
-                            <Badge variant={org.vacation_mode === 'planning' ? 'secondary' : 'default'} className="text-xs">
+                            <Badge variant={org.vacation_mode === 'planning' ? 'secondary' : 'default'} className="text-[10px] px-1.5 h-5">
                               {org.vacation_mode === 'planning' ? 'Planning Mode' : 'Full Mode'}
                             </Badge>
                           </div>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 justify-end sm:justify-start pt-3 sm:pt-0 border-t sm:border-0">
                         <Button
                           variant="outline"
                           size="sm"
@@ -644,19 +667,21 @@ const OrganizationManagement = () => {
                     </div>
 
                     <CollapsibleContent>
-                      <div className="px-4 pb-4 pt-0 ml-8 border-t">
-                        <h4 className="text-sm font-medium text-muted-foreground mt-3 mb-2">Workspaces</h4>
+                      <div className="px-4 pb-4 pt-0 sm:ml-8 border-t bg-muted/10">
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 mt-4 mb-2 px-1">Active Workspaces</h4>
                         {orgWorkspaces.length > 0 ? (
-                          <div className="space-y-2">
+                          <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
                             {orgWorkspaces.map((ws) => (
-                              <div key={ws.id} className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
-                                <Building className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm">{ws.name}</span>
+                              <div key={ws.id} className="flex items-center gap-2.5 p-2.5 bg-background border rounded-md shadow-sm">
+                                <Building className="h-4 w-4 text-primary shrink-0" />
+                                <span className="text-xs sm:text-sm font-medium truncate">{ws.name}</span>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <p className="text-sm text-muted-foreground">No workspaces in this organization yet.</p>
+                          <div className="py-4 text-center border-2 border-dashed rounded-lg bg-background/50">
+                            <p className="text-xs text-muted-foreground">No workspaces created yet.</p>
+                          </div>
                         )}
                       </div>
                     </CollapsibleContent>
