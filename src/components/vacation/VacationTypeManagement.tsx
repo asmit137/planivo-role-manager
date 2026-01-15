@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 
 const VacationTypeManagement = () => {
   const queryClient = useQueryClient();
+  const formRef = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editingType, setEditingType] = useState<any>(null);
   const [formData, setFormData] = useState({
@@ -96,6 +97,9 @@ const VacationTypeManagement = () => {
       requires_documentation: type.requires_documentation || false,
     });
     setIsEditing(true);
+
+    // Scroll to the edit form
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -111,71 +115,73 @@ const VacationTypeManagement = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {isEditing ? 'Edit Vacation Type' : 'Create Vacation Type'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="max_days">Maximum Days</Label>
-              <Input
-                id="max_days"
-                type="number"
-                value={formData.max_days}
-                onChange={(e) =>
-                  setFormData({ ...formData, max_days: parseInt(e.target.value) })
-                }
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="requires_documentation"
-                checked={formData.requires_documentation}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, requires_documentation: checked })
-                }
-              />
-              <Label htmlFor="requires_documentation">
-                Requires Documentation
-              </Label>
-            </div>
-            <div className="flex gap-2">
-              <Button type="submit">
-                {isEditing ? 'Update' : 'Create'}
-              </Button>
-              {isEditing && (
-                <Button type="button" variant="outline" onClick={resetForm}>
-                  Cancel
+      <div ref={formRef}>
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {isEditing ? 'Edit Vacation Type' : 'Create Vacation Type'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="max_days">Maximum Days</Label>
+                <Input
+                  id="max_days"
+                  type="number"
+                  value={formData.max_days}
+                  onChange={(e) =>
+                    setFormData({ ...formData, max_days: parseInt(e.target.value) })
+                  }
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="requires_documentation"
+                  checked={formData.requires_documentation}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, requires_documentation: checked })
+                  }
+                />
+                <Label htmlFor="requires_documentation">
+                  Requires Documentation
+                </Label>
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit">
+                  {isEditing ? 'Update' : 'Create'}
                 </Button>
-              )}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+                {isEditing && (
+                  <Button type="button" variant="outline" onClick={resetForm}>
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader>

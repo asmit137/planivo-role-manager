@@ -159,43 +159,47 @@ const OrganizationVacationMonitor = ({ organizationId }: OrganizationVacationMon
   return (
     <div className="space-y-6">
       {/* Stats Overview */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-2 sm:gap-4 grid-cols-2 md:grid-cols-4">
         <StatsCard
-          title="Pending Requests"
+          title="Pending"
           value={vacationStats?.pending || 0}
           icon={Clock}
-          description="Awaiting approval"
+          description="Awaiting"
+          className="p-3 sm:p-6"
         />
         <StatsCard
           title="Approved"
           value={vacationStats?.approved || 0}
           icon={CheckCircle}
-          description="Approved requests"
+          description="Approved"
+          className="p-3 sm:p-6"
         />
         <StatsCard
           title="Rejected"
           value={vacationStats?.rejected || 0}
           icon={XCircle}
-          description="Rejected requests"
+          description="Rejected"
+          className="p-3 sm:p-6"
         />
         <StatsCard
-          title="Total Requests"
+          title="Total"
           value={vacationStats?.total || 0}
           icon={Calendar}
-          description="All vacation requests"
+          description="All"
+          className="p-3 sm:p-6"
         />
       </div>
 
       {/* Recent Vacation Requests */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-3 sm:px-6">
+          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
             <Calendar className="h-5 w-5 text-primary" />
-            Recent Vacation Requests
+            Recent Requests
           </CardTitle>
-          <CardDescription>Latest vacation requests across your organization</CardDescription>
+          <CardDescription className="text-xs sm:text-sm">Latest vacation requests in your organization</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           {!recentPlans || recentPlans.length === 0 ? (
             <EmptyState
               icon={Calendar}
@@ -205,17 +209,24 @@ const OrganizationVacationMonitor = ({ organizationId }: OrganizationVacationMon
           ) : (
             <div className="space-y-3">
               {recentPlans.map((plan: any) => (
-                <div key={plan.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                <div key={plan.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border bg-muted/30 gap-3">
                   <div className="space-y-1">
-                    <p className="font-medium">{plan.staffName}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between sm:justify-start gap-2">
+                      <p className="font-medium text-sm sm:text-base">{plan.staffName}</p>
+                      <div className="sm:hidden">
+                        {getStatusBadge(plan.status)}
+                      </div>
+                    </div>
+                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">
                       {plan.departmentName} · {plan.vacationType} · {plan.total_days} days
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
                       Submitted: {format(new Date(plan.created_at), 'MMM d, yyyy')}
                     </p>
                   </div>
-                  {getStatusBadge(plan.status)}
+                  <div className="hidden sm:block">
+                    {getStatusBadge(plan.status)}
+                  </div>
                 </div>
               ))}
             </div>

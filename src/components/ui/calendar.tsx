@@ -26,10 +26,10 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         nav_button_next: "absolute right-1",
         table: "w-full border-collapse",
         head_row: "flex",
-        head_cell: "text-muted-foreground rounded-md w-10 font-medium text-[0.75rem] uppercase tracking-wide",
+        head_cell: "text-muted-foreground rounded-md flex-1 min-w-0 font-medium text-[0.6rem] sm:text-[0.75rem] uppercase tracking-wide text-center",
         row: "flex w-full mt-1",
         cell: cn(
-          "relative h-10 w-10 text-center text-sm p-0 focus-within:relative focus-within:z-20",
+          "relative h-8 sm:h-10 text-center text-xs sm:text-sm p-0 focus-within:relative focus-within:z-20 flex-1 min-w-0",
           "[&:has([aria-selected])]:bg-primary/10 [&:has([aria-selected])]:rounded-lg",
           "[&:has([aria-selected].day-range-end)]:rounded-r-lg",
           "[&:has([aria-selected].day-outside)]:bg-accent/50",
@@ -37,7 +37,7 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         ),
         day: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-10 w-10 p-0 font-normal rounded-lg transition-all duration-200",
+          "h-full w-full p-0 font-normal rounded-lg transition-all duration-200",
           "hover:bg-accent hover:text-accent-foreground hover:scale-105",
           "aria-selected:opacity-100"
         ),

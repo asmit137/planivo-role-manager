@@ -134,43 +134,47 @@ const OrganizationTrainingMonitor = ({ organizationId }: OrganizationTrainingMon
   return (
     <div className="space-y-6">
       {/* Stats Overview */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-2 sm:gap-4 grid-cols-2 md:grid-cols-4">
         <StatsCard
-          title="Upcoming Events"
+          title="Upcoming"
           value={trainingStats?.upcoming || 0}
           icon={Calendar}
-          description="Scheduled events"
+          description="Scheduled"
+          className="p-3 sm:p-6"
         />
         <StatsCard
           title="Completed"
           value={trainingStats?.completed || 0}
           icon={GraduationCap}
-          description="Finished events"
+          description="Finished"
+          className="p-3 sm:p-6"
         />
         <StatsCard
-          title="Draft Events"
+          title="Draft"
           value={trainingStats?.draft || 0}
           icon={Clock}
-          description="Pending publication"
+          description="Pending"
+          className="p-3 sm:p-6"
         />
         <StatsCard
-          title="Total Events"
+          title="Total"
           value={trainingStats?.total || 0}
           icon={Users}
-          description="All training events"
+          description="All"
+          className="p-3 sm:p-6"
         />
       </div>
 
       {/* Recent Training Events */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-3 sm:px-6">
+          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
             <GraduationCap className="h-5 w-5 text-primary" />
-            Recent Training Events
+            Recent Events
           </CardTitle>
-          <CardDescription>Latest training and meeting events in your organization</CardDescription>
+          <CardDescription className="text-xs sm:text-sm">Latest training and meeting events in your organization</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           {!recentEvents || recentEvents.length === 0 ? (
             <EmptyState
               icon={GraduationCap}
@@ -180,18 +184,24 @@ const OrganizationTrainingMonitor = ({ organizationId }: OrganizationTrainingMon
           ) : (
             <div className="space-y-3">
               {recentEvents.map((event: any) => (
-                <div key={event.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                <div key={event.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border bg-muted/30 gap-3">
                   <div className="space-y-1">
-                    <p className="font-medium">{event.title}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between sm:justify-start gap-2">
+                      <p className="font-medium text-sm sm:text-base line-clamp-1">{event.title}</p>
+                      <div className="sm:hidden flex gap-1">
+                        {getEventTypeBadge(event.event_type)}
+                        {getStatusBadge(event.status)}
+                      </div>
+                    </div>
+                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">
                       {event.responsibleName} · {event.location_type}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
                       {format(new Date(event.start_datetime), 'MMM d, yyyy h:mm a')}
                       {event.max_participants && ` · ${event.registrationCount}/${event.max_participants} registered`}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="hidden sm:flex gap-2">
                     {getEventTypeBadge(event.event_type)}
                     {getStatusBadge(event.status)}
                   </div>

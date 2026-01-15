@@ -169,56 +169,65 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-primary" />
-            Organization Facilities
-          </CardTitle>
-          <CardDescription>
-            {totalFacilities} facilities across {workspacesWithFacilities.length} workspaces
-          </CardDescription>
+      <Card className="border-2 shadow-sm">
+        <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4 border-b bg-muted/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+              <MapPin className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg sm:text-xl font-bold tracking-tight">Organization Facilities</CardTitle>
+              <CardDescription className="text-xs sm:text-sm mt-0.5">
+                {totalFacilities} facilities across {workspacesWithFacilities.length} workspaces
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           <Accordion type="multiple" className="space-y-2">
             {workspacesWithFacilities.map((workspace) => (
               <AccordionItem key={workspace.id} value={workspace.id} className="border rounded-lg">
-                <AccordionTrigger className="px-4 hover:no-underline">
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-primary" />
-                    <span className="font-semibold">{workspace.name}</span>
-                    <Badge variant="secondary">{workspace.facilityCount} facilities</Badge>
+                <AccordionTrigger className="px-3 sm:px-5 py-3.5 sm:py-4 hover:no-underline hover:bg-muted/50 transition-all rounded-t-lg">
+                  <div className="flex items-center gap-2.5 text-left min-w-0 flex-1">
+                    <Building2 className="h-4 w-4 sm:h-5 w-5 text-primary shrink-0 opacity-80" />
+                    <span className="font-semibold text-sm sm:text-base line-clamp-1 flex-1">{workspace.name}</span>
+                    <Badge variant="secondary" className="shrink-0 text-[10px] sm:text-xs font-medium px-2">
+                      {workspace.facilityCount} {workspace.facilityCount === 1 ? 'fac' : 'facs'}
+                    </Badge>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="px-4 pb-4">
+                <AccordionContent className="px-3 sm:px-4 pb-4">
                   {workspace.facilities.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-2">No facilities in this workspace</p>
+                    <div className="py-6 text-center border-2 border-dashed rounded-lg bg-muted/5 mt-2">
+                      <p className="text-xs sm:text-sm text-muted-foreground">No facilities in this workspace</p>
+                    </div>
                   ) : (
-                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-2.5 sm:gap-4 grid-cols-1 xs:grid-cols-2 md:grid-cols-3 pt-3">
                       {workspace.facilities.map((facility: any) => (
-                        <Card key={facility.id} className="bg-muted/30">
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium">{facility.name}</span>
+                        <Card key={facility.id} className="bg-background border-2 hover:border-primary/20 transition-all shadow-sm">
+                          <CardContent className="p-3 sm:p-4">
+                            <div className="flex items-start justify-between gap-2 mb-3">
+                              <span className="font-semibold text-sm sm:text-[15px] leading-tight line-clamp-2">{facility.name}</span>
                               <Button
                                 variant="ghost"
-                                size="sm"
+                                size="icon"
+                                className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 hover:bg-primary/5 hover:text-primary transition-colors"
                                 onClick={() => {
                                   setSelectedFacility(facility);
                                   setNewName(facility.name);
                                   setEditNameOpen(true);
                                 }}
                               >
-                                <Edit className="h-4 w-4" />
+                                <Edit className="h-3.5 w-3.5" />
                               </Button>
                             </div>
-                            <div className="flex gap-2 text-xs">
-                              <Badge variant="outline">
-                                {facility.departmentCount} depts
+                            <div className="flex flex-wrap gap-1.5">
+                              <Badge variant="outline" className="text-[10px] px-1.5 h-5 flex items-center gap-1 bg-muted/30">
+                                {facility.departmentCount} Depts
                               </Badge>
-                              <Badge variant="outline">
-                                <Users className="h-3 w-3 mr-1" />
-                                {facility.userCount} users
+                              <Badge variant="outline" className="text-[10px] px-1.5 h-5 flex items-center gap-1 bg-muted/30">
+                                <Users className="h-3 w-3 opacity-70" />
+                                {facility.userCount} Users
                               </Badge>
                             </div>
                           </CardContent>

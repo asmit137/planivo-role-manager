@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LoadingState } from '@/components/layout/LoadingState';
 import { toast } from 'sonner';
-import { Save, UserPlus, RefreshCcw } from 'lucide-react';
+import { Save, UserPlus, RefreshCcw, Pencil } from 'lucide-react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 
 export function AdminBalanceManager() {
@@ -16,13 +16,14 @@ export function AdminBalanceManager() {
     const queryClient = useQueryClient();
     const currentYear = new Date().getFullYear();
     const [updating, setUpdating] = useState<string | null>(null);
+    const [editingCell, setEditingCell] = useState<string | null>(null);
 
     // Fetch all staff and their balances
     const { data: staffWithBalances, isLoading } = useQuery({
         queryKey: ['admin-leave-balances', currentOrganization?.id, currentYear],
         queryFn: async () => {
             // Get all staff roles in this organization
-            const { data: staffRoles, error: rolesError } = await supabase
+            const { data: staffRoles, error: rolesError } = await (supabase as any)
                 .from('user_roles')
                 .select(`user_id, profiles:user_id (id, full_name, email)`)
                 .eq('organization_id', currentOrganization?.id);
@@ -93,6 +94,36 @@ export function AdminBalanceManager() {
         }
     });
 
+    if (currentOrganization?.id === 'all') {
+        return (
+            <div className="space-y-6">
+                <Card>
+                    <CardContent className="p-8 text-center text-muted-foreground flex flex-col items-center justify-center min-h-[200px]">
+                        <p className="text-lg font-medium mb-2">Select Organization</p>
+                        <p>Please select a specific organization from the sidebar to manage leave balances.</p>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    if (currentOrganization?.vacation_mode === 'planning') {
+        return (
+            <div className="space-y-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Staff Leave Allocation</CardTitle>
+                        <CardDescription>Set annual, sick, and emergency leave allowances for the year {currentYear}.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-8 text-center text-muted-foreground flex flex-col items-center justify-center min-h-[200px]">
+                        <p className="text-lg font-medium mb-2">Planning Mode Active</p>
+                        <p>This organization is currently in planning mode. Leave balances are not managed in this mode.</p>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
     if (isLoading) return <LoadingState />;
 
     return (
@@ -135,8 +166,18 @@ export function AdminBalanceManager() {
                                                             type="number"
                                                             className="w-20"
                                                             defaultValue={balance?.accrued || 0}
+                                                            disabled={editingCell !== `${member.user_id}-${type.id}` && !isLocalUpdating}
+                                                            autoFocus={editingCell === `${member.user_id}-${type.id}`}
                                                             onBlur={(e) => {
+                                                                setEditingCell(null);
                                                                 const val = parseInt(e.target.value);
+
+                                                                if (val < 0) {
+                                                                    toast.error("Balance cannot be negative");
+                                                                    e.target.value = (balance?.accrued || 0).toString(); // Reset input
+                                                                    return;
+                                                                }
+
                                                                 if (val !== (balance?.accrued || 0)) {
                                                                     setUpdating(`${member.user_id}-${type.id}`);
                                                                     updateBalanceMutation.mutate({
@@ -146,8 +187,22 @@ export function AdminBalanceManager() {
                                                                     });
                                                                 }
                                                             }}
-                                                            disabled={isLocalUpdating}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.currentTarget.blur();
+                                                                }
+                                                            }}
                                                         />
+                                                        {editingCell !== `${member.user_id}-${type.id}` && !isLocalUpdating && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                                onClick={() => setEditingCell(`${member.user_id}-${type.id}`)}
+                                                            >
+                                                                <Pencil className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
                                                         {isLocalUpdating && <RefreshCcw className="h-4 w-4 animate-spin text-muted-foreground" />}
                                                     </div>
                                                     {balance && (

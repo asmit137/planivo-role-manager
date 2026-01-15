@@ -8,23 +8,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from '@/components/ui/table';
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { 
-  User, 
+import {
+  User,
   Search,
   Plus,
   Trash2,
@@ -77,7 +77,7 @@ const UserModuleAccess = () => {
     can_delete: false,
     can_admin: false,
   });
-  
+
   const queryClient = useQueryClient();
 
   const { data: modules, isLoading: modulesLoading } = useQuery({
@@ -88,7 +88,7 @@ const UserModuleAccess = () => {
         .select('*')
         .eq('is_active', true)
         .order('name');
-      
+
       if (error) throw error;
       return data as Module[];
     },
@@ -98,7 +98,7 @@ const UserModuleAccess = () => {
     queryKey: ['user-module-access-list', selectedModule],
     queryFn: async () => {
       if (!selectedModule) return [];
-      
+
       const { data, error } = await supabase
         .from('user_module_access')
         .select(`
@@ -107,7 +107,7 @@ const UserModuleAccess = () => {
           module_definitions!user_module_access_module_id_fkey(id, name, key)
         `)
         .eq('module_id', selectedModule);
-      
+
       if (error) throw error;
       return data as UserModuleAccessEntry[];
     },
@@ -122,7 +122,7 @@ const UserModuleAccess = () => {
         .select('id, full_name, email')
         .eq('is_active', true)
         .order('full_name');
-      
+
       if (error) throw error;
       return data;
     },
@@ -131,7 +131,7 @@ const UserModuleAccess = () => {
   const addUserAccessMutation = useMutation({
     mutationFn: async () => {
       const { data: session } = await supabase.auth.getSession();
-      
+
       const { error } = await supabase
         .from('user_module_access')
         .insert({
@@ -144,7 +144,7 @@ const UserModuleAccess = () => {
           is_override: true,
           created_by: session?.session?.user?.id,
         });
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -164,18 +164,18 @@ const UserModuleAccess = () => {
   });
 
   const updateUserAccessMutation = useMutation({
-    mutationFn: async ({ 
-      accessId, 
-      permissions 
-    }: { 
-      accessId: string; 
-      permissions: Partial<UserModuleAccessEntry> 
+    mutationFn: async ({
+      accessId,
+      permissions
+    }: {
+      accessId: string;
+      permissions: Partial<UserModuleAccessEntry>
     }) => {
       const { error } = await supabase
         .from('user_module_access')
         .update({ ...permissions, updated_at: new Date().toISOString() })
         .eq('id', accessId);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -193,7 +193,7 @@ const UserModuleAccess = () => {
         .from('user_module_access')
         .delete()
         .eq('id', accessId);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -232,7 +232,7 @@ const UserModuleAccess = () => {
   });
 
   // Filter out users who already have access to the selected module
-  const availableUsers = users?.filter(user => 
+  const availableUsers = users?.filter(user =>
     !userAccess?.some(access => access.user_id === user.id)
   );
 
@@ -260,21 +260,21 @@ const UserModuleAccess = () => {
           <Alert>
             <Shield className="h-4 w-4" />
             <AlertDescription>
-              User-specific permissions take priority over role-based permissions. 
+              User-specific permissions take priority over role-based permissions.
               Use this to grant additional access or restrict access for specific users.
             </AlertDescription>
           </Alert>
 
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <Label>Select Module</Label>
+          <div className="flex flex-col gap-4">
+            <div className="w-full">
+              <Label className="text-xs sm:text-sm mb-1.5 block">Select Module</Label>
               <Select value={selectedModule} onValueChange={setSelectedModule}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm">
                   <SelectValue placeholder="Choose a module to manage" />
                 </SelectTrigger>
                 <SelectContent>
                   {modules?.map((module) => (
-                    <SelectItem key={module.id} value={module.id}>
+                    <SelectItem key={module.id} value={module.id} className="text-xs sm:text-sm">
                       {module.name}
                     </SelectItem>
                   ))}
@@ -283,18 +283,18 @@ const UserModuleAccess = () => {
             </div>
 
             {selectedModule && (
-              <div className="flex items-end gap-2">
-                <div className="relative flex-1 sm:flex-none">
+              <div className="flex flex-col xs:flex-row items-stretch xs:items-end gap-3">
+                <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search users..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 w-full sm:w-60"
+                    className="pl-9 h-9 sm:h-10 text-xs sm:text-sm w-full"
                   />
                 </div>
-                <Button onClick={() => setAddUserDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
+                <Button onClick={() => setAddUserDialogOpen(true)} className="h-9 sm:h-10 text-xs sm:text-sm shrink-0">
+                  <Plus className="h-3.5 w-3.5 mr-2" />
                   Add User
                 </Button>
               </div>
@@ -308,96 +308,123 @@ const UserModuleAccess = () => {
                   <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
               ) : filteredAccess && filteredAccess.length > 0 ? (
-                <div className="border rounded-lg overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>User</TableHead>
-                        <TableHead className="text-center">
-                          <div className="flex flex-col items-center">
-                            <Eye className="h-4 w-4" />
-                            <span className="text-xs">View</span>
-                          </div>
-                        </TableHead>
-                        <TableHead className="text-center">
-                          <div className="flex flex-col items-center">
-                            <Edit className="h-4 w-4" />
-                            <span className="text-xs">Edit</span>
-                          </div>
-                        </TableHead>
-                        <TableHead className="text-center">
-                          <div className="flex flex-col items-center">
-                            <Trash2 className="h-4 w-4" />
-                            <span className="text-xs">Delete</span>
-                          </div>
-                        </TableHead>
-                        <TableHead className="text-center">
-                          <div className="flex flex-col items-center">
-                            <Shield className="h-4 w-4" />
-                            <span className="text-xs">Admin</span>
-                          </div>
-                        </TableHead>
-                        <TableHead className="text-center">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredAccess.map((access) => (
-                        <TableRow key={access.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <User className="h-4 w-4 text-muted-foreground" />
-                              <div>
-                                <p className="font-medium">{access.profiles?.full_name || 'Unknown'}</p>
-                                <p className="text-sm text-muted-foreground">{access.profiles?.email}</p>
+                <div className="space-y-4">
+                  {/* Desktop Table */}
+                  <div className="hidden md:block border rounded-lg overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>User</TableHead>
+                          <TableHead className="text-center">View</TableHead>
+                          <TableHead className="text-center">Edit</TableHead>
+                          <TableHead className="text-center">Delete</TableHead>
+                          <TableHead className="text-center">Admin</TableHead>
+                          <TableHead className="text-center">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredAccess.map((access) => (
+                          <TableRow key={access.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                  <User className="h-4 w-4 text-primary" />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-medium text-sm truncate">{access.profiles?.full_name || 'Unknown'}</p>
+                                  <p className="text-[10px] text-muted-foreground truncate">{access.profiles?.email}</p>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={access.can_view}
+                                onCheckedChange={(checked) => handlePermissionChange(access.id, 'can_view', checked as boolean)}
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={access.can_edit}
+                                onCheckedChange={(checked) => handlePermissionChange(access.id, 'can_edit', checked as boolean)}
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={access.can_delete}
+                                onCheckedChange={(checked) => handlePermissionChange(access.id, 'can_delete', checked as boolean)}
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Checkbox
+                                checked={access.can_admin}
+                                onCheckedChange={(checked) => handlePermissionChange(access.id, 'can_admin', checked as boolean)}
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteAccess(access.id)}
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Mobile Card List */}
+                  <div className="md:hidden space-y-3">
+                    {filteredAccess.map((access) => (
+                      <Card key={access.id} className="border border-border/60 bg-muted/20">
+                        <CardContent className="p-3 space-y-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <User className="h-4 w-4 text-primary" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-sm truncate">{access.profiles?.full_name || 'Unknown'}</p>
+                                <p className="text-[10px] text-muted-foreground truncate">{access.profiles?.email}</p>
                               </div>
                             </div>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Checkbox
-                              checked={access.can_view}
-                              onCheckedChange={(checked) =>
-                                handlePermissionChange(access.id, 'can_view', checked as boolean)
-                              }
-                            />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Checkbox
-                              checked={access.can_edit}
-                              onCheckedChange={(checked) =>
-                                handlePermissionChange(access.id, 'can_edit', checked as boolean)
-                              }
-                            />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Checkbox
-                              checked={access.can_delete}
-                              onCheckedChange={(checked) =>
-                                handlePermissionChange(access.id, 'can_delete', checked as boolean)
-                              }
-                            />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Checkbox
-                              checked={access.can_admin}
-                              onCheckedChange={(checked) =>
-                                handlePermissionChange(access.id, 'can_admin', checked as boolean)
-                              }
-                            />
-                          </TableCell>
-                          <TableCell className="text-center">
                             <Button
                               variant="ghost"
-                              size="icon"
+                              size="sm"
                               onClick={() => handleDeleteAccess(access.id)}
-                              className="text-destructive hover:text-destructive"
+                              className="text-destructive h-7 w-7 p-0 shrink-0"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { label: 'View', icon: Eye, field: 'can_view' },
+                              { label: 'Edit', icon: Edit, field: 'can_edit' },
+                              { label: 'Delete', icon: Trash2, field: 'can_delete' },
+                              { label: 'Admin', icon: Shield, field: 'can_admin' }
+                            ].map((perm) => (
+                              <div key={perm.label} className="flex items-center justify-between bg-card p-2 rounded border border-border/40">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <perm.icon className="h-3 w-3 text-muted-foreground shrink-0" />
+                                  <span className="text-[10px] font-medium">{perm.label}</span>
+                                </div>
+                                <Checkbox
+                                  checked={(access as any)[perm.field]}
+                                  onCheckedChange={(checked) => handlePermissionChange(access.id, perm.field as any, checked as boolean)}
+                                  className="scale-90"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
@@ -487,8 +514,8 @@ const UserModuleAccess = () => {
               </div>
             </div>
 
-            <Button 
-              onClick={() => addUserAccessMutation.mutate()} 
+            <Button
+              onClick={() => addUserAccessMutation.mutate()}
               className="w-full"
               disabled={!selectedUserId || addUserAccessMutation.isPending}
             >

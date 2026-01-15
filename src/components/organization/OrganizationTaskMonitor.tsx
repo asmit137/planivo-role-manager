@@ -139,43 +139,47 @@ const OrganizationTaskMonitor = ({ organizationId }: OrganizationTaskMonitorProp
   return (
     <div className="space-y-6">
       {/* Stats Overview */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-2 sm:gap-4 grid-cols-2 md:grid-cols-4">
         <StatsCard
-          title="Active Tasks"
+          title="Active"
           value={taskStats?.active || 0}
           icon={ListTodo}
           description="In progress"
+          className="p-3 sm:p-6"
         />
         <StatsCard
           title="Completed"
           value={taskStats?.completed || 0}
           icon={CheckSquare}
-          description="Finished tasks"
+          description="Finished"
+          className="p-3 sm:p-6"
         />
         <StatsCard
           title="Overdue"
           value={taskStats?.overdue || 0}
           icon={AlertTriangle}
-          description="Past due date"
+          description="Past due"
+          className="p-3 sm:p-6 text-destructive"
         />
         <StatsCard
-          title="Total Tasks"
+          title="Total"
           value={taskStats?.total || 0}
           icon={Clock}
-          description="All tasks"
+          description="All"
+          className="p-3 sm:p-6"
         />
       </div>
 
       {/* Recent Tasks */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-3 sm:px-6">
+          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
             <ListTodo className="h-5 w-5 text-primary" />
             Recent Tasks
           </CardTitle>
-          <CardDescription>Latest tasks across your organization</CardDescription>
+          <CardDescription className="text-xs sm:text-sm">Latest tasks in your organization</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           {!recentTasks || recentTasks.length === 0 ? (
             <EmptyState
               icon={ListTodo}
@@ -185,19 +189,25 @@ const OrganizationTaskMonitor = ({ organizationId }: OrganizationTaskMonitorProp
           ) : (
             <div className="space-y-3">
               {recentTasks.map((task: any) => (
-                <div key={task.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                <div key={task.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border bg-muted/30 gap-3">
                   <div className="space-y-1">
-                    <p className="font-medium">{task.title}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Created by {task.creatorName} · {task.scope_type}
+                    <div className="flex items-center justify-between sm:justify-start gap-2">
+                      <p className="font-medium text-sm sm:text-base line-clamp-1">{task.title}</p>
+                      <div className="sm:hidden flex gap-1">
+                        {getPriorityBadge(task.priority)}
+                        {getStatusBadge(task.status)}
+                      </div>
+                    </div>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      By {task.creatorName} · {task.scope_type}
                     </p>
                     {task.due_date && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">
                         Due: {format(new Date(task.due_date), 'MMM d, yyyy')}
                       </p>
                     )}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="hidden sm:flex gap-2">
                     {getPriorityBadge(task.priority)}
                     {getStatusBadge(task.status)}
                   </div>

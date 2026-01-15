@@ -13,11 +13,11 @@ interface ResponsiveTabsListProps {
  */
 export const ResponsiveTabsList = ({ children, className }: ResponsiveTabsListProps) => {
   return (
-    <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
-      <TabsList 
+    <div className="w-full overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0 scrollbar-hide">
+      <TabsList
         className={cn(
-          "inline-flex h-auto min-w-max gap-1 p-1",
-          "md:flex md:flex-wrap",
+          "inline-flex h-auto w-full justify-start gap-1 p-1 bg-muted/20",
+          "md:flex md:flex-wrap md:justify-center",
           className
         )}
       >

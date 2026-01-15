@@ -619,10 +619,10 @@ const UnifiedUserCreation = ({ open, onOpenChange, initialOrganizationId }: Unif
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Create New User</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader className="mb-4">
+          <DialogTitle className="text-xl sm:text-2xl">Create New User</DialogTitle>
+          <DialogDescription className="text-sm">
             Enter user information and assign to facility, department, and specialty
           </DialogDescription>
         </DialogHeader>
@@ -635,9 +635,9 @@ const UnifiedUserCreation = ({ open, onOpenChange, initialOrganizationId }: Unif
               Basic Information
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
+                <Label htmlFor="email" className="text-sm">Email *</Label>
                 <Input
                   id="email"
                   type="email"
@@ -647,11 +647,12 @@ const UnifiedUserCreation = ({ open, onOpenChange, initialOrganizationId }: Unif
                   required
                   maxLength={255}
                   autoComplete="off"
+                  className="h-10"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="full_name">Full Name *</Label>
+                <Label htmlFor="full_name" className="text-sm">Full Name *</Label>
                 <Input
                   id="full_name"
                   type="text"
@@ -661,6 +662,7 @@ const UnifiedUserCreation = ({ open, onOpenChange, initialOrganizationId }: Unif
                   required
                   maxLength={100}
                   autoComplete="off"
+                  className="h-10"
                 />
               </div>
             </div>
@@ -752,17 +754,17 @@ const UnifiedUserCreation = ({ open, onOpenChange, initialOrganizationId }: Unif
                 Organization & Scope Assignment
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Organization - Required for almost all roles */}
                 <div className="space-y-2">
-                  <Label htmlFor="organization">Organization *</Label>
+                  <Label htmlFor="organization" className="text-sm">Organization *</Label>
                   <Select
                     value={organizationId}
                     onValueChange={handleOrganizationChange}
                     required
                     disabled={!!currentUserRole?.organization_id}
                   >
-                    <SelectTrigger id="organization">
+                    <SelectTrigger id="organization" className="h-10 text-sm">
                       <SelectValue placeholder="Select organization" />
                     </SelectTrigger>
                     <SelectContent>

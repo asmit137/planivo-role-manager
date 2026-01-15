@@ -223,6 +223,64 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       let effectiveAction = action;
       let rejectionReason = '';
       // Check for conflicts before approval (only for Department Head level)
+      if (action === 'approve') {
+        // 1. Fetch Plan Details to get staff and type
+        const { data: planDetails } = await supabase
+          .from('vacation_plans')
+          .select('staff_id, vacation_type_id, department_id, departments(facility_id, facilities(workspace_id, workspaces(organization_id)))')
+          .eq('id', planId)
+          .single();
+
+        if (planDetails) {
+          // 2. Determine Organization ID (traverse up)
+          // The plan -> department -> facility -> workspace -> organization
+          const orgId = (planDetails.departments as any)?.facilities?.workspaces?.organization_id;
+
+          if (orgId) {
+            // 3. Check Organization Vacation Mode
+            const { data: orgData } = await supabase
+              .from('organizations')
+              .select('vacation_mode')
+              .eq('id', orgId)
+              .single();
+
+            if (orgData?.vacation_mode === 'full') {
+              // 4. Fetch Current Balance
+              const currentYear = new Date().getFullYear();
+              const { data: balanceData } = await supabase
+                .from('leave_balances')
+                .select('balance')
+                .eq('staff_id', planDetails.staff_id)
+                .eq('vacation_type_id', planDetails.vacation_type_id)
+                .eq('year', currentYear)
+                .maybeSingle();
+
+              // 5. Calculate Days to be Approved
+              // If selectedSplitIds is provided, calculate ONLY those.
+              // If not (e.g. quick approve?), use all splits? 
+              // The confirmApproval function ENSURES selectedSplitIds is populated.
+              // But let's be safe and fetch splits if needed, though we have selectedSplitIds arg.
+
+              let approvedDays = 0;
+              if (selectedSplitIds && selectedSplitIds.length > 0) {
+                const { data: splits } = await supabase
+                  .from('vacation_splits')
+                  .select('days')
+                  .in('id', selectedSplitIds);
+
+                if (splits) {
+                  approvedDays = splits.reduce((acc, curr) => acc + curr.days, 0);
+                }
+              }
+
+              if (balanceData && balanceData.balance < approvedDays) {
+                throw new Error('INSUFFICIENT_BALANCE');
+              }
+            }
+          }
+        }
+      }
+
       if (action === 'approve' && approvalLevel === 1 && !hasConflict) {
         const { data: planData } = await supabase
           .from('vacation_plans')
@@ -392,11 +450,14 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
           .eq('id', user?.id) as any)
           .single();
 
+        const finalComment = (effectiveAction === 'reject' && rejectionReason) ? rejectionReason : (comments || '');
+
         await sendVacationStatusNotification(
           planId,
           newStatus,
           planData.staff_id,
-          approverProfile?.full_name
+          approverProfile?.full_name,
+          finalComment
         );
       }
     },

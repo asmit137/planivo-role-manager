@@ -112,37 +112,40 @@ const OrganizationScheduleMonitor = ({ organizationId }: OrganizationScheduleMon
   return (
     <div className="space-y-6">
       {/* Stats Overview */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-2 sm:gap-4 grid-cols-2 md:grid-cols-3">
         <StatsCard
-          title="Published Schedules"
+          title="Published"
           value={scheduleStats?.published || 0}
           icon={Calendar}
-          description="Active schedules"
+          description="Active"
+          className="p-3 sm:p-6"
         />
         <StatsCard
-          title="Draft Schedules"
+          title="Draft"
           value={scheduleStats?.draft || 0}
           icon={FileText}
-          description="Pending publication"
+          description="Pending"
+          className="p-3 sm:p-6"
         />
         <StatsCard
-          title="Total Schedules"
+          title="Total"
           value={scheduleStats?.total || 0}
           icon={Clock}
-          description="All schedules"
+          description="All"
+          className="p-3 sm:p-6 col-span-2 sm:col-span-1"
         />
       </div>
 
       {/* Recent Schedules */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="px-3 sm:px-6">
+          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
             <Calendar className="h-5 w-5 text-primary" />
             Recent Schedules
           </CardTitle>
-          <CardDescription>Latest schedules across your organization</CardDescription>
+          <CardDescription className="text-xs sm:text-sm">Latest schedules in your organization</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           {!recentSchedules || recentSchedules.length === 0 ? (
             <EmptyState
               icon={Calendar}
@@ -152,17 +155,24 @@ const OrganizationScheduleMonitor = ({ organizationId }: OrganizationScheduleMon
           ) : (
             <div className="space-y-3">
               {recentSchedules.map((schedule: any) => (
-                <div key={schedule.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                <div key={schedule.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border bg-muted/30 gap-3">
                   <div className="space-y-1">
-                    <p className="font-medium">{schedule.name}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between sm:justify-start gap-2">
+                      <p className="font-medium text-sm sm:text-base">{schedule.name}</p>
+                      <div className="sm:hidden">
+                        {getStatusBadge(schedule.status)}
+                      </div>
+                    </div>
+                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">
                       {schedule.facilityName} · {schedule.departmentName}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
                       {format(new Date(schedule.start_date), 'MMM d')} - {format(new Date(schedule.end_date), 'MMM d, yyyy')} · {schedule.shift_count} shifts
                     </p>
                   </div>
-                  {getStatusBadge(schedule.status)}
+                  <div className="hidden sm:block">
+                    {getStatusBadge(schedule.status)}
+                  </div>
                 </div>
               ))}
             </div>

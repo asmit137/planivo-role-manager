@@ -11,11 +11,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { CalendarIcon, Plus, Trash2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { sendVacationStatusNotification } from '@/lib/vacationNotifications';
 
 interface VacationSplit {
   start_date: Date;
@@ -82,12 +83,20 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
   // Fetch all departments for Super Admin
   const { data: allDepartments } = useQuery({
-    queryKey: ['all-departments'],
+    queryKey: ['all-departments', currentOrganization?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('departments')
-        .select('id, name, facilities(name)')
+        .select('id, name, facilities!inner(name, workspaces!inner(organizations!inner(id, is_active)))')
+        .eq('facilities.workspaces.organizations.is_active', true)
         .order('name');
+
+      // If specific organization is selected (and not 'all'), filter by it
+      if (currentOrganization?.id && currentOrganization.id !== 'all') {
+        query = query.eq('facilities.workspaces.organizations.id', currentOrganization.id);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -212,7 +221,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       if (error) throw error;
       return data;
     },
-    enabled: !!targetStaffIdForBalance && currentOrganization?.vacation_mode === 'full',
+    enabled: !!targetStaffIdForBalance, // Removed && currentOrganization?.vacation_mode === 'full'
   });
 
   const createPlanMutation = useMutation({
@@ -224,7 +233,9 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
         throw new Error('No department ID available');
       }
 
-      // Check validation only if NOT in planning mode
+      // Check validation only if NOT in planning mode OR if explicitly requested (e.g. strict check passed)
+      // Actually, we perform checks in handleSubmit. Here we just trust the inputs mostly, 
+      // EXCEPT for concurrency checks which are still good.
       if (currentOrganization?.vacation_mode !== 'planning') {
         // Check for same-user overlapping vacation plans
         const targetStaffId = effectiveStaffOnly ? user?.id : planData.staff_id;
@@ -235,8 +246,12 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
         if (userOverlaps && Array.isArray(userOverlaps) && userOverlaps.length > 0) {
           const overlap = userOverlaps[0] as any;
+          const sDate = new Date(overlap.start_date);
+          const eDate = new Date(overlap.end_date);
+          const startStr = !isNaN(sDate.getTime()) ? format(sDate, 'PPP') : 'Unknown Start';
+          const endStr = !isNaN(eDate.getTime()) ? format(eDate, 'PPP') : 'Unknown End';
           throw new Error(
-            `You already have a vacation request from ${format(new Date(overlap.start_date), 'PPP')} to ${format(new Date(overlap.end_date), 'PPP')} (${overlap.vacation_type}) that overlaps with this date range.`
+            `You already have a vacation request from ${startStr} to ${endStr} (${overlap.vacation_type}) that overlaps with this date range.`
           );
         }
 
@@ -251,7 +266,9 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
           if (shifts && shifts.length > 0) {
             const s = shifts[0] as any;
-            throw new Error(`Conflict with shift: ${s.shifts?.name} on ${format(new Date(s.assignment_date), 'PPP')}. Please resolve the schedule conflict first.`);
+            const aDate = new Date(s.assignment_date);
+            const dateStr = !isNaN(aDate.getTime()) ? format(aDate, 'PPP') : 'Unknown Date';
+            throw new Error(`Conflict with shift: ${s.shifts?.name} on ${dateStr}. Please resolve the schedule conflict first.`);
           }
 
           // Check for Training/Meeting Events
@@ -265,7 +282,9 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
           if (trainingTargets && trainingTargets.length > 0) {
             const t = trainingTargets[0] as any;
-            throw new Error(`Conflict with ${t.training_events?.event_type || 'training'}: ${t.training_events?.title} on ${format(new Date(t.training_events?.start_datetime), 'PPP')}.`);
+            const tDate = new Date(t.training_events?.start_datetime);
+            const dateStr = !isNaN(tDate.getTime()) ? format(tDate, 'PPP') : 'Unknown Date';
+            throw new Error(`Conflict with ${t.training_events?.event_type || 'training'}: ${t.training_events?.title} on ${dateStr}.`);
           }
         }
       }
@@ -279,7 +298,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
           total_days: planData.total_days,
           notes: planData.notes,
           created_by: user?.id,
-          status: 'pending_approval',
+          status: planData.status || 'pending_approval', // Use passed status
         })
         .select()
         .single();
@@ -293,6 +312,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
             planData.splits.map((split: any) => ({
               vacation_plan_id: plan.id,
               ...split,
+              status: planData.status === 'approved' ? 'approved' : 'pending', // Auto-approve splits too
             }))
           );
         if (splitsError) throw splitsError;
@@ -300,10 +320,24 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
       return plan;
     },
-    onSuccess: () => {
+    onSuccess: async (data, variables: any) => {
       queryClient.invalidateQueries({ queryKey: ['vacation-plans'] });
       queryClient.invalidateQueries({ queryKey: ['vacations'] });
-      toast.success('Vacation plan created');
+
+      // Send notification if approved
+      if (variables.status === 'approved') {
+        await sendVacationStatusNotification(
+          data.id,
+          'approved',
+          variables.staff_id,
+          userProfile?.full_name || 'Manager',
+          'Auto-approved by manager'
+        );
+        toast.success('Vacation plan created and approved successfully');
+      } else {
+        toast.success('Vacation plan created');
+      }
+
       resetForm();
     },
     onError: (error: any) => {
@@ -329,15 +363,36 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
   const updateSplit = (index: number, field: keyof VacationSplit, value: any) => {
     const newSplits = [...splits];
+    const vacationType = vacationTypes?.find(t => t.id === selectedVacationType);
+    const maxDays = vacationType?.max_days;
+
     newSplits[index] = { ...newSplits[index], [field]: value };
 
-    if (field === 'start_date' || field === 'end_date') {
-      const start = new Date(newSplits[index].start_date);
-      const end = new Date(newSplits[index].end_date);
+    if (field === 'start_date') {
+      const start = new Date(value);
+      if (start && !isNaN(start.getTime()) && maxDays) {
+        // Automatically set end_date based on max_days
+        const autoEndDate = addDays(start, maxDays - 1);
+        newSplits[index].end_date = autoEndDate;
+        newSplits[index].days = maxDays;
+      } else if (start && !isNaN(start.getTime())) {
+        // If no maxDays, ensure end_date is at least start_date
+        if (newSplits[index].end_date < start) {
+          newSplits[index].end_date = start;
+          newSplits[index].days = 1;
+        } else {
+          const end = new Date(newSplits[index].end_date);
+          const diffTime = Math.abs(end.getTime() - start.getTime());
+          newSplits[index].days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        }
+      }
+    }
 
-      // Only validate if both dates are set and valid
+    if (field === 'end_date') {
+      const start = new Date(newSplits[index].start_date);
+      const end = new Date(value);
+
       if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
-        // Validate end date is not before start date
         if (end < start) {
           toast.error('End date cannot be before start date');
           return;
@@ -345,6 +400,12 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
         const diffTime = Math.abs(end.getTime() - start.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+        if (maxDays && diffDays > maxDays) {
+          toast.warning(`You can plan the vacation only for ${maxDays} days for this vacation type`);
+          // Optionally reset to max allowed, or just warn. User said "show the message".
+        }
+
         newSplits[index].days = diffDays;
       }
     }
@@ -385,16 +446,39 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
     const totalDays = splits.reduce((sum, split) => sum + split.days, 0);
 
-    // Balance check for 'full' mode
-    if (currentOrganization?.vacation_mode === 'full') {
-      const typeBalance = (staffBalances as any)?.find((b: any) => b.vacation_type_id === selectedVacationType);
-      if (!typeBalance) {
-        toast.error('No leave balance found for this vacation type for the selected staff.');
-        return;
+    // Manager Auto-Approval Logic
+    const isManagerPlanning = (isSuperAdmin || isSupervisor || isDepartmentHead) && selectedStaff && selectedStaff !== user?.id;
+    let initialStatus = 'pending_approval';
+
+    if (isManagerPlanning) {
+      if (currentOrganization?.vacation_mode === 'full') {
+        const typeBalance = (staffBalances as any)?.find((b: any) => b.vacation_type_id === selectedVacationType);
+
+        // Strict balance check for Managers in Full Mode
+        if (!typeBalance || totalDays > (typeBalance as any).balance) {
+          const typeName = vacationTypes?.find(t => t.id === selectedVacationType)?.name || 'this vacation type';
+          const balance = typeBalance ? (typeBalance as any).balance : 0;
+          toast.error(`Insufficient leave balance. You are requesting ${totalDays} days, but only ${balance} days remain for ${typeName}. Cannot auto-approve.`);
+          return;
+        }
+        initialStatus = 'approved';
+      } else if (currentOrganization?.vacation_mode === 'planning') {
+        // Planning mode: Skip balance check and Auto-Approve
+        initialStatus = 'approved';
       }
-      if ((typeBalance as any).balance !== undefined && totalDays > (typeBalance as any).balance) {
-        toast.error(`Insufficient leave balance. You are requesting ${totalDays} days, but only ${(typeBalance as any).balance} days remain.`);
-        return;
+    } else {
+      // Regular user or Self-Planning
+      const typeBalance = (staffBalances as any)?.find((b: any) => b.vacation_type_id === selectedVacationType);
+
+      // Balance check (Always enforce if balance exists and not in planning mode)
+      if (currentOrganization?.vacation_mode === 'full') {
+        if (typeBalance) {
+          if (totalDays > (typeBalance as any).balance) {
+            const typeName = vacationTypes?.find(t => t.id === selectedVacationType)?.name || 'this vacation type';
+            toast.error(`Insufficient leave balance. You are requesting ${totalDays} days, but only ${(typeBalance as any).balance} days remain for ${typeName}.`);
+            return;
+          }
+        }
       }
     }
 
@@ -403,6 +487,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       vacation_type_id: selectedVacationType,
       total_days: totalDays,
       notes,
+      status: initialStatus, // Pass status to mutation
       splits: splits.map(split => ({
         start_date: format(split.start_date, 'yyyy-MM-dd'),
         end_date: format(split.end_date, 'yyyy-MM-dd'),

@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { UserPlus, Filter, Pencil, Trash2, FileSpreadsheet, Lock } from 'lucide-react';
+import { UserPlus, RefreshCw, Pencil, Trash2, FileSpreadsheet, Lock, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,7 +35,14 @@ interface UnifiedUserHubProps {
   currentUserCount?: number;
 }
 
-const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, currentUserCount }: UnifiedUserHubProps) => {
+const UnifiedUserHub = ({
+  scope,
+  scopeId,
+  mode,
+  organizationId,
+  maxUsers,
+  currentUserCount
+}: UnifiedUserHubProps) => {
   const [unifiedCreateOpen, setUnifiedCreateOpen] = useState(false);
   const [filterWorkspace, setFilterWorkspace] = useState<string>('all');
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
@@ -52,11 +59,25 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
   // Check if current user is super admin
   const isSuperAdmin = userRoles?.some(r => r.role === 'super_admin');
 
-  // Auto-detect scope from user's role if not provided
-  const detectedScope: 'system' | 'workspace' | 'facility' | 'department' =
-    scope || (userRoles?.[0]?.role === 'super_admin' ? 'system' :
-      userRoles?.[0]?.role === 'department_head' ? 'department' : 'system');
-  const detectedScopeId = scopeId || userRoles?.[0]?.department_id || userRoles?.[0]?.facility_id || userRoles?.[0]?.workspace_id;
+  // Improved Scope Detection
+  const superAdminRole = userRoles?.find(r => r.role === 'super_admin' || r.role === 'organization_admin');
+  const deptHeadRole = userRoles?.find(r => r.role === 'department_head');
+  const facilitySuperRole = userRoles?.find(r => r.role === 'facility_supervisor');
+  const workspaceSuperRole = userRoles?.find(r => r.role === 'workplace_supervisor' || r.role === 'workspace_supervisor');
+
+  const detectedScope: 'system' | 'workspace' | 'facility' | 'department' = scope || (
+    superAdminRole ? 'system' :
+      deptHeadRole ? 'department' :
+        facilitySuperRole ? 'facility' :
+          workspaceSuperRole ? 'workspace' : 'system'
+  );
+
+  const detectedScopeId = scopeId || (
+    detectedScope === 'department' ? deptHeadRole?.department_id :
+      detectedScope === 'facility' ? facilitySuperRole?.facility_id :
+        detectedScope === 'workspace' ? workspaceSuperRole?.workspace_id :
+          undefined
+  );
 
   const { selectedOrganizationId } = useOrganization();
 
@@ -95,7 +116,7 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
     queryFn: async () => {
       let query = supabase
         .from('departments')
-        .select('*, facilities(workspace_id, workspaces(organization_id))')
+        .select('*, facilities(name, workspace_id, workspaces(organization_id))')
         .order('name');
 
       if (activeOrganizationId && activeOrganizationId !== 'all') {
@@ -111,12 +132,20 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
   const { data: users, isLoading: usersLoading, error: usersError } = useQuery({
     queryKey: ['unified-users', detectedScope, detectedScopeId, activeOrganizationId, filterWorkspace, filterDepartment],
     queryFn: async () => {
+      console.log(`[UnifiedUserHub] Scope: ${detectedScope}, ScopeId: ${detectedScopeId}, OrgId: ${activeOrganizationId}`);
+
       // Build optimized query based on scope
+      // Use !inner for scoped views to filter profiles to those in the scope
+      // Use !inner if an organization is selected to prevent leaking all users
+      // Use left join (default) for system view with 'all' organizations to include users without roles
+      const isFilteredByOrg = activeOrganizationId && activeOrganizationId !== 'all';
+      const joinType = (detectedScope && detectedScope !== 'system') || isFilteredByOrg ? '!inner' : '';
+
       let query = supabase
         .from('profiles')
         .select(`
           *,
-          user_roles!inner(
+          user_roles${joinType}(
             *,
             custom_role:custom_roles(id, name)
           )
@@ -124,21 +153,26 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
         .order('created_at', { ascending: false });
 
       if (detectedScope === 'department' && detectedScopeId) {
+        console.log(`[UnifiedUserHub] Filtering by Department: ${detectedScopeId}`);
         query = query
-          .eq('user_roles.department_id', detectedScopeId)
-          .in('user_roles.role', ['staff', 'department_head']);
+          .eq('user_roles.department_id', detectedScopeId);
       } else if (detectedScope === 'facility' && detectedScopeId) {
         query = query.eq('user_roles.facility_id', detectedScopeId);
       } else if (detectedScope === 'workspace' && detectedScopeId) {
         query = query.eq('user_roles.workspace_id', detectedScopeId);
-      } else if (activeOrganizationId && activeOrganizationId !== 'all') {
+      } else if (isFilteredByOrg) {
         // Core organization filter - always apply if we have an org context (and it's not 'all')
         // This ensures we normally don't leak users across organizations, but allows 'all' for super admins
         query = query.eq('user_roles.organization_id', activeOrganizationId);
       }
 
       const { data: profilesWithRoles, error: queryError } = await query;
-      if (queryError) throw queryError;
+      if (queryError) {
+        console.error('[UnifiedUserHub] Query Error:', queryError);
+        throw queryError;
+      }
+
+      console.log(`[UnifiedUserHub] Fetched ${profilesWithRoles?.length} users`);
 
       // Map back to the structure the component expects
       return (profilesWithRoles || []).map((p: any) => ({
@@ -147,6 +181,11 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
       }));
     },
   });
+
+  const handleManualRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['unified-users'] });
+    toast.info('Refreshing user list...');
+  };
 
   // Secondary filters (dropdowns)
   const filteredProfiles = (users || []).filter((user: any) => {
@@ -372,10 +411,17 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
         }
 
         const specialty = allDepartments?.find((d) => d.id === departmentRole.specialty_id);
-        return specialty ? (
-          <Badge variant="outline">{specialty.name}</Badge>
-        ) : (
-          <Badge variant="outline" className="opacity-50">Unknown specialty</Badge>
+        const facilityName = (specialty as any)?.facilities?.name;
+
+        return (
+          <div className="flex flex-col gap-1">
+            <Badge variant="outline">{specialty ? specialty.name : 'Unknown specialty'}</Badge>
+            {facilityName && (
+              <span className="text-[10px] text-muted-foreground italic">
+                ({facilityName})
+              </span>
+            )}
+          </div>
         );
       },
     });
@@ -445,6 +491,143 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
   // Check if user limit is reached
   const isAtUserLimit = maxUsers !== null && maxUsers !== undefined && (currentUserCount || 0) >= maxUsers;
 
+  // Mobilized user card component
+  const UserCard = ({ user }: { user: any }) => {
+    return (
+      <Card className="mb-3 border border-border/60 bg-card/50 hover:border-primary/40 transition-all duration-200">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex justify-between items-start mb-2 gap-2">
+            <div className="space-y-0.5 min-w-0 flex-1">
+              <h4 className="font-semibold text-sm sm:text-[15px] leading-tight truncate">{user.full_name}</h4>
+              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{user.email}</p>
+            </div>
+            <div className="shrink-0 pt-0.5">
+              {hasEditPermission ? (
+                <Switch
+                  checked={user.is_active ?? false}
+                  onCheckedChange={() => handleToggleActive(user.id, user.is_active ?? false)}
+                  disabled={toggleActiveMutation.isPending}
+                  className="scale-90 sm:scale-100"
+                />
+              ) : (
+                <Badge variant={user.is_active ? 'default' : 'secondary'} className="text-[9px] sm:text-[10px] h-4 sm:h-5 px-1.5 font-normal">
+                  {user.is_active ? 'Active' : 'Inactive'}
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1 mt-2.5">
+            {user.roles.map((roleData: any, idx: number) => (
+              <Badge key={idx} variant="secondary" className="text-[10px] bg-secondary/40 hover:bg-secondary/60 transition-colors">
+                {roleData.role === 'custom' && roleData.custom_role?.name
+                  ? roleData.custom_role.name
+                  : roleData.role === 'workplace_supervisor'
+                    ? 'Workspace Supervisor'
+                    : roleData.role.replace(/_/g, ' ')}
+              </Badge>
+            ))}
+            {user.roles.length === 0 && (
+              <span className="text-[10px] text-muted-foreground italic">No roles</span>
+            )}
+          </div>
+
+          {detectedScope === 'department' && (
+            <div className="mt-2 pt-2 border-t border-dashed">
+              <SpecialtyBadge user={user} />
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 mt-4 pt-2 border-t">
+            {hasEditPermission && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleEdit(user)}
+                className="h-8 text-[11px] sm:text-xs flex-1 px-2"
+              >
+                <Pencil className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
+                Edit
+              </Button>
+            )}
+            {(hasDeletePermission && detectedScope === 'department') || isSuperAdmin ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDeleteClick(user.id)}
+                disabled={deleteUserMutation.isPending && deleteUserId === user.id}
+                className="h-8 text-[11px] sm:text-xs text-destructive border-destructive/20 hover:bg-destructive/10 flex-1 px-2"
+              >
+                <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
+                Remove
+              </Button>
+            ) : null}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const SpecialtyBadge = ({ user }: { user: any }) => {
+    const departmentRole = user.roles.find((r: any) => r.department_id === detectedScopeId);
+    if (!departmentRole?.specialty_id) {
+      return <span className="text-[10px] text-muted-foreground">Specialty: Not assigned</span>;
+    }
+
+    const specialty = allDepartments?.find((d) => d.id === departmentRole.specialty_id);
+    const facilityName = (specialty as any)?.facilities?.name;
+
+    return (
+      <div className="flex items-center gap-1.5 text-[10px]">
+        <span className="font-semibold shrink-0">Specialty:</span>
+        <Badge variant="secondary" className="text-[9px] py-0 h-4 px-1">{specialty ? specialty.name : 'Unknown'}</Badge>
+        {facilityName && (
+          <span className="text-muted-foreground italic truncate">({facilityName})</span>
+        )}
+      </div>
+    );
+  };
+
+  const UserListContent = () => {
+    return (
+      <>
+        {/* Mobile-Only Card View */}
+        <div className="md:hidden space-y-3">
+          {filteredProfiles.length > 0 ? (
+            filteredProfiles.map((user: any) => (
+              <UserCard key={user.id} user={user} />
+            ))
+          ) : (
+            <div className="p-8 text-center border-2 border-dashed rounded-lg bg-muted/20">
+              <p className="text-sm text-muted-foreground">No users found</p>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop-Only Table View */}
+        <div className="hidden md:block">
+          <DataTable
+            data={filteredProfiles}
+            columns={columns}
+            isLoading={usersLoading}
+            error={usersError as Error}
+            emptyState={{
+              title: 'No users found',
+              description: detectedScope === 'department'
+                ? 'Add staff members to your department to get started.'
+                : 'Create your first user to get started.',
+              action: hasEditPermission ? {
+                label: detectedScope === 'department' ? 'Add Staff' : 'Create User',
+                onClick: () => setUnifiedCreateOpen(true),
+              } : undefined,
+            }}
+          />
+        </div>
+      </>
+    );
+  };
+
+
   return (
     <ErrorBoundary
       fallback={
@@ -455,8 +638,7 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
         />
       }
     >
-
-      <>
+      <div className="space-y-4 w-full overflow-x-hidden">
         <UnifiedUserCreation
           open={unifiedCreateOpen}
           onOpenChange={setUnifiedCreateOpen}
@@ -471,20 +653,22 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
         />
 
         <AlertDialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
-          <AlertDialogContent>
+          <AlertDialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
             <AlertDialogHeader>
-              <AlertDialogTitle>{isSuperAdmin ? 'Permanently Delete User' : 'Remove User'}</AlertDialogTitle>
-              <AlertDialogDescription>
+              <AlertDialogTitle className="text-lg sm:text-xl">
+                {isSuperAdmin ? 'Permanently Delete User' : 'Remove User'}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-sm sm:text-base">
                 {isSuperAdmin
                   ? "Are you sure you want to permanently delete this user from the entire system? This action cannot be undone and will remove all their data and access."
                   : "Are you sure you want to remove this user from the department? This action cannot be undone."}
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+              <AlertDialogCancel className="w-full sm:w-auto mt-0">Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDeleteConfirm}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="w-full sm:w-auto bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 {isSuperAdmin ? 'Delete Permanently' : 'Remove'}
               </AlertDialogAction>
@@ -492,65 +676,80 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
           </AlertDialogContent>
         </AlertDialog>
 
-        <Card className="border-2">
-          <CardHeader>
+        <Card className="border-2 shadow-sm">
+          <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4 gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <CardTitle className="text-lg sm:text-xl">{scopeTitle}</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">
-                  {scopeDescription}
+              <div className="space-y-1">
+                <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight">{scopeTitle}</CardTitle>
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardDescription className="text-xs sm:text-sm">
+                    {scopeDescription}
+                  </CardDescription>
                   {maxUsers !== null && maxUsers !== undefined && (
-                    <span className="ml-2 text-muted-foreground">
-                      ({currentUserCount || 0} / {maxUsers} users)
-                    </span>
+                    <Badge variant="secondary" className="px-1.5 py-0 h-5 font-normal text-[10px] sm:text-xs">
+                      {currentUserCount || 0} / {maxUsers} users
+                    </Badge>
                   )}
-                </CardDescription>
+                </div>
               </div>
-              <div className="flex gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleManualRefresh}
+                  disabled={usersLoading}
+                  className="shrink-0 h-10 w-10 sm:h-9 sm:w-9 bg-[#1A1F2C] border-[#2D3139] hover:bg-[#2D3139]"
+                  title="Refresh List"
+                >
+                  <RefreshCw className={`h-4 w-4 ${usersLoading ? 'animate-spin' : ''}`} />
+                </Button>
                 {hasEditPermission && (
                   <ActionButton
                     onClick={() => setUnifiedCreateOpen(true)}
-                    className="bg-gradient-primary w-full sm:w-auto min-h-[44px]"
+                    className="bg-[#6366f1] hover:bg-[#4f46e5] border-none text-white flex-1 sm:flex-none h-10 sm:h-9 px-3 sm:px-6"
                     disabled={isAtUserLimit}
                     title={isAtUserLimit ? 'User limit reached' : undefined}
                   >
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    <span className="sm:inline">{detectedScope === 'department' ? 'Add Staff' : 'Create User'}</span>
+                    <UserPlus className="mr-2 h-4 w-4 shrink-0" />
+                    <span className="text-sm font-semibold whitespace-nowrap">{detectedScope === 'department' ? 'Add Staff' : 'Create User'}</span>
                   </ActionButton>
                 )}
               </div>
             </div>
             {isAtUserLimit && (
-              <div className="mt-2 p-2 bg-destructive/10 border border-destructive/20 rounded text-sm text-destructive">
-                User limit reached. Contact your administrator to increase the limit.
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive font-medium flex items-center gap-2">
+                <Lock className="h-4 w-4 shrink-0" />
+                <span>User limit reached. Contact admin to increase.</span>
               </div>
             )}
           </CardHeader>
-          <CardContent>
+
+          <CardContent className="p-0 sm:p-6 pt-0">
             {hasBulkUpload && detectedScope === 'system' ? (
               <Tabs defaultValue="list" className="space-y-4">
-                <TabsList className="inline-flex h-auto gap-1 w-auto">
-                  <TabsTrigger value="list" className="min-h-[40px] px-4 text-sm">
-                    <Filter className="h-4 w-4 mr-2 shrink-0" />
-                    User List
-                  </TabsTrigger>
-                  <TabsTrigger value="bulk" className="min-h-[40px] px-4 text-sm">
-                    <FileSpreadsheet className="h-4 w-4 mr-2 shrink-0" />
-                    Bulk Upload
-                  </TabsTrigger>
-                </TabsList>
+                <div className="px-0 pt-0 sm:pt-0">
+                  <TabsList className="w-full h-auto min-h-10 bg-[#1A1F2C]/50 border border-[#2D3139] p-1 grid grid-cols-2">
+                    <TabsTrigger value="list" className="px-2 sm:px-4 text-[11px] sm:text-sm font-medium data-[state=active]:bg-[#1A1F2C] data-[state=active]:border-[#2D3139] data-[state=active]:text-white h-8 sm:h-9">
+                      <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2 shrink-0" />
+                      User List
+                    </TabsTrigger>
+                    <TabsTrigger value="bulk" className="px-2 sm:px-4 text-[11px] sm:text-sm font-medium data-[state=active]:bg-[#1A1F2C] data-[state=active]:border-[#2D3139] data-[state=active]:text-white h-8 sm:h-9">
+                      <FileSpreadsheet className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2 shrink-0" />
+                      Bulk Upload
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
 
-                <TabsContent value="list" className="space-y-4">
+                <TabsContent value="list" className="space-y-4 px-3 sm:px-0">
                   {detectedScope === 'system' && (
-                    <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
-                      <div className="flex items-center gap-2">
-                        <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <Label className="text-sm whitespace-nowrap shrink-0">Workspace:</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2">
+                      <div className="space-y-2 focus-within:text-primary">
+                        <Label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground ml-1">WORKSPACE</Label>
                         <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
-                          <SelectTrigger className="w-[180px] min-h-[40px]">
-                            <SelectValue placeholder="Select workspace" />
+                          <SelectTrigger className="h-10 sm:h-11 border-[#2D3139] bg-[#1A1F2C] text-sm font-medium">
+                            <SelectValue placeholder="All Workspaces" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-[#1A1F2C] border-[#2D3139]">
                             <SelectItem value="all">All Workspaces</SelectItem>
                             {workspaces?.map((workspace) => (
                               <SelectItem key={workspace.id} value={workspace.id}>
@@ -562,14 +761,13 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
                       </div>
 
                       {isSuperAdmin && (
-                        <div className="flex items-center gap-2">
-                          <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <Label className="text-sm whitespace-nowrap shrink-0">Department:</Label>
+                        <div className="space-y-2 focus-within:text-primary">
+                          <Label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground ml-1">DEPARTMENT</Label>
                           <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-                            <SelectTrigger className="w-[180px] min-h-[40px]">
-                              <SelectValue placeholder="Select department" />
+                            <SelectTrigger className="h-10 sm:h-11 border-[#2D3139] bg-[#1A1F2C] text-sm font-medium">
+                              <SelectValue placeholder="All Departments" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="bg-[#1A1F2C] border-[#2D3139]">
                               <SelectItem value="all">All Departments</SelectItem>
                               {allDepartments?.map((department) => (
                                 <SelectItem key={department.id} value={department.id}>
@@ -582,43 +780,24 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
                       )}
                     </div>
                   )}
-
-                  <DataTable
-                    data={filteredProfiles}
-                    columns={columns}
-                    isLoading={usersLoading}
-                    error={usersError as Error}
-                    emptyState={{
-                      title: 'No users found',
-                      description: (detectedScope as string) === 'department'
-                        ? 'Add staff members to your department to get started.'
-                        : 'Create your first user to get started.',
-                      action: hasEditPermission ? {
-                        label: (detectedScope as string) === 'department' ? 'Add Staff' : 'Create User',
-                        onClick: () => setUnifiedCreateOpen(true),
-                      } : undefined,
-                    }}
-                  />
+                  <UserListContent />
                 </TabsContent>
 
-                <TabsContent value="bulk">
+                <TabsContent value="bulk" className="px-3 sm:px-0 pb-4">
                   <BulkUserUpload organizationId={activeOrganizationId === 'all' ? undefined : activeOrganizationId} />
                 </TabsContent>
               </Tabs>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 px-3 sm:px-0 pt-2 sm:pt-0">
                 {detectedScope === 'system' && (
-                  <div className="flex flex-col gap-3 sm:gap-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Filter className="h-4 w-4 text-muted-foreground" />
-                        <Label className="text-sm whitespace-nowrap">Workspace:</Label>
-                      </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-2 sm:pb-0">
+                    <div className="space-y-2 focus-within:text-primary">
+                      <Label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground ml-1">WORKSPACE</Label>
                       <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
-                        <SelectTrigger className="w-full sm:w-48 md:w-64 min-h-[44px]">
-                          <SelectValue placeholder="Select workspace" />
+                        <SelectTrigger className="h-10 sm:h-11 border-[#2D3139] bg-[#1A1F2C] text-sm font-medium">
+                          <SelectValue placeholder="All Workspaces" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-[#1A1F2C] border-[#2D3139]">
                           <SelectItem value="all">All Workspaces</SelectItem>
                           {workspaces?.map((workspace) => (
                             <SelectItem key={workspace.id} value={workspace.id}>
@@ -630,16 +809,13 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
                     </div>
 
                     {isSuperAdmin && (
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Filter className="h-4 w-4 text-muted-foreground" />
-                          <Label className="text-sm whitespace-nowrap">Department:</Label>
-                        </div>
+                      <div className="space-y-2 focus-within:text-primary">
+                        <Label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground ml-1">DEPARTMENT</Label>
                         <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-                          <SelectTrigger className="w-full sm:w-48 md:w-64 min-h-[44px]">
-                            <SelectValue placeholder="Select department" />
+                          <SelectTrigger className="h-10 sm:h-11 border-[#2D3139] bg-[#1A1F2C] text-sm font-medium">
+                            <SelectValue placeholder="All Departments" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-[#1A1F2C] border-[#2D3139]">
                             <SelectItem value="all">All Departments</SelectItem>
                             {allDepartments?.map((department) => (
                               <SelectItem key={department.id} value={department.id}>
@@ -652,23 +828,7 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
                     )}
                   </div>
                 )}
-
-                <DataTable
-                  data={filteredProfiles}
-                  columns={columns}
-                  isLoading={usersLoading}
-                  error={usersError as Error}
-                  emptyState={{
-                    title: 'No users found',
-                    description: detectedScope === 'department'
-                      ? 'Add staff members to your department to get started.'
-                      : 'Create your first user to get started.',
-                    action: hasEditPermission ? {
-                      label: detectedScope === 'department' ? 'Add Staff' : 'Create User',
-                      onClick: () => setUnifiedCreateOpen(true),
-                    } : undefined,
-                  }}
-                />
+                <UserListContent />
               </div>
             )}
           </CardContent>
@@ -676,53 +836,55 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
 
         {/* Rate Limit Activity - Super Admin Only */}
         {isSuperAdmin && detectedScope === 'system' && (
-          <Card className="border-2 mt-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Lock className="h-5 w-5" />
+          <Card className="border-2 shadow-sm mt-6">
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <Lock className="h-5 w-5 text-primary" />
                 Rate Limit Activity
               </CardTitle>
-              <CardDescription>Recent rate limiting events and blocked requests</CardDescription>
+              <CardDescription className="text-xs sm:text-sm">Recent security events and blocked requests</CardDescription>
             </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[300px]">
+            <CardContent className="p-0 sm:p-6 pt-0">
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Identifier</TableHead>
-                      <TableHead>Action Type</TableHead>
-                      <TableHead>Request Count</TableHead>
-                      <TableHead>Window Start</TableHead>
-                      <TableHead>Status</TableHead>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="w-[100px] sm:w-auto">Identifier</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="text-center">Count</TableHead>
+                      <TableHead className="hidden sm:table-cell">Time</TableHead>
+                      <TableHead className="text-right">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {rateLimits?.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground italic">
                           No rate limit events recorded
                         </TableCell>
                       </TableRow>
                     ) : (
                       rateLimits?.map(limit => (
-                        <TableRow key={limit.id}>
-                          <TableCell className="font-mono text-xs">{limit.identifier.slice(0, 20)}...</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{limit.action_type}</Badge>
+                        <TableRow key={limit.id} className="hover:bg-muted/10">
+                          <TableCell className="font-mono text-[10px] sm:text-xs">
+                            {limit.identifier.slice(0, 12)}...
                           </TableCell>
                           <TableCell>
-                            <span className={(limit.request_count || 0) >= 10 ? 'text-red-500 font-bold' : ''}>
+                            <Badge variant="outline" className="text-[9px] sm:text-xs">{limit.action_type}</Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className={`text-xs font-medium ${(limit.request_count || 0) >= 10 ? 'text-red-500 font-bold' : ''}`}>
                               {limit.request_count}
                             </span>
                           </TableCell>
-                          <TableCell className="text-xs">
-                            {limit.window_start ? format(new Date(limit.window_start), 'MMM d, HH:mm:ss') : '-'}
+                          <TableCell className="text-[10px] sm:text-xs text-muted-foreground hidden sm:table-cell">
+                            {limit.window_start ? format(new Date(limit.window_start), 'MMM d, HH:mm') : '-'}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="text-right">
                             {(limit.request_count || 0) >= 10 ? (
-                              <Badge className="bg-red-500/20 text-red-400">Blocked</Badge>
+                              <Badge className="bg-red-500/20 text-red-500 hover:bg-red-500/30 border-none px-2 py-0 h-5">Blocked</Badge>
                             ) : (
-                              <Badge className="bg-green-500/20 text-green-400">Active</Badge>
+                              <Badge className="bg-green-500/20 text-green-500 hover:bg-green-500/30 border-none px-2 py-0 h-5">Active</Badge>
                             )}
                           </TableCell>
                         </TableRow>
@@ -730,11 +892,11 @@ const UnifiedUserHub = ({ scope, scopeId, mode, organizationId, maxUsers, curren
                     )}
                   </TableBody>
                 </Table>
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
         )}
-      </>
+      </div>
     </ErrorBoundary>
   );
 };

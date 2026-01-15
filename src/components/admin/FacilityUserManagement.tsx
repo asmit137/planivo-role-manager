@@ -133,6 +133,18 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
     mutationFn: async (data: { name: string; workspace_id: string }) => {
       const validated = facilitySchema.parse(data);
 
+      // Check for duplicate name in this workspace
+      const { data: existing } = await supabase
+        .from('facilities')
+        .select('id')
+        .eq('workspace_id', validated.workspace_id)
+        .ilike('name', validated.name)
+        .maybeSingle();
+
+      if (existing) {
+        throw new Error('A facility with this name already exists in this workspace');
+      }
+
       const { data: facility, error } = await supabase
         .from('facilities')
         .insert({
