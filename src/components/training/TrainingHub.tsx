@@ -31,6 +31,9 @@ const TrainingHub = () => {
     ['super_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor'].includes(r.role)
   );
 
+  const orgAdminRole = roles?.find(r => r.role === 'organization_admin');
+  const userOrgId = orgAdminRole?.organization_id;
+
   if (isLoading) {
     return <LoadingState message="Loading training module..." />;
   }
@@ -104,7 +107,7 @@ const TrainingHub = () => {
           {isAdmin && (
             <>
               <TabsContent value="create">
-                <TrainingEventForm />
+                <TrainingEventForm organizationId={userOrgId || undefined} />
               </TabsContent>
 
               <TabsContent value="manage">

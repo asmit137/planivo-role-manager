@@ -67,7 +67,7 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
         .maybeSingle();
 
       const workspaceId = (currentDept?.facilities as any)?.workspace_id;
-      
+
       // Try workspace-assigned departments first
       if (workspaceId) {
         const { data: workspaceDepts } = await supabase
@@ -92,12 +92,12 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
         .eq('is_template', true)
         .is('parent_department_id', null)
         .order('name');
-      
+
       if (error) {
         console.error('Error fetching departments:', error);
         return [];
       }
-      
+
       return templateDepts || [];
     },
   });
@@ -123,19 +123,31 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
   // Create schedule mutation
   const createSchedule = useMutation({
     mutationFn: async () => {
-      // Get user's facility and workspace from their role
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('facility_id, workspace_id, facilities(workspace_id)')
-        .eq('user_id', user?.id)
-        .not('facility_id', 'is', null)
-        .maybeSingle();
-
-      const facilityId = userRole?.facility_id;
-      const workspaceId = userRole?.workspace_id || (userRole?.facilities as any)?.workspace_id;
-
       // Use first selected department for the schedule
       const primaryDepartmentId = selectedDepartments[0] || departmentId;
+
+      // Fetch department info to get correct facility and workspace
+      const { data: deptInfo } = await supabase
+        .from('departments')
+        .select('facility_id, facilities(workspace_id)')
+        .eq('id', primaryDepartmentId)
+        .single();
+
+      const facilityId = deptInfo?.facility_id;
+      const workspaceId = (deptInfo?.facilities as any)?.workspace_id;
+
+      // Check for duplicate name in department
+      const { data: existingSchedule } = await supabase
+        .from('schedules')
+        .select('id')
+        .eq('workspace_id', workspaceId)
+        .eq('department_id', primaryDepartmentId)
+        .eq('name', name)
+        .maybeSingle();
+
+      if (existingSchedule) {
+        throw new Error(`A schedule with the name "${name}" already exists in this department.`);
+      }
 
       const { data: schedule, error: scheduleError } = await supabase
         .from('schedules')
@@ -235,7 +247,7 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
   };
 
   const toggleDepartment = (deptId: string) => {
-    setSelectedDepartments(prev => 
+    setSelectedDepartments(prev =>
       prev.includes(deptId)
         ? prev.filter(id => id !== deptId)
         : [...prev, deptId]
@@ -353,8 +365,8 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
                             checked={selectedDepartments.includes(dept.id)}
                             onCheckedChange={() => toggleDepartment(dept.id)}
                           />
-                          <Label 
-                            htmlFor={`dept-${dept.id}`} 
+                          <Label
+                            htmlFor={`dept-${dept.id}`}
                             className="cursor-pointer text-sm font-normal"
                           >
                             {dept.name}

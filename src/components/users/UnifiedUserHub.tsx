@@ -115,20 +115,60 @@ const UnifiedUserHub = ({
   const { data: allDepartments } = useQuery({
     queryKey: ['all-departments', activeOrganizationId],
     queryFn: async () => {
-      let query = supabase
-        .from('departments')
-        .select('*, facilities(name, workspace_id, workspaces(organization_id))')
-        .order('name');
-
+      // If filtering by organization, first get workspace IDs for that organization
       if (activeOrganizationId && activeOrganizationId !== 'all') {
-        query = query.eq('facilities.workspaces.organization_id', activeOrganizationId);
+        // Get workspaces for this organization
+        const { data: workspaces, error: workspaceError } = await supabase
+          .from('workspaces')
+          .select('id')
+          .eq('organization_id', activeOrganizationId);
+
+        if (workspaceError) throw workspaceError;
+
+        const workspaceIds = workspaces?.map(w => w.id) || [];
+
+        if (workspaceIds.length === 0) {
+          return []; // No workspaces, so no departments
+        }
+
+        // Get facilities for these workspaces
+        const { data: facilities, error: facilityError } = await supabase
+          .from('facilities')
+          .select('id')
+          .in('workspace_id', workspaceIds);
+
+        if (facilityError) throw facilityError;
+
+        const facilityIds = facilities?.map(f => f.id) || [];
+
+        if (facilityIds.length === 0) {
+          return []; // No facilities, so no departments
+        }
+
+        // Get departments for these facilities
+        const { data, error } = await supabase
+          .from('departments')
+          .select('*, facilities(name, workspace_id)')
+          .in('facility_id', facilityIds)
+          .order('name');
+
+        if (error) throw error;
+        return data;
       }
 
-      const { data, error } = await query;
+      // No organization filter - get all departments
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*, facilities(name, workspace_id)')
+        .order('name');
+
       if (error) throw error;
       return data;
     },
   });
+
+  console.log("allDepartments", allDepartments);
+  console.log("activeOrganizationId", activeOrganizationId);
 
   const { data: users, isLoading: usersLoading, error: usersError } = useQuery({
     queryKey: ['unified-users', detectedScope, detectedScopeId, activeOrganizationId, filterWorkspace, filterDepartment],
@@ -279,10 +319,23 @@ const UnifiedUserHub = ({
 
         // Use Edge Function only (RPC fallback disabled)
         const { data, error } = await supabase.functions.invoke('delete-user', {
-          body: { userId }
+          body: { userId },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
         });
 
         if (error) {
+          console.error("Delete user error:", error);
+          if (error.context && typeof error.context.json === 'function') {
+            try {
+              const body = await error.context.json();
+              console.log("Delete error body:", body);
+              if (body.error) throw new Error(body.error);
+            } catch (e) {
+              console.error("Failed to parse delete error body", e);
+            }
+          }
           throw error;
         }
         return data;

@@ -444,7 +444,7 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
           <div className="space-y-1">
             <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight">Workspaces</CardTitle>
             <CardDescription className="text-xs sm:text-sm">
-              Manage {workspaceId ? 'this workspace' : 'all system workspaces'}
+              Manage {workspaceId ? 'this workspace' : (organizationId && organizationId !== 'all' ? 'organization workspaces' : 'all system workspaces')}
               {maxWorkspaces !== null && maxWorkspaces !== undefined && (
                 <span className="block sm:inline sm:ml-2 text-muted-foreground mt-1 sm:mt-0 font-medium">
                   ({currentWorkspaceCount || 0} / {maxWorkspaces} workspaces)

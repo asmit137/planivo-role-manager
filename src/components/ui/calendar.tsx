@@ -17,14 +17,14 @@ function Calendar({
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn(
-        "p-3 sm:p-4 w-full max-w-full overflow-x-hidden pointer-events-auto",
+        "p-3 sm:p-4 overflow-x-hidden pointer-events-auto",
         className
       )}
       classNames={{
         /* Layout */
         months:
-          "flex flex-col sm:flex-row gap-4 sm:gap-6 w-full justify-center",
-        month: "space-y-4 w-full",
+          "flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center",
+        month: "space-y-4",
         caption:
           "relative flex items-center justify-center h-10 w-full px-8",
         caption_label:
@@ -38,11 +38,11 @@ function Calendar({
         nav_button_next: "absolute right-1",
 
         /* Table */
-        table: "w-full border-collapse table-fixed",
-        head_row: "grid grid-cols-7 w-full mb-2",
+        table: "border-collapse",
+        head_row: "grid grid-cols-7 mb-2",
         head_cell:
-          "text-muted-foreground font-semibold text-[0.6rem] sm:text-[0.75rem] uppercase tracking-[0.2em] text-center",
-        row: "grid grid-cols-7 w-full mt-1",
+          "text-muted-foreground font-semibold text-[0.6rem] sm:text-[0.75rem] uppercase tracking-[0.2em] text-center w-8 sm:w-9",
+        row: "grid grid-cols-7 mt-1",
 
         /* Cells */
         cell: cn(

@@ -4,13 +4,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Building2, Users, MapPin, Edit } from 'lucide-react';
+import { Building2, Users, MapPin, Edit, Trash2 } from 'lucide-react';
 import { LoadingState } from '@/components/layout/LoadingState';
 import { EmptyState } from '@/components/layout/EmptyState';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
 interface OrganizationFacilitiesViewProps {
@@ -42,6 +44,64 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
       toast.error(error.message || 'Failed to update facility');
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('facilities')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['org-facilities-view'] });
+      toast.success('Facility deleted successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to delete facility');
+    },
+  });
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newFacilityName, setNewFacilityName] = useState('');
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('');
+
+  const createMutation = useMutation({
+    mutationFn: async ({ name, workspaceId }: { name: string; workspaceId: string }) => {
+      const { data, error } = await supabase
+        .from('facilities')
+        .insert([{ name, workspace_id: workspaceId }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['org-facilities-view'] });
+      toast.success('Facility created successfully');
+      setCreateOpen(false);
+      setNewFacilityName('');
+      setSelectedWorkspaceId('');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to create facility');
+    },
+  });
+
+  const handleCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFacilityName.trim()) {
+      toast.error('Facility name is required');
+      return;
+    }
+    if (!selectedWorkspaceId) {
+      toast.error('Please select a workspace');
+      return;
+    }
+    createMutation.mutate({ name: newFacilityName, workspaceId: selectedWorkspaceId });
+  };
 
   const { data: workspacesWithFacilities, isLoading } = useQuery({
     queryKey: ['org-facilities-view', organizationId, facilityId],
@@ -182,6 +242,55 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
               </CardDescription>
             </div>
           </div>
+
+          {!facilityId && (
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+              <DialogTrigger asChild>
+                <Button className="ml-auto bg-gradient-primary text-xs sm:text-sm h-9 sm:h-10">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Facility
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Facility</DialogTitle>
+                  <DialogDescription>
+                    Create a new facility in one of your workspaces.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreateSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="workspace">Workspace</Label>
+                    <Select value={selectedWorkspaceId} onValueChange={setSelectedWorkspaceId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select workspace..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {workspacesWithFacilities?.map((ws) => (
+                          <SelectItem key={ws.id} value={ws.id}>
+                            {ws.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="facility-name">Facility Name</Label>
+                    <Input
+                      id="facility-name"
+                      placeholder="e.g., Main Campus"
+                      value={newFacilityName}
+                      onChange={(e) => setNewFacilityName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+                    {createMutation.isPending ? 'Creating...' : 'Create Facility'}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </CardHeader>
         <CardContent className="px-3 sm:px-6">
           <Accordion type="multiple" className="space-y-2">
@@ -220,6 +329,22 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
                               >
                                 <Edit className="h-3.5 w-3.5" />
                               </Button>
+
+                              {!facilityId && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 hover:bg-destructive/10 hover:text-destructive transition-colors ml-1"
+                                  onClick={() => {
+                                    if (confirm('Are you sure you want to delete this facility? This action cannot be undone.')) {
+                                      deleteMutation.mutate(facility.id);
+                                    }
+                                  }}
+                                  disabled={deleteMutation.isPending}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                             </div>
                             <div className="flex flex-wrap gap-1.5">
                               <Badge variant="outline" className="text-[10px] px-1.5 h-5 flex items-center gap-1 bg-muted/30">

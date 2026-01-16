@@ -23,10 +23,13 @@ import { ModuleGuard } from '@/components/ModuleGuard';
 import { useModuleContext } from '@/contexts/ModuleContext';
 import { useLocation } from 'react-router-dom';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { AuditLogsDashboard } from '@/components/admin/AuditLogsDashboard';
 
 const GeneralAdminDashboard = () => {
   const { user } = useAuth();
   const { hasAccess } = useModuleContext();
+  const { selectedOrganizationId } = useOrganization();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const activeTab = searchParams.get('tab');
@@ -39,53 +42,32 @@ const GeneralAdminDashboard = () => {
   useRealtimeSubscription({ table: 'vacation_plans', invalidateQueries: ['workspace-vacation-stats'] });
   useRealtimeSubscription({ table: 'schedules', invalidateQueries: ['workspace-schedules-stats'] });
 
-  const { data: userRole } = useQuery({
+  const { data: userRole, isLoading: roleLoading } = useQuery({
     queryKey: ['general-admin-role', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('user_roles')
-        .select('*, workspaces(name)')
+        .select('*, workspaces(name), organizations(name)')
         .eq('user_id', user?.id)
         .eq('role', 'general_admin')
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data as any;
     },
     enabled: !!user,
   });
 
-  const { data: stats } = useQuery({
-    queryKey: ['workspace-stats', userRole?.workspace_id],
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['general-admin-stats'],
     queryFn: async () => {
-      if (!userRole?.workspace_id) return null;
-
+      // General Admin has system-wide access like Super Admin
       const [facilities, users, departments, pendingVacations, activeTasks, publishedSchedules] = await Promise.all([
-        supabase
-          .from('facilities')
-          .select('id', { count: 'exact', head: true })
-          .eq('workspace_id', userRole.workspace_id),
-        supabase
-          .from('user_roles')
-          .select('id', { count: 'exact', head: true })
-          .eq('workspace_id', userRole.workspace_id),
-        supabase
-          .from('departments')
-          .select('id', { count: 'exact', head: true })
-          .eq('facility_id', 'in.(select id from facilities where workspace_id = ' + userRole.workspace_id + ')'),
-        supabase
-          .from('vacation_plans')
-          .select('id', { count: 'exact', head: true })
-          .in('status', ['department_pending', 'facility_pending', 'workspace_pending']),
-        supabase
-          .from('tasks')
-          .select('id', { count: 'exact', head: true })
-          .eq('workspace_id', userRole.workspace_id)
-          .eq('status', 'active'),
-        supabase
-          .from('schedules')
-          .select('id', { count: 'exact', head: true })
-          .eq('workspace_id', userRole.workspace_id)
-          .eq('status', 'published'),
+        supabase.from('facilities').select('id', { count: 'exact', head: true }),
+        supabase.from('user_roles').select('id', { count: 'exact', head: true }),
+        supabase.from('departments').select('id', { count: 'exact', head: true }),
+        supabase.from('vacation_plans').select('id', { count: 'exact', head: true }).in('status', ['department_pending', 'facility_pending', 'workspace_pending']),
+        supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('schedules').select('id', { count: 'exact', head: true }).eq('status', 'published'),
       ]);
 
       return {
@@ -97,11 +79,11 @@ const GeneralAdminDashboard = () => {
         publishedSchedules: publishedSchedules.count || 0,
       };
     },
-    enabled: !!userRole?.workspace_id,
+    enabled: !!userRole,
   });
 
-  if (!userRole?.workspace_id) {
-    return <LoadingState message="Loading workspace information..." />;
+  if (roleLoading || statsLoading) {
+    return <LoadingState message="Loading dashboard information..." />;
   }
 
   return (
@@ -139,12 +121,7 @@ const GeneralAdminDashboard = () => {
             description="Manage workspace users and their roles"
           />
         )}
-        {activeTab === 'modules' && (
-          <PageHeader
-            title="Module Configuration"
-            description="Configure module access for this workspace"
-          />
-        )}
+
         {activeTab === 'vacation' && (
           <PageHeader
             title="Vacation Management"
@@ -187,6 +164,12 @@ const GeneralAdminDashboard = () => {
             description="View important updates"
           />
         )}
+        {activeTab === 'audit' && (
+          <PageHeader
+            title="Audit Logs"
+            description="View system activity and security logs"
+          />
+        )}
 
         <div className="space-y-6">
           {/* Stats Grid - Show in overview or on tabs */}
@@ -227,81 +210,68 @@ const GeneralAdminDashboard = () => {
 
           {/* Management Sections */}
           <div className="space-y-4">
-            {activeTab === 'facilities' && hasAccess('organization') && (
-              <ModuleGuard moduleKey="organization">
-                <WorkspaceManagement />
-              </ModuleGuard>
+            {activeTab === 'facilities' && (
+              <WorkspaceManagement
+                workspaceId={userRole.workspace_id}
+              />
             )}
 
-            {activeTab === 'categories' && hasAccess('organization') && (
-              <ModuleGuard moduleKey="organization">
-                <CategoryDepartmentManagement />
-              </ModuleGuard>
+            {activeTab === 'categories' && (
+              <CategoryDepartmentManagement
+                workspaceId={userRole.workspace_id}
+              />
             )}
 
-            {activeTab === 'users' && hasAccess('user_management') && (
-              <ModuleGuard moduleKey="user_management">
-                <FacilityUserManagement />
-              </ModuleGuard>
+            {activeTab === 'users' && (
+              <FacilityUserManagement />
             )}
 
-            {activeTab === 'modules' && (
-              <ModuleGuard moduleKey="organization">
-                <WorkspaceModuleManagement />
-              </ModuleGuard>
+
+
+            {activeTab === 'vacation' && (
+              <VacationHub />
             )}
 
-            {activeTab === 'vacation' && hasAccess('vacation_planning') && (
-              <ModuleGuard moduleKey="vacation_planning">
-                <VacationHub />
-              </ModuleGuard>
+            {activeTab === 'training' && (
+              <TrainingHub />
             )}
 
-            {activeTab === 'training' && hasAccess('training') && (
-              <ModuleGuard moduleKey="training">
-                <TrainingHub />
-              </ModuleGuard>
+            {activeTab === 'tasks' && (
+              <Tabs defaultValue="manage" className="w-full">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="manage">Manage Workspace Tasks</TabsTrigger>
+                  <TabsTrigger value="my-tasks">My Assigned Tasks</TabsTrigger>
+                </TabsList>
+                <TabsContent value="manage">
+                  <TaskManager scopeType="workspace" scopeId={userRole.workspace_id} />
+                </TabsContent>
+                <TabsContent value="my-tasks">
+                  <StaffTaskView />
+                </TabsContent>
+              </Tabs>
             )}
 
-            {activeTab === 'tasks' && hasAccess('task_management') && (
-              <ModuleGuard moduleKey="task_management">
-                <Tabs defaultValue="manage" className="w-full">
-                  <TabsList className="mb-4">
-                    <TabsTrigger value="manage">Manage Workspace Tasks</TabsTrigger>
-                    <TabsTrigger value="my-tasks">My Assigned Tasks</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="manage">
-                    <TaskManager scopeType="workspace" scopeId={userRole.workspace_id} />
-                  </TabsContent>
-                  <TabsContent value="my-tasks">
-                    <StaffTaskView />
-                  </TabsContent>
-                </Tabs>
-              </ModuleGuard>
+            {activeTab === 'scheduling' && (
+              <SchedulingHub />
             )}
 
-            {activeTab === 'scheduling' && hasAccess('scheduling') && (
-              <ModuleGuard moduleKey="scheduling">
-                <SchedulingHub />
-              </ModuleGuard>
+            {activeTab === 'staff' && (
+              <UnifiedUserHub
+                scope="system"
+                organizationId={selectedOrganizationId}
+              />
             )}
 
-            {activeTab === 'staff' && hasAccess('staff_management') && (
-              <ModuleGuard moduleKey="staff_management">
-                <UnifiedUserHub scope="workspace" scopeId={userRole.workspace_id} />
-              </ModuleGuard>
+            {activeTab === 'messaging' && (
+              <MessagingHub />
             )}
 
-            {activeTab === 'messaging' && hasAccess('messaging') && (
-              <ModuleGuard moduleKey="messaging">
-                <MessagingHub />
-              </ModuleGuard>
+            {activeTab === 'notifications' && (
+              <NotificationHub />
             )}
 
-            {activeTab === 'notifications' && hasAccess('notifications') && (
-              <ModuleGuard moduleKey="notifications">
-                <NotificationHub />
-              </ModuleGuard>
+            {activeTab === 'audit' && (
+              <AuditLogsDashboard />
             )}
           </div>
         </div>

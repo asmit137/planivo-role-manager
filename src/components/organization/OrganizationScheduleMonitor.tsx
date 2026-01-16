@@ -1,18 +1,36 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Users, FileText } from 'lucide-react';
 import { LoadingState } from '@/components/layout/LoadingState';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { StatsCard } from '@/components/shared';
 import { format } from 'date-fns';
+import { ScheduleManager } from '@/components/scheduling/ScheduleManager';
+import { Button } from '@/components/ui/button';
+import {
+  Calendar, Clock, Users, FileText, ArrowLeft, Plus,
+  Eye, Activity, ListTodo, Search, Filter
+} from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { SchedulingHub } from '@/components/scheduling/SchedulingHub';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 
 interface OrganizationScheduleMonitorProps {
   organizationId: string;
 }
 
 const OrganizationScheduleMonitor = ({ organizationId }: OrganizationScheduleMonitorProps) => {
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'manage' | 'view' | null>(null);
+  const [departmentSelectOpen, setDepartmentSelectOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterDept, setFilterDept] = useState('all');
+
   // Get all workspace IDs for this organization
   const { data: workspaceIds } = useQuery({
     queryKey: ['org-workspace-ids', organizationId],
@@ -25,6 +43,64 @@ const OrganizationScheduleMonitor = ({ organizationId }: OrganizationScheduleMon
       return data?.map(w => w.id) || [];
     },
     enabled: !!organizationId,
+  });
+
+  // Fetch all departments for selection
+  const { data: allDepartments } = useQuery({
+    queryKey: ['org-all-departments', workspaceIds],
+    queryFn: async () => {
+      if (!workspaceIds || workspaceIds.length === 0) return [];
+
+      // First, get all departments linked via facilities
+      const { data: viaFacilities } = await (supabase
+        .from('departments') as any)
+        .select('id, name, facility_id, facilities!inner(id, name, workspace_id)')
+        .in('facilities.workspace_id', workspaceIds);
+
+      // Second, get all departments linked via workspace_departments
+      const { data: viaWorkspaceDepts } = await (supabase
+        .from('workspace_departments') as any)
+        .select('workspace_id, departments!inner(id, name, facility_id, facilities(id, name))')
+        .in('workspace_id', workspaceIds);
+
+      // Fetch schedule counts to show in dropdown
+      const { data: scheduleCounts } = await supabase
+        .from('schedules')
+        .select('department_id')
+        .in('workspace_id', workspaceIds || []);
+
+      const countMap = (scheduleCounts || []).reduce((acc: any, s: any) => {
+        acc[s.department_id] = (acc[s.department_id] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Merge results
+      const deptMap = new Map();
+
+      viaFacilities?.forEach((d: any) => {
+        deptMap.set(d.id, {
+          id: d.id,
+          name: d.name,
+          facilityName: d.facilities?.name || 'No Facility',
+          scheduleCount: countMap[d.id] || 0
+        });
+      });
+
+      viaWorkspaceDepts?.forEach((wd: any) => {
+        const d = wd.departments;
+        if (d && !deptMap.has(d.id)) {
+          deptMap.set(d.id, {
+            id: d.id,
+            name: d.name,
+            facilityName: d.facilities?.name || 'No Facility',
+            scheduleCount: countMap[d.id] || 0
+          });
+        }
+      });
+
+      return Array.from(deptMap.values()).sort((a: any, b: any) => a.name.localeCompare(b.name));
+    },
+    enabled: !!workspaceIds && workspaceIds.length > 0
   });
 
   // Get schedule stats
@@ -65,8 +141,8 @@ const OrganizationScheduleMonitor = ({ organizationId }: OrganizationScheduleMon
     queryFn: async () => {
       if (!workspaceIds || workspaceIds.length === 0) return [];
 
-      const { data: schedules, error } = await supabase
-        .from('schedules')
+      const { data: schedules, error } = await (supabase
+        .from('schedules') as any)
         .select(`
           id,
           name,
@@ -75,18 +151,26 @@ const OrganizationScheduleMonitor = ({ organizationId }: OrganizationScheduleMon
           end_date,
           shift_count,
           department_id,
-          departments (name, facility_id, facilities (name))
+          workspace_id,
+          departments (
+            name, 
+            facility_id, 
+            facilities (
+              name,
+              workspace_id
+            )
+          )
         `)
         .in('workspace_id', workspaceIds)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(50);
 
       if (error) throw error;
 
-      return schedules?.map(s => ({
+      return schedules?.map((s: any) => ({
         ...s,
-        departmentName: (s.departments as any)?.name || 'Unknown',
-        facilityName: (s.departments as any)?.facilities?.name || 'Unknown',
+        departmentName: s.departments?.name || 'No Department',
+        facilityName: s.departments?.facilities?.name || 'No Facility',
       })) || [];
     },
     enabled: !!workspaceIds && workspaceIds.length > 0,
@@ -109,8 +193,114 @@ const OrganizationScheduleMonitor = ({ organizationId }: OrganizationScheduleMon
     }
   };
 
+  if (selectedDepartmentId && viewMode) {
+    return (
+      <div className="space-y-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setSelectedDepartmentId(null);
+            setViewMode(null);
+          }}
+          className="gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Overview
+        </Button>
+        {viewMode === 'manage' ? (
+          <ScheduleManager departmentId={selectedDepartmentId} />
+        ) : (
+          <SchedulingHub departmentId={selectedDepartmentId} />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-medium">Schedule Overview</h3>
+        <Dialog open={departmentSelectOpen} onOpenChange={setDepartmentSelectOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Manage Schedules
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Select Department</DialogTitle>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label>Department to manage</Label>
+                <Select onValueChange={(value) => {
+                  setSelectedDepartmentId(value);
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a department..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(() => {
+                      const groups = allDepartments?.reduce((acc: any, dept: any) => {
+                        const facility = dept.facilityName;
+                        if (!acc[facility]) acc[facility] = [];
+                        acc[facility].push(dept);
+                        return acc;
+                      }, {});
+
+                      return Object.entries(groups || {}).map(([facility, departments]: [string, any]) => (
+                        <SelectGroup key={facility}>
+                          <SelectLabel className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted/30">
+                            {facility}
+                          </SelectLabel>
+                          {departments.map((dept: any) => (
+                            <SelectItem key={dept.id} value={dept.id}>
+                              <div className="flex items-center justify-between w-full gap-4">
+                                <span>{dept.name}</span>
+                                {dept.scheduleCount > 0 && (
+                                  <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-primary/10 text-primary">
+                                    {dept.scheduleCount} {dept.scheduleCount === 1 ? 'sch' : 'schs'}
+                                  </Badge>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      ));
+                    })()}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <Button
+                  variant="outline"
+                  disabled={!selectedDepartmentId}
+                  onClick={() => {
+                    setViewMode('view');
+                    setDepartmentSelectOpen(false);
+                  }}
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Calendar
+                </Button>
+                <Button
+                  disabled={!selectedDepartmentId}
+                  onClick={() => {
+                    setViewMode('manage');
+                    setDepartmentSelectOpen(false);
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Manage Schedules
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
       {/* Stats Overview */}
       <div className="grid gap-2 sm:gap-4 grid-cols-2 md:grid-cols-3">
         <StatsCard
@@ -136,51 +326,225 @@ const OrganizationScheduleMonitor = ({ organizationId }: OrganizationScheduleMon
         />
       </div>
 
-      {/* Recent Schedules */}
-      <Card>
-        <CardHeader className="px-3 sm:px-6">
-          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-            <Calendar className="h-5 w-5 text-primary" />
-            Recent Schedules
-          </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Latest schedules in your organization</CardDescription>
-        </CardHeader>
-        <CardContent className="px-3 sm:px-6">
-          {!recentSchedules || recentSchedules.length === 0 ? (
-            <EmptyState
-              icon={Calendar}
-              title="No Schedules"
-              description="No schedules found in your organization."
-            />
-          ) : (
-            <div className="space-y-3">
-              {recentSchedules.map((schedule: any) => (
-                <div key={schedule.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border bg-muted/30 gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between sm:justify-start gap-2">
-                      <p className="font-medium text-sm sm:text-base">{schedule.name}</p>
-                      <div className="sm:hidden">
-                        {getStatusBadge(schedule.status)}
-                      </div>
-                    </div>
-                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">
-                      {schedule.facilityName} · {schedule.departmentName}
-                    </p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">
-                      {format(new Date(schedule.start_date), 'MMM d')} - {format(new Date(schedule.end_date), 'MMM d, yyyy')} · {schedule.shift_count} shifts
-                    </p>
+      <Tabs defaultValue="active" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-6 bg-muted/30">
+          <TabsTrigger value="active" className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            <span className="hidden sm:inline">Active Schedules</span>
+            <span className="sm:hidden">Active</span>
+          </TabsTrigger>
+          <TabsTrigger value="all" className="flex items-center gap-2">
+            <ListTodo className="h-4 w-4" />
+            <span className="hidden sm:inline">Global Browser</span>
+            <span className="sm:hidden">Global</span>
+          </TabsTrigger>
+          <TabsTrigger value="recent" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            <span className="hidden sm:inline">Recent Activity</span>
+            <span className="sm:hidden">Recent</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="active">
+          <Card className="border-2 shadow-sm">
+            <CardHeader className="px-3 sm:px-6">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <Activity className="h-5 w-5 text-emerald-500" />
+                Currently Running
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Schedules active today in your organization</CardDescription>
+            </CardHeader>
+            <CardContent className="px-3 sm:px-6">
+              {(() => {
+                const now = new Date();
+                const activeSchedules = recentSchedules?.filter((s: any) => {
+                  const start = new Date(s.start_date);
+                  const end = new Date(s.end_date);
+                  return s.status === 'published' && now >= start && now <= end;
+                }) || [];
+
+                if (activeSchedules.length === 0) {
+                  return (
+                    <EmptyState
+                      icon={Calendar}
+                      title="No Active Schedules"
+                      description="There are no schedules currently running today."
+                    />
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {activeSchedules.map((schedule: any) => (
+                      <ScheduleItem key={schedule.id} schedule={schedule} getStatusBadge={getStatusBadge} setViewMode={setViewMode} setSelectedDepartmentId={setSelectedDepartmentId} />
+                    ))}
                   </div>
-                  <div className="hidden sm:block">
-                    {getStatusBadge(schedule.status)}
-                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="all">
+          <Card className="border-2 shadow-sm">
+            <CardHeader className="px-3 sm:px-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                    <ListTodo className="h-5 w-5 text-primary" />
+                    All Organization Schedules
+                  </CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">Exhaustive list of all schedules across all facilities</CardDescription>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search schedules..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 h-9"
+                    />
+                  </div>
+                  <Select value={filterDept} onValueChange={setFilterDept}>
+                    <SelectTrigger className="h-9 w-[150px]">
+                      <Filter className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Filter Dept" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Departments</SelectItem>
+                      {(() => {
+                        const groups = allDepartments?.reduce((acc: any, dept: any) => {
+                          const facility = dept.facilityName;
+                          if (!acc[facility]) acc[facility] = [];
+                          acc[facility].push(dept);
+                          return acc;
+                        }, {});
+
+                        return Object.entries(groups || {}).map(([facility, departments]: [string, any]) => (
+                          <SelectGroup key={facility}>
+                            <SelectLabel className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted/30">
+                              {facility}
+                            </SelectLabel>
+                            {departments.map((dept: any) => (
+                              <SelectItem key={dept.id} value={dept.id}>
+                                <div className="flex flex-col items-start gap-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-sm">{dept.name}</span>
+                                    {dept.scheduleCount > 0 && (
+                                      <Badge variant="secondary" className="text-[9px] h-3.5 px-1 bg-primary/10 text-primary">
+                                        {dept.scheduleCount} {dept.scheduleCount === 1 ? 'sch' : 'schs'}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] text-muted-foreground">{dept.facilityName}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        ));
+                      })()}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="px-3 sm:px-6">
+              {(() => {
+                const filtered = recentSchedules?.filter((s: any) => {
+                  const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    s.facilityName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    s.departmentName?.toLowerCase().includes(searchQuery.toLowerCase());
+                  const matchesDept = filterDept === 'all' || s.department_id === filterDept;
+                  return matchesSearch && matchesDept;
+                }) || [];
+
+                if (filtered.length === 0) {
+                  return (
+                    <EmptyState
+                      icon={Calendar}
+                      title="No matching schedules"
+                      description="Try adjusting your search or filters."
+                    />
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {filtered.map((schedule: any) => (
+                      <ScheduleItem key={schedule.id} schedule={schedule} getStatusBadge={getStatusBadge} setViewMode={setViewMode} setSelectedDepartmentId={setSelectedDepartmentId} />
+                    ))}
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="recent">
+          <Card className="border-2 shadow-sm">
+            <CardHeader className="px-3 sm:px-6">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <Clock className="h-5 w-5 text-primary" />
+                Recent Activity
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm">The 10 most recently updated schedules</CardDescription>
+            </CardHeader>
+            <CardContent className="px-3 sm:px-6">
+              {!recentSchedules || recentSchedules.length === 0 ? (
+                <EmptyState
+                  icon={Calendar}
+                  title="No Recent Activity"
+                  description="No schedule activity recorded yet."
+                />
+              ) : (
+                <div className="space-y-3">
+                  {recentSchedules.slice(0, 10).map((schedule: any) => (
+                    <ScheduleItem key={schedule.id} schedule={schedule} getStatusBadge={getStatusBadge} setViewMode={setViewMode} setSelectedDepartmentId={setSelectedDepartmentId} />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
+
+const ScheduleItem = ({ schedule, getStatusBadge, setViewMode, setSelectedDepartmentId }: any) => (
+  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border bg-muted/30 gap-3">
+    <div className="space-y-1">
+      <div className="flex items-center justify-between sm:justify-start gap-2">
+        <p className="font-medium text-sm sm:text-base">{schedule.name}</p>
+        <div className="sm:hidden">
+          {getStatusBadge(schedule.status)}
+        </div>
+      </div>
+      <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">
+        {schedule.facilityName} · {schedule.departmentName}
+      </p>
+      <p className="text-[10px] sm:text-xs text-muted-foreground">
+        {format(new Date(schedule.start_date), 'MMM d')} - {format(new Date(schedule.end_date), 'MMM d, yyyy')} · {schedule.shift_count} shifts
+      </p>
+    </div>
+    <div className="flex items-center gap-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-8 w-8 p-0"
+        onClick={() => {
+          setSelectedDepartmentId(schedule.department_id);
+          setViewMode('view');
+        }}
+      >
+        <Eye className="h-4 w-4" />
+      </Button>
+      <div className="hidden sm:block">
+        {getStatusBadge(schedule.status)}
+      </div>
+    </div>
+  </div>
+);
 
 export default OrganizationScheduleMonitor;

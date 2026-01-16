@@ -22,7 +22,9 @@ import {
   Activity,
   ChevronRight,
   Archive,
-  Menu
+  Menu,
+  Briefcase,
+  MapPin
 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
@@ -62,9 +64,16 @@ interface AppSidebarProps {
 // Module configuration with icons and labels
 const moduleConfig = [
   { key: 'core', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', alwaysShow: true },
-  { key: 'user_management', label: 'Users', icon: Users, path: '/dashboard?tab=users' },
-  { key: 'organization', label: 'Organization', icon: Building2, path: '/dashboard?tab=organization' },
-  { key: 'staff_management', label: 'Staff', icon: UserCog, path: '/dashboard?tab=staff' },
+  {
+    key: 'organization',
+    label: 'Organization',
+    icon: Building2,
+    subItems: [
+      { key: 'workspaces', label: 'Workspaces', path: '/dashboard?tab=workspaces', icon: Briefcase },
+      { key: 'facilities', label: 'Facilities', path: '/dashboard?tab=facilities', icon: MapPin },
+    ]
+  },
+  { key: 'user_management', label: 'Users & Roles', icon: Users, path: '/dashboard?tab=users' },
   { key: 'vacation_planning', label: 'Vacation', icon: Calendar, path: '/dashboard?tab=vacation' },
   { key: 'scheduling', label: 'Scheduling', icon: CalendarClock, path: '/dashboard?tab=scheduling' },
   { key: 'task_management', label: 'Tasks', icon: CheckSquare, path: '/dashboard?tab=tasks' },
@@ -151,18 +160,55 @@ function SidebarInnerContent({
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {visibleModules.map((module) => (
-                <SidebarMenuItem key={module.key}>
-                  <SidebarMenuButton
-                    onClick={() => handleSidebarNavigation(module.path)}
-                    isActive={isActive(module.path)}
-                    className="w-full"
-                  >
-                    <module.icon className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
-                    {!collapsed && <span>{module.label}</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {visibleModules.map((module: any) => {
+                if (module.subItems) {
+                  return (
+                    <Collapsible key={module.key} className="group/collapsible" defaultOpen={true}>
+                      <SidebarMenuItem>
+                        <CollapsibleTrigger asChild>
+                          <SidebarMenuButton tooltip={module.label}>
+                            <module.icon className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
+                            {!collapsed && (
+                              <>
+                                <span>{module.label}</span>
+                                <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                              </>
+                            )}
+                          </SidebarMenuButton>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <SidebarMenuSub>
+                            {module.subItems.map((sub: any) => (
+                              <SidebarMenuSubItem key={sub.key}>
+                                <SidebarMenuSubButton
+                                  onClick={() => handleSidebarNavigation(sub.path)}
+                                  isActive={isActive(sub.path)}
+                                >
+                                  {sub.icon && <sub.icon size={16} />}
+                                  <span>{sub.label}</span>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            ))}
+                          </SidebarMenuSub>
+                        </CollapsibleContent>
+                      </SidebarMenuItem>
+                    </Collapsible>
+                  );
+                }
+
+                return (
+                  <SidebarMenuItem key={module.key}>
+                    <SidebarMenuButton
+                      onClick={() => handleSidebarNavigation(module.path)}
+                      isActive={isActive(module.path)}
+                      className="w-full"
+                    >
+                      <module.icon className={collapsed ? 'mx-auto' : 'mr-2'} size={18} />
+                      {!collapsed && <span>{module.label}</span>}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -307,6 +353,12 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
       if (['workplace_supervisor', 'workspace_supervisor', 'facility_supervisor'].includes(primaryRole || '')) {
         return false;
       }
+    }
+
+    // General Admin gets all modules except 'modules' (Module Access)
+    if (primaryRole === 'general_admin') {
+      if (module.key === 'modules') return false;
+      return true;
     }
 
     return module.alwaysShow || hasAccess(module.key);

@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/auth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { PageHeader, LoadingState, ErrorState } from '@/components/layout';
 import { StatsCard } from '@/components/shared';
-import { Building, Users, MapPin, Briefcase, AlertTriangle, Calendar, ListTodo, GraduationCap, Clock, CheckCircle } from 'lucide-react';
+import { Building, Users, MapPin, Briefcase, AlertTriangle, Calendar, ListTodo, GraduationCap, Clock, CheckCircle, MessageSquare, Bell, BarChart3, FileText } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -22,12 +22,30 @@ import {
   OrganizationTaskMonitor,
   OrganizationTrainingMonitor
 } from '@/components/organization';
+import { MessagingHub } from '@/modules/messaging';
+import { NotificationHub } from '@/modules/notifications';
+import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
+import { AuditLogsDashboard } from '@/components/admin/AuditLogsDashboard';
+import { EmailManagement } from '@/components/admin/EmailManagement';
 
 const OrganizationAdminDashboard = () => {
   const { user } = useAuth();
   const { data: roles } = useUserRole();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || '';
+
+  // Map sidebar tabs to dashboard inner tabs to prevent blank screens
+  const normalizedTab = (activeTab: string) => {
+    const mapping: Record<string, string> = {
+      'staff': 'users',
+      'scheduling': 'schedules',
+      'organization': 'workspaces',
+      'settings': '',
+    };
+    return mapping[activeTab] || activeTab;
+  };
+
+  const currentTab = normalizedTab(activeTab);
 
   useRealtimeSubscription({
     table: 'organizations',
@@ -134,12 +152,16 @@ const OrganizationAdminDashboard = () => {
         }
       }
 
-      // Get active tasks count
-      const { count: activeTasks } = await supabase
-        .from('tasks' as any)
-        .select('id', { count: 'exact', head: true })
-        .eq('organization_id', organization.id)
-        .eq('status', 'active');
+      // Get active tasks count - tasks table uses workspace_id, not organization_id
+      let activeTasks = 0;
+      if (workspaceIds.length > 0) {
+        const { count } = await supabase
+          .from('tasks')
+          .select('id', { count: 'exact', head: true })
+          .in('workspace_id', workspaceIds)
+          .eq('status', 'active');
+        activeTasks = count || 0;
+      }
 
       // Get upcoming training count
       const { count: upcomingTraining } = await supabase
@@ -154,7 +176,7 @@ const OrganizationAdminDashboard = () => {
         facilities: facilityCount,
         users: userCount || 0,
         pendingVacations,
-        activeTasks: activeTasks || 0,
+        activeTasks,
         upcomingTraining: upcomingTraining || 0,
       };
     },
@@ -343,49 +365,8 @@ const OrganizationAdminDashboard = () => {
         />
       </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <ResponsiveTabsList>
-          <TabsTrigger value="" className="flex-1 min-h-[44px] px-3 text-sm">
-            <Building className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
-            <span className="hidden sm:inline">Overview</span>
-            <span className="sm:hidden">Status</span>
-          </TabsTrigger>
-          <TabsTrigger value="workspaces" className="flex-1 min-h-[44px] px-3 text-sm">
-            <Briefcase className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
-            <span className="hidden sm:inline">Workspaces</span>
-            <span className="sm:hidden">Work</span>
-          </TabsTrigger>
-          <TabsTrigger value="facilities" className="flex-1 min-h-[44px] px-3 text-sm">
-            <MapPin className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
-            <span className="hidden sm:inline">Facilities</span>
-            <span className="sm:hidden">Fac</span>
-          </TabsTrigger>
-          <TabsTrigger value="users" className="flex-1 min-h-[44px] px-3 text-sm">
-            <Users className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
-            <span className="hidden lg:inline">Users & Roles</span>
-            <span className="lg:hidden">Users</span>
-          </TabsTrigger>
-          <TabsTrigger value="vacation" className="flex-1 min-h-[44px] px-3 text-sm">
-            <Calendar className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
-            <span className="hidden sm:inline">Vacation</span>
-            <span className="sm:hidden">Vac</span>
-          </TabsTrigger>
-          <TabsTrigger value="schedules" className="flex-1 min-h-[44px] px-3 text-sm">
-            <Clock className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
-            <span className="hidden sm:inline">Schedules</span>
-            <span className="sm:hidden">Sched</span>
-          </TabsTrigger>
-          <TabsTrigger value="tasks" className="flex-1 min-h-[44px] px-3 text-sm">
-            <ListTodo className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
-            <span className="hidden sm:inline">Tasks</span>
-            <span className="sm:hidden">Task</span>
-          </TabsTrigger>
-          <TabsTrigger value="training" className="flex-1 min-h-[44px] px-3 text-sm">
-            <GraduationCap className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
-            <span className="hidden sm:inline">Training</span>
-            <span className="sm:hidden">Edu</span>
-          </TabsTrigger>
-        </ResponsiveTabsList>
+      <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
+        {/* Navigation is now handled by the AppSidebar. The Tabs component is kept for content routing logic. */}
 
         <TabsContent value="" className="mt-4 sm:mt-6 px-4 sm:px-0">
           {renderOverview()}
@@ -437,6 +418,27 @@ const OrganizationAdminDashboard = () => {
 
         <TabsContent value="training" className="mt-4 sm:mt-6 px-4 sm:px-0">
           <OrganizationTrainingMonitor organizationId={organization.id} />
+        </TabsContent>
+
+        {/* Messaging, Notifications, Analytics, and Audit Logs are accessible via sidebar only */}
+        <TabsContent value="messaging" className="mt-4 sm:mt-6 px-4 sm:px-0">
+          <MessagingHub />
+        </TabsContent>
+
+        <TabsContent value="notifications" className="mt-4 sm:mt-6 px-4 sm:px-0">
+          <NotificationHub />
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-4 sm:mt-6 px-4 sm:px-0">
+          <AnalyticsDashboard organizationId={organization.id} />
+        </TabsContent>
+
+        <TabsContent value="audit" className="mt-4 sm:mt-6 px-4 sm:px-0">
+          <AuditLogsDashboard />
+        </TabsContent>
+
+        <TabsContent value="emails" className="mt-4 sm:mt-6 px-4 sm:px-0">
+          <EmailManagement />
         </TabsContent>
       </Tabs>
     </div>
