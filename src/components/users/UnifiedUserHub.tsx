@@ -279,10 +279,23 @@ const UnifiedUserHub = ({
 
         // Use Edge Function only (RPC fallback disabled)
         const { data, error } = await supabase.functions.invoke('delete-user', {
-          body: { userId }
+          body: { userId },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
         });
 
         if (error) {
+          console.error("Delete user error:", error);
+          if (error.context && typeof error.context.json === 'function') {
+            try {
+              const body = await error.context.json();
+              console.log("Delete error body:", body);
+              if (body.error) throw new Error(body.error);
+            } catch (e) {
+              console.error("Failed to parse delete error body", e);
+            }
+          }
           throw error;
         }
         return data;

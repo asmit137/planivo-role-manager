@@ -161,14 +161,16 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
             </TabsContent>
           )}
 
-          <TabsContent value="team-plans">
-            <VacationPlansList
-              scopeType={approvalInfo.scopeType}
-              scopeId={approvalInfo.scopeId}
-              departmentId={departmentId}
-              isSuperAdmin={isSuperAdmin}
-            />
-          </TabsContent>
+          {isApprover && approvalInfo && (
+            <TabsContent value="team-plans">
+              <VacationPlansList
+                scopeType={approvalInfo.scopeType}
+                scopeId={approvalInfo.scopeId}
+                departmentId={departmentId}
+                isSuperAdmin={isSuperAdmin}
+              />
+            </TabsContent>
+          )}
 
           {isApprover && (
             <TabsContent value="conflicts">
