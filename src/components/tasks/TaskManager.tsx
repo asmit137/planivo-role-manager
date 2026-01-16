@@ -20,9 +20,11 @@ import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 interface TaskManagerProps {
   scopeType: 'workspace' | 'facility' | 'department' | 'organization';
   scopeId: string;
+  hideTaskList?: boolean;
+  onSuccess?: () => void;
 }
 
-const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
+const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess }: TaskManagerProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
@@ -46,9 +48,21 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
     queryKey: ['available-staff', scopeType, scopeId],
     queryFn: async () => {
       if (scopeType === 'organization') {
+        const { data: userRoles, error: rolesError } = await (supabase
+          .from('user_roles' as any)
+          .select('user_id')
+          .eq('organization_id', scopeId) as any);
+
+        if (rolesError) throw rolesError;
+
+        const userIds = [...new Set((userRoles as any[]).map(r => r.user_id))] as string[];
+
+        if (userIds.length === 0) return [];
+
         const { data: profiles, error } = await supabase
           .from('profiles')
           .select('id, full_name, email')
+          .in('id', userIds)
           .order('full_name');
 
         if (error) throw error;
@@ -199,8 +213,11 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      toast.success('Task created');
+      toast.success('Task created successfully');
       resetForm();
+      if (onSuccess) {
+        onSuccess();
+      }
     },
     onError: (error: any) => {
       console.error('Task creation error:', error);
@@ -276,7 +293,7 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Due Date</Label>
-                <Popover>
+                <Popover modal={true}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -289,7 +306,12 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
                       {dueDate ? format(dueDate, 'PPP') : 'Pick date'}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
+                  <PopoverContent
+                    className="w-auto p-0 z-[100]"
+                    align="start"
+                    side="bottom"
+                    sideOffset={4}
+                  >
                     <Calendar
                       mode="single"
                       selected={dueDate}
@@ -374,51 +396,53 @@ const TaskManager = ({ scopeType, scopeId }: TaskManagerProps) => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Tasks</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {tasks?.map((task) => (
-              <div key={task.id} className="border p-3 sm:p-4 rounded-lg">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">
-                  <h3 className="font-semibold text-sm sm:text-base">{task.title}</h3>
-                  <span className={cn('text-xs sm:text-sm font-medium', getPriorityColor(task.priority))}>
-                    {task.priority}
-                  </span>
-                </div>
-                {task.description && (
-                  <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
-                )}
-                {task.due_date && (
-                  <p className="text-sm">
-                    Due: {format(new Date(task.due_date), 'PPP')}
-                  </p>
-                )}
-                {task.task_assignments && task.task_assignments.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-sm font-medium">Assigned to:</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {task.task_assignments.map((assignment: any) => (
-                        <span
-                          key={assignment.id}
-                          className="text-xs bg-accent px-2 py-1 rounded"
-                        >
-                          {assignment.profiles?.full_name || 'Unknown User'} ({assignment.status})
-                        </span>
-                      ))}
-                    </div>
+      {!hideTaskList && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Tasks</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {tasks?.map((task) => (
+                <div key={task.id} className="border p-3 sm:p-4 rounded-lg">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">
+                    <h3 className="font-semibold text-sm sm:text-base">{task.title}</h3>
+                    <span className={cn('text-xs sm:text-sm font-medium', getPriorityColor(task.priority))}>
+                      {task.priority}
+                    </span>
                   </div>
-                )}
-              </div>
-            ))}
-            {tasks?.length === 0 && (
-              <p className="text-center text-muted-foreground">No tasks yet</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                  {task.description && (
+                    <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
+                  )}
+                  {task.due_date && (
+                    <p className="text-sm">
+                      Due: {format(new Date(task.due_date), 'PPP')}
+                    </p>
+                  )}
+                  {task.task_assignments && task.task_assignments.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-sm font-medium">Assigned to:</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {task.task_assignments.map((assignment: any) => (
+                          <span
+                            key={assignment.id}
+                            className="text-xs bg-accent px-2 py-1 rounded"
+                          >
+                            {assignment.profiles?.full_name || 'Unknown User'} ({assignment.status})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {tasks?.length === 0 && (
+                <p className="text-center text-muted-foreground">No tasks yet</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

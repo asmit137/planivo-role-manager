@@ -33,13 +33,14 @@ export const CreateDMModal = ({ open, onOpenChange, onConversationCreated }: Cre
         queryFn: async () => {
             if (!user) return [];
 
-            // Check if user is super admin
+            // Check user roles
             const { data: userRoles } = await supabase
                 .from('user_roles')
-                .select('role, workspace_id')
-                .eq('user_id', user.id);
+                .select('role, workspace_id, organization_id')
+                .eq('user_id', user.id) as { data: any[] | null };
 
             const isSuperAdmin = userRoles?.some(r => r.role === 'super_admin');
+            const isOrgAdmin = userRoles?.some(r => r.role === 'organization_admin');
 
             if (isSuperAdmin) {
                 // Super admin can message anyone
@@ -49,6 +50,35 @@ export const CreateDMModal = ({ open, onOpenChange, onConversationCreated }: Cre
                     .neq('id', user.id);
 
                 return allProfiles || [];
+            }
+
+            if (isOrgAdmin) {
+                // Organization admin can message users in their organization
+                const orgIds = [...new Set(userRoles?.filter(r => r.role === 'organization_admin').map(r => r.organization_id).filter(Boolean))] as string[];
+
+                if (orgIds.length === 0) return [];
+
+                // Get all users with roles in those organizations using or filter
+                const orgUserRolesPromises = orgIds.map(orgId =>
+                    (supabase
+                        .from('user_roles') as any)
+                        .select('user_id')
+                        .eq('organization_id', orgId)
+                );
+
+                const results = await Promise.all(orgUserRolesPromises);
+                const allOrgUserRoles = results.flatMap(r => r.data || []);
+
+                if (allOrgUserRoles.length === 0) return [];
+
+                const userIds = [...new Set(allOrgUserRoles.map(r => r.user_id))].filter(id => id !== user.id);
+
+                const { data: profiles } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, email')
+                    .in('id', userIds);
+
+                return profiles || [];
             }
 
             if (!userRoles || userRoles.length === 0) return [];

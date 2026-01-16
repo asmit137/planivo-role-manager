@@ -15,7 +15,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
-const CategoryDepartmentManagement = () => {
+interface CategoryDepartmentManagementProps {
+  organizationId?: string;
+  workspaceId?: string;
+}
+
+const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryDepartmentManagementProps = {}) => {
   const [createCategoryOpen, setCreateCategoryOpen] = useState(false);
   const [editCategoryOpen, setEditCategoryOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);

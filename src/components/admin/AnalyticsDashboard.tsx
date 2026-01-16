@@ -40,14 +40,18 @@ const itemVariants = {
     y: 0,
     opacity: 1,
     transition: {
-      type: "spring",
+      type: "spring" as const,
       stiffness: 100,
       damping: 15
     }
   }
 };
 
-export function AnalyticsDashboard() {
+interface AnalyticsDashboardProps {
+  organizationId?: string;
+}
+
+export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps = {}) {
   const { data: roles } = useUserRole();
   const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
 
@@ -72,29 +76,47 @@ export function AnalyticsDashboard() {
     }
   };
 
-  // Fetch Facilities (Super Admin only)
+  // Fetch Facilities (Super Admin or Org Admin)
   const { data: facilities } = useQuery({
-    queryKey: ['admin-facilities-list'],
+    queryKey: ['admin-facilities-list', organizationId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('facilities').select('id, name').order('name');
+      let query = supabase.from('facilities').select('id, name');
+
+      if (organizationId) {
+        // Facilities don't have organization_id directly, need to join with workspaces
+        const { data: workspaces } = await supabase
+          .from('workspaces')
+          .select('id')
+          .eq('organization_id', organizationId);
+
+        const workspaceIds = workspaces?.map(w => w.id) || [];
+        if (workspaceIds.length === 0) return [];
+
+        query = query.in('workspace_id', workspaceIds);
+      }
+
+      const { data, error } = await query.order('name');
       if (error) throw error;
       return data;
     },
-    enabled: isSuperAdmin,
+    enabled: isSuperAdmin || !!organizationId,
   });
 
   // User growth data
   const { data: userGrowth } = useQuery({
-    queryKey: ['user-growth', dateRange?.from, dateRange?.to, selectedFacilityId],
+    queryKey: ['user-growth', dateRange?.from, dateRange?.to, selectedFacilityId, organizationId],
     queryFn: async () => {
-      let query: any = supabase
-        .from(selectedFacilityId === 'all' ? 'profiles' : 'user_roles')
-        .select('created_at')
-        .order('created_at', { ascending: true });
+      let query: any;
 
       if (selectedFacilityId !== 'all') {
-        query = query.eq('facility_id', selectedFacilityId);
+        query = supabase.from('user_roles').select('created_at').eq('facility_id', selectedFacilityId);
+      } else if (organizationId) {
+        query = (supabase.from('user_roles') as any).select('created_at').eq('organization_id', organizationId);
+      } else {
+        query = supabase.from('profiles').select('created_at');
       }
+
+      query = (query as any).order('created_at', { ascending: true });
 
       if (dateRange?.from) {
         query = query.gte('created_at', startOfDay(dateRange.from).toISOString());
@@ -136,12 +158,14 @@ export function AnalyticsDashboard() {
   const { data: roleDistribution } = useQuery({
     queryKey: ['role-distribution-chart', selectedFacilityId],
     queryFn: async () => {
-      let query = supabase
+      let query: any = supabase
         .from('user_roles')
         .select('role');
 
       if (selectedFacilityId !== 'all') {
-        query = query.eq('facility_id', selectedFacilityId);
+        query = (query as any).eq('facility_id', selectedFacilityId);
+      } else if (organizationId) {
+        query = (query as any).eq('organization_id', organizationId);
       }
 
       const { data, error } = await query;
@@ -198,16 +222,40 @@ export function AnalyticsDashboard() {
   const { data: entityCounts } = useQuery({
     queryKey: ['entity-counts'],
     queryFn: async () => {
-      const [orgs, workspaces, facilities, departments, tasks, schedules, vacations, trainings] = await Promise.all([
-        supabase.from('organizations').select('id', { count: 'exact', head: true }),
-        supabase.from('workspaces').select('id', { count: 'exact', head: true }),
-        supabase.from('facilities').select('id', { count: 'exact', head: true }),
-        supabase.from('departments').select('id', { count: 'exact', head: true }),
-        supabase.from('tasks').select('id', { count: 'exact', head: true }),
-        supabase.from('schedules').select('id', { count: 'exact', head: true }),
-        supabase.from('vacation_plans').select('id', { count: 'exact', head: true }),
-        supabase.from('training_events').select('id', { count: 'exact', head: true }),
-      ]);
+      let workspaceIds: string[] = [];
+      if (organizationId) {
+        const { data: ws } = await supabase.from('workspaces').select('id').eq('organization_id', organizationId);
+        workspaceIds = ws?.map(w => w.id) || [];
+      }
+
+      const counts = await Promise.all([
+        organizationId
+          ? Promise.resolve({ count: 1, error: null })
+          : supabase.from('organizations').select('id', { count: 'exact', head: true }),
+        organizationId
+          ? (supabase.from('workspaces') as any).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)
+          : supabase.from('workspaces').select('id', { count: 'exact', head: true }),
+        organizationId
+          ? (supabase.from('facilities') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
+          : supabase.from('facilities').select('id', { count: 'exact', head: true }),
+        organizationId
+          ? (supabase.from('departments') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
+          : supabase.from('departments').select('id', { count: 'exact', head: true }),
+        organizationId
+          ? (supabase.from('tasks') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
+          : supabase.from('tasks').select('id', { count: 'exact', head: true }),
+        organizationId
+          ? (supabase.from('schedules') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
+          : supabase.from('schedules').select('id', { count: 'exact', head: true }),
+        organizationId
+          ? (supabase.from('vacation_plans') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
+          : supabase.from('vacation_plans').select('id', { count: 'exact', head: true }),
+        organizationId
+          ? (supabase.from('training_events') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
+          : supabase.from('training_events').select('id', { count: 'exact', head: true }),
+      ]) as any[];
+
+      const [orgs, workspaces, facilities, departments, tasks, schedules, vacations, trainings] = counts;
 
       return [
         { name: 'Organizations', count: orgs.count || 0, icon: Building2, color: 'hsl(var(--primary))' },
@@ -224,19 +272,48 @@ export function AnalyticsDashboard() {
 
   // Activity by day of week
   const { data: activityByDay } = useQuery({
-    queryKey: ['activity-by-day', dateRange?.from, dateRange?.to],
+    queryKey: ['activity-by-day', dateRange?.from, dateRange?.to, organizationId],
     queryFn: async () => {
       let query = supabase
         .from('audit_logs')
         .select('performed_at');
 
       if (dateRange?.from) {
-        query = query.gte('performed_at', startOfDay(dateRange.from).toISOString());
+        query = (query as any).gte('performed_at', startOfDay(dateRange.from).toISOString());
       }
       if (dateRange?.to) {
-        query = query.lte('performed_at', endOfDay(dateRange.to).toISOString());
+        query = (query as any).lte('performed_at', endOfDay(dateRange.to).toISOString());
       } else {
-        query = query.gte('performed_at', subDays(new Date(), 30).toISOString());
+        query = (query as any).gte('performed_at', subDays(new Date(), 30).toISOString());
+      }
+
+      // Filter by organization if provided (via performed_by user or explicit column if exists)
+      // Audit logs might not have organization_id. Skipping strict org filter for audit logs for now or checking if table has it.
+      // Assuming for now we show all or basic.
+      // If we want to filter by org, we'd need to join with profiles/users.
+      // Simplified: if organizationId is present, try to filter if column exists, else leave as is (Global/System logs might be visible to Org Admin? Probably not ideal but safer than breaking).
+      // Actually, let's leave audit logs scoping for a separate task if schema verification is needed.
+      // BUT, user asked for "analytics tab show only for that organization".
+      // Let's try to filter by joining with profiles if possible.
+      // Supabase join syntax: select('performed_at, profiles!inner(organization_id)') ...
+      // But query is on audit_logs.
+
+      if (organizationId) {
+        // This assumes audit_logs has organization_id or using performed_by lookup which is expensive here. 
+        // Let's skip deep filtering here to avoid breaking it without schema knowledge, 
+        // but we can limit to current user's actions if we wanted, but Org Admin wants to see org actions.
+        // Let's try adding an empty check if we can't filter, or just proceed.
+        // Better to leave it as "Global" for this specific chart if schema is unknown, 
+        // OR query users first.
+
+        // Let's fetching org users first
+        const { data: orgUsers } = await (supabase.from('user_roles') as any).select('user_id').eq('organization_id', organizationId);
+        const userIds = orgUsers?.map(u => u.user_id) || [];
+        if (userIds.length > 0) {
+          query = (query as any).in('performed_by', userIds);
+        } else {
+          return [];
+        }
       }
 
       const { data, error } = await query;
@@ -263,7 +340,7 @@ export function AnalyticsDashboard() {
   const COLORS = ['hsl(262, 83%, 58%)', 'hsl(199, 89%, 48%)', 'hsl(142, 71%, 45%)', 'hsl(38, 92%, 50%)', 'hsl(326, 100%, 74%)', 'hsl(280, 67%, 51%)', 'hsl(173, 58%, 39%)'];
 
   return (
-    <motion.div 
+    <motion.div
       initial="hidden"
       animate="visible"
       variants={containerVariants}
@@ -309,7 +386,7 @@ export function AnalyticsDashboard() {
 
             <AnimatePresence mode="wait">
               {dateFilter === 'custom' && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
@@ -386,11 +463,11 @@ export function AnalyticsDashboard() {
             <Card className="bg-card border-border hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-3">
-                  <motion.div 
+                  <motion.div
                     initial={{ scale: 0.8 }}
                     animate={{ scale: 1 }}
                     transition={{ delay: index * 0.1 }}
-                    className="p-2 rounded-lg" 
+                    className="p-2 rounded-lg"
                     style={{ backgroundColor: `${entity.color}20` }}
                   >
                     <entity.icon className="h-5 w-5" style={{ color: entity.color }} />
@@ -525,10 +602,10 @@ export function AnalyticsDashboard() {
                         borderRadius: '8px',
                       }}
                     />
-                    <Bar 
-                      dataKey="roles" 
-                      fill="hsl(var(--primary))" 
-                      radius={[0, 4, 4, 0]} 
+                    <Bar
+                      dataKey="roles"
+                      fill="hsl(var(--primary))"
+                      radius={[0, 4, 4, 0]}
                       isAnimationActive={true}
                       animationDuration={1500}
                       animationEasing="ease-out"
@@ -564,10 +641,10 @@ export function AnalyticsDashboard() {
                         borderRadius: '8px',
                       }}
                     />
-                    <Bar 
-                      dataKey="events" 
-                      fill="hsl(142, 71%, 45%)" 
-                      radius={[4, 4, 0, 0]} 
+                    <Bar
+                      dataKey="events"
+                      fill="hsl(142, 71%, 45%)"
+                      radius={[4, 4, 0, 0]}
                       isAnimationActive={true}
                       animationDuration={1500}
                       animationEasing="ease-out"

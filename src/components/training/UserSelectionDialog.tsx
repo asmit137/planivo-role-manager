@@ -71,12 +71,14 @@ const UserSelectionDialog = ({
     if (!roles?.length) return null;
 
     const isSuperAdmin = roles.some(r => r.role === 'super_admin');
+    const organizationAdmin = roles.find(r => r.role === 'organization_admin');
     const generalAdmin = roles.find(r => r.role === 'general_admin');
     const workplaceSupervisor = roles.find(r => r.role === 'workplace_supervisor');
     const facilitySupervisor = roles.find(r => r.role === 'facility_supervisor');
     const departmentHead = roles.find(r => r.role === 'department_head');
 
     if (isSuperAdmin) return { type: 'all' as const };
+    if (organizationAdmin) return { type: 'organization' as const, organizationId: organizationAdmin.organization_id };
     if (generalAdmin) return { type: 'workspace' as const, workspaceId: generalAdmin.workspace_id };
     if (workplaceSupervisor) return { type: 'workspace' as const, workspaceId: workplaceSupervisor.workspace_id };
     if (facilitySupervisor) return { type: 'facility' as const, facilityId: facilitySupervisor.facility_id };
@@ -93,16 +95,22 @@ const UserSelectionDialog = ({
       let userIds: string[] = [];
 
       try {
-        if (userScope.type === 'all' && organizationId) {
-          // Direct join to get all users in organization workspaces
-          const { data: roleData, error: roleError } = await supabase
-            .from('user_roles')
-            .select('user_id, workspaces!inner(organization_id)')
-            .eq('workspaces.organization_id', organizationId);
+        if ((userScope.type === 'all' || userScope.type === 'organization') && (organizationId || (userScope as any).organizationId)) {
+          const targetOrgId = organizationId || (userScope as any).organizationId;
 
-          if (roleError) throw roleError;
-          userIds = [...new Set(roleData?.map(r => r.user_id) || [])];
-        } else if (userScope.type === 'workspace' && userScope.workspaceId) {
+          // Split into two simple queries to avoid deep instantiation
+          const query1 = supabase.from('user_roles' as any).select('user_id, workspaces!inner(organization_id)');
+          const { data: workspaceMembers } = await (query1.eq('workspaces.organization_id', targetOrgId) as any);
+
+          const query2 = supabase.from('user_roles' as any).select('user_id');
+          const { data: directMembers } = await (query2.eq('organization_id', targetOrgId) as any);
+
+          const ids = new Set<string>();
+          (workspaceMembers as any[])?.forEach(m => ids.add(m.user_id));
+          (directMembers as any[])?.forEach(m => ids.add(m.user_id));
+          userIds = Array.from(ids);
+        }
+        else if (userScope.type === 'workspace' && userScope.workspaceId) {
           const { data: roleData, error: roleError } = await supabase
             .from('user_roles')
             .select('user_id')

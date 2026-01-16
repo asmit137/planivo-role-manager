@@ -50,7 +50,20 @@ const TrainingEventList = ({
     queryKey: ['user-org-id', user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data, error } = await supabase
+      // Try direct role first (Org Admin)
+      const { data: directOrg } = await (supabase
+        .from('user_roles')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .not('organization_id', 'is', null)
+        .limit(1)
+        .maybeSingle() as any);
+
+      if (directOrg?.organization_id) {
+        return directOrg.organization_id;
+      }
+
+      const { data: workspaceOrg, error } = await supabase
         .from('user_roles')
         .select('workspaces(organization_id)')
         .eq('user_id', user.id)
@@ -59,7 +72,7 @@ const TrainingEventList = ({
         .maybeSingle();
 
       if (error) throw error;
-      return data?.workspaces?.organization_id || null;
+      return (workspaceOrg?.workspaces as any)?.organization_id || null;
     },
     enabled: !!user && !isSuperAdmin, // Only fetch if not super admin
   });

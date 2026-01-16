@@ -8,12 +8,19 @@ import { EmptyState } from '@/components/layout/EmptyState';
 import { StatsCard } from '@/components/shared';
 import { format } from 'date-fns';
 import { safeProfileName } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import TrainingEventForm from '@/components/training/TrainingEventForm';
 
 interface OrganizationTrainingMonitorProps {
   organizationId: string;
 }
 
 const OrganizationTrainingMonitor = ({ organizationId }: OrganizationTrainingMonitorProps) => {
+  const [createOpen, setCreateOpen] = useState(false);
+
   // Get training event stats
   const { data: trainingStats, isLoading: statsLoading } = useQuery({
     queryKey: ['org-training-stats', organizationId],
@@ -67,7 +74,8 @@ const OrganizationTrainingMonitor = ({ organizationId }: OrganizationTrainingMon
           start_datetime,
           end_datetime,
           max_participants,
-          responsible_user_id
+          responsible_user_id,
+          created_by
         `)
         .eq('organization_id', organizationId)
         .order('start_datetime', { ascending: false })
@@ -83,12 +91,14 @@ const OrganizationTrainingMonitor = ({ organizationId }: OrganizationTrainingMon
             .select('*', { count: 'exact', head: true })
             .eq('event_id', event.id);
 
-          let responsibleName = 'Unknown';
-          if (event.responsible_user_id) {
+          let responsibleName = 'Unassigned Coordinator';
+          const targetUserId = event.responsible_user_id || event.created_by;
+
+          if (targetUserId) {
             const { data: profile } = await supabase
               .from('profiles')
               .select('full_name')
-              .eq('id', event.responsible_user_id)
+              .eq('id', targetUserId)
               .single();
             responsibleName = safeProfileName(profile);
           }
@@ -168,11 +178,29 @@ const OrganizationTrainingMonitor = ({ organizationId }: OrganizationTrainingMon
       {/* Recent Training Events */}
       <Card>
         <CardHeader className="px-3 sm:px-6">
-          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-            <GraduationCap className="h-5 w-5 text-primary" />
-            Recent Events
-          </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Latest training and meeting events in your organization</CardDescription>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <GraduationCap className="h-5 w-5 text-primary" />
+              Recent Events
+            </CardTitle>
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-gradient-primary text-xs sm:text-sm h-8 sm:h-9">
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Create Event
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full p-0">
+                <div className="p-1">
+                  <TrainingEventForm
+                    organizationId={organizationId}
+                    onSuccess={() => setCreateOpen(false)}
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+          <CardDescription className="text-xs sm:text-sm mt-1">Latest training and meeting events in your organization</CardDescription>
         </CardHeader>
         <CardContent className="px-3 sm:px-6">
           {!recentEvents || recentEvents.length === 0 ? (

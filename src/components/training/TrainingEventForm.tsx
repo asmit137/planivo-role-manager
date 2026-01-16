@@ -54,10 +54,11 @@ type EventFormData = z.infer<typeof eventSchema>;
 
 interface TrainingEventFormProps {
   eventId?: string;
+  organizationId?: string;
   onSuccess?: () => void;
 }
 
-const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
+const TrainingEventForm = ({ eventId, organizationId, onSuccess }: TrainingEventFormProps) => {
   const { user } = useAuth();
   const { data: roles } = useUserRole();
   const { selectedOrganizationId } = useOrganization();
@@ -84,21 +85,35 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
     enabled: isSuperAdmin,
   });
 
-  // Get user's organization from their workspace
+  // Get user's organization from their user_roles
   const { data: userOrganization } = useQuery({
     queryKey: ['user-organization', user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data, error } = await supabase
-        .from('user_roles')
+      // Try to find a role with a direct organization_id first (Org Admin)
+      const { data: directOrg, error: directError } = await (supabase
+        .from('user_roles' as any)
+        .select('organization_id, organizations(id, name)')
+        .eq('user_id', user.id)
+        .not('organization_id', 'is', null)
+        .limit(1)
+        .maybeSingle() as any);
+
+      if (!directError && directOrg?.organizations) {
+        return directOrg.organizations;
+      }
+
+      // Fallback: Get from workspace association
+      const { data: workspaceOrg, error: workspaceError } = await (supabase
+        .from('user_roles' as any)
         .select('workspace_id, workspaces(organization_id, organizations(id, name))')
         .eq('user_id', user.id)
         .not('workspace_id', 'is', null)
         .limit(1)
-        .maybeSingle();
+        .maybeSingle() as any);
 
-      if (error) throw error;
-      return data?.workspaces?.organizations;
+      if (workspaceError) throw workspaceError;
+      return workspaceOrg?.workspaces?.organizations;
     },
     enabled: !isSuperAdmin && !!user,
   });
@@ -170,9 +185,9 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
 
   // Fetch potential coordinators (admins in org)
   const { data: potentialCoordinators } = useQuery({
-    queryKey: ['potential-coordinators', userOrganization?.id, organizations],
+    queryKey: ['potential-coordinators', organizationId || userOrganization?.id, organizations],
     queryFn: async () => {
-      const orgId = userOrganization?.id || organizations?.[0]?.id;
+      const orgId = organizationId || userOrganization?.id || organizations?.[0]?.id;
       if (!orgId) return [];
 
       // Get workspaces for this org
@@ -235,7 +250,7 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
       online_link: existingEvent?.online_link || '',
       start_datetime: existingEvent?.start_datetime ? new Date(existingEvent.start_datetime).toISOString().slice(0, 16) : '',
       end_datetime: existingEvent?.end_datetime ? new Date(existingEvent.end_datetime).toISOString().slice(0, 16) : '',
-      organization_id: existingEvent?.organization_id || userOrganization?.id || '',
+      organization_id: existingEvent?.organization_id || organizationId || userOrganization?.id || '',
       max_participants: existingEvent?.max_participants || null,
       status: (existingEvent?.status as EventFormData['status']) || 'published',
       // Registration defaults
@@ -264,7 +279,7 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
   const locationType = form.watch('location_type');
   const enableVideoConference = form.watch('enable_video_conference');
   const registrationType = form.watch('registration_type');
-  const organizationId = form.watch('organization_id');
+  const currentOrgId = form.watch('organization_id');
 
   const isEventPast = existingEvent?.end_datetime ? new Date(existingEvent.end_datetime) < new Date() : false;
 
@@ -298,6 +313,19 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
           const names = profiles?.map(p => p.full_name).join(', ') || 'Selected users';
           throw new Error(`The following users are on vacation during this time: ${names}`);
         }
+      }
+
+      // Check for duplicate title within the same organization
+      const { data: existingTitle } = await supabase
+        .from('training_events')
+        .select('id')
+        .eq('organization_id', data.organization_id)
+        .eq('title', data.title)
+        .neq('id', eventId || '00000000-0000-0000-0000-000000000000')
+        .maybeSingle();
+
+      if (existingTitle) {
+        throw new Error(`An event with the title "${data.title}" already exists in this organization.`);
       }
 
       const eventData = {
@@ -526,30 +554,40 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
               <FormField
                 control={form.control}
                 name="organization_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Organization *</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      disabled={!isSuperAdmin && !!userOrganization}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select organization" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {availableOrganizations?.map((org) => (
-                          <SelectItem key={org.id} value={org.id}>
-                            {org.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const selectedOrgName = availableOrganizations?.find(org => org.id === field.value)?.name;
+
+                  return (
+                    <FormItem>
+                      <FormLabel>Organization *</FormLabel>
+                      {!isSuperAdmin ? (
+                        <div className="flex items-center h-10 w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm font-semibold text-primary">
+                          <Building className="mr-2 h-4 w-4 text-primary/70" />
+                          {selectedOrgName || 'Loading organization...'}
+                        </div>
+                      ) : (
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select organization" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {availableOrganizations?.map((org) => (
+                              <SelectItem key={org.id} value={org.id}>
+                                {org.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
 
               <FormField

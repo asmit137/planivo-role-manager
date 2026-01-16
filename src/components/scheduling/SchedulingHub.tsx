@@ -18,13 +18,15 @@ interface SchedulingHubProps {
 
 export const SchedulingHub: React.FC<SchedulingHubProps> = ({ departmentId }) => {
   const { data: roles } = useUserRole();
-  const [activeTab, setActiveTab] = useState('assignments');
-
   const isDepartmentHead = roles?.some(r => r.role === 'department_head');
   const isStaff = roles?.some(r => r.role === 'staff');
   const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
+  const isOrgAdmin = roles?.some(r => r.role === 'organization_admin' || r.role === 'general_admin');
 
-  const canManage = isDepartmentHead || isSuperAdmin;
+  const canManage = isDepartmentHead || isSuperAdmin || isOrgAdmin;
+
+  // Org Admin sees calendar first and can't use assignments
+  const [activeTab, setActiveTab] = useState((isOrgAdmin && !isDepartmentHead) ? 'calendar' : 'assignments');
 
   // Get department ID from role if not provided
   const effectiveDepartmentId = departmentId || roles?.find(r => r.department_id)?.department_id;
@@ -53,11 +55,13 @@ export const SchedulingHub: React.FC<SchedulingHubProps> = ({ departmentId }) =>
     <ErrorBoundary>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <ResponsiveTabsList>
-          <TabsTrigger value="assignments" className="min-h-[44px] px-3 text-sm">
-            <Users className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Assign Staff</span>
-            <span className="sm:hidden">Staff</span>
-          </TabsTrigger>
+          {(!isOrgAdmin || isDepartmentHead || isSuperAdmin) && (
+            <TabsTrigger value="assignments" className="min-h-[44px] px-3 text-sm">
+              <Users className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Assign Staff</span>
+              <span className="sm:hidden">Staff</span>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="calendar" className="min-h-[44px] px-3 text-sm">
             <Calendar className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Calendar</span>
@@ -76,9 +80,11 @@ export const SchedulingHub: React.FC<SchedulingHubProps> = ({ departmentId }) =>
         </ResponsiveTabsList>
 
 
-        <TabsContent value="assignments">
-          <InteractiveStaffCalendar departmentId={effectiveDepartmentId} />
-        </TabsContent>
+        {(!isOrgAdmin || isDepartmentHead || isSuperAdmin) && (
+          <TabsContent value="assignments">
+            <InteractiveStaffCalendar departmentId={effectiveDepartmentId} />
+          </TabsContent>
+        )}
 
         <TabsContent value="calendar">
           <ShiftCalendarView departmentId={effectiveDepartmentId} />

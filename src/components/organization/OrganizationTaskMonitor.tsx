@@ -8,12 +8,33 @@ import { EmptyState } from '@/components/layout/EmptyState';
 import { StatsCard } from '@/components/shared';
 import { format } from 'date-fns';
 import { safeProfileName } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import TaskManager from '../tasks/TaskManager';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface OrganizationTaskMonitorProps {
   organizationId: string;
 }
 
 const OrganizationTaskMonitor = ({ organizationId }: OrganizationTaskMonitorProps) => {
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleTaskSuccess = () => {
+    setIsCreateDialogOpen(false);
+    queryClient.invalidateQueries({ queryKey: ['org-task-stats', workspaceIds] });
+    queryClient.invalidateQueries({ queryKey: ['org-recent-tasks', workspaceIds] });
+  };
+
   // Get all workspace IDs for this organization
   const { data: workspaceIds } = useQuery({
     queryKey: ['org-workspace-ids', organizationId],
@@ -37,26 +58,26 @@ const OrganizationTaskMonitor = ({ organizationId }: OrganizationTaskMonitorProp
       const { count: active } = await supabase
         .from('tasks')
         .select('*', { count: 'exact', head: true })
-        .in('workspace_id', workspaceIds)
+        .or(`workspace_id.in.(${workspaceIds.join(',')}),scope_type.eq.organization`)
         .eq('status', 'active');
 
       const { count: completed } = await supabase
         .from('tasks')
         .select('*', { count: 'exact', head: true })
-        .in('workspace_id', workspaceIds)
+        .or(`workspace_id.in.(${workspaceIds.join(',')}),scope_type.eq.organization`)
         .eq('status', 'completed');
 
       const { count: overdue } = await supabase
         .from('tasks')
         .select('*', { count: 'exact', head: true })
-        .in('workspace_id', workspaceIds)
+        .or(`workspace_id.in.(${workspaceIds.join(',')}),scope_type.eq.organization`)
         .eq('status', 'active')
         .lt('due_date', new Date().toISOString().split('T')[0]);
 
       const { count: total } = await supabase
         .from('tasks')
         .select('*', { count: 'exact', head: true })
-        .in('workspace_id', workspaceIds);
+        .or(`workspace_id.in.(${workspaceIds.join(',')}),scope_type.eq.organization`);
 
       return {
         active: active || 0,
@@ -85,7 +106,7 @@ const OrganizationTaskMonitor = ({ organizationId }: OrganizationTaskMonitorProp
           created_by,
           scope_type
         `)
-        .in('workspace_id', workspaceIds)
+        .or(`workspace_id.in.(${workspaceIds.join(',')}),scope_type.eq.organization`)
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -177,7 +198,30 @@ const OrganizationTaskMonitor = ({ organizationId }: OrganizationTaskMonitorProp
             <ListTodo className="h-5 w-5 text-primary" />
             Recent Tasks
           </CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Latest tasks in your organization</CardDescription>
+          <div className="flex items-center justify-between mt-1">
+            <CardDescription className="text-xs sm:text-sm">Latest tasks in your organization</CardDescription>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="h-8 gap-1">
+                  <Plus className="h-3.5 w-3.5" />
+                  Create Task
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px] max-h-[95vh] overflow-hidden">
+                <DialogHeader>
+                  <DialogTitle>Create Organization Task</DialogTitle>
+                </DialogHeader>
+                <div className="py-2 overflow-y-auto max-h-[calc(95vh-120px)]">
+                  <TaskManager
+                    scopeType="organization"
+                    scopeId={organizationId}
+                    hideTaskList={true}
+                    onSuccess={handleTaskSuccess}
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent className="px-3 sm:px-6">
           {!recentTasks || recentTasks.length === 0 ? (

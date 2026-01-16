@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 const facilitySchema = z.object({
   name: z.string().min(2, 'Facility name must be at least 2 characters'),
@@ -35,6 +36,7 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
   const [selectedFacilityId, setSelectedFacilityId] = useState('');
   const [selectedDeptTemplateId, setSelectedDeptTemplateId] = useState('');
   const queryClient = useQueryClient();
+  const { selectedOrganizationId } = useOrganization();
 
   // Real-time subscriptions for live updates
   useRealtimeSubscription({
@@ -53,12 +55,19 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
   });
 
   const { data: workspaces, isLoading, isError, error } = useQuery({
-    queryKey: ['workspaces-with-facilities'],
+    queryKey: ['workspaces-with-facilities', selectedOrganizationId],
     queryFn: async () => {
-      const { data: workspacesData, error: workspacesError } = await supabase
+      let query = supabase
         .from('workspaces')
         .select('*')
         .order('name');
+
+      // Filter by organization if one is selected (not "all")
+      if (selectedOrganizationId && selectedOrganizationId !== 'all') {
+        query = query.eq('organization_id', selectedOrganizationId);
+      }
+
+      const { data: workspacesData, error: workspacesError } = await query;
 
       if (workspacesError) throw workspacesError;
 

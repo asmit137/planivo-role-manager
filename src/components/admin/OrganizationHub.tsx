@@ -8,7 +8,12 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorState } from '@/components/layout/ErrorState';
 import { ResponsiveTabsList } from '@/components/layout/ResponsiveTabsList';
 
-const OrganizationHub = () => {
+interface OrganizationHubProps {
+  organizationId?: string;
+  workspaceId?: string;
+}
+
+const OrganizationHub = ({ organizationId, workspaceId }: OrganizationHubProps = {}) => {
   return (
     <ErrorBoundary
       fallback={
@@ -20,13 +25,15 @@ const OrganizationHub = () => {
       }
     >
       <div className="space-y-4 md:space-y-6">
-        <Tabs defaultValue="organizations" className="space-y-4">
+        <Tabs defaultValue={organizationId ? "workspaces" : "organizations"} className="space-y-4">
           <ResponsiveTabsList>
-            <TabsTrigger value="organizations" className="min-h-[44px] px-3 text-sm">
-              <Building className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
-              <span className="hidden sm:inline">Organizations</span>
-              <span className="sm:hidden">Orgs</span>
-            </TabsTrigger>
+            {!organizationId && (
+              <TabsTrigger value="organizations" className="min-h-[44px] px-3 text-sm">
+                <Building className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
+                <span className="hidden sm:inline">Organizations</span>
+                <span className="sm:hidden">Orgs</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="workspaces" className="min-h-[44px] px-3 text-sm">
               <Building2 className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
               <span className="hidden sm:inline">Workspaces</span>
@@ -44,12 +51,17 @@ const OrganizationHub = () => {
             </TabsTrigger>
           </ResponsiveTabsList>
 
-          <TabsContent value="organizations">
-            <OrganizationManagement />
-          </TabsContent>
+          {!organizationId && (
+            <TabsContent value="organizations">
+              <OrganizationManagement />
+            </TabsContent>
+          )}
 
           <TabsContent value="workspaces">
-            <WorkspaceManagement />
+            <WorkspaceManagement
+              organizationId={organizationId}
+              workspaceId={workspaceId}
+            />
           </TabsContent>
 
           <TabsContent value="facilities">
@@ -57,7 +69,10 @@ const OrganizationHub = () => {
           </TabsContent>
 
           <TabsContent value="categories">
-            <CategoryDepartmentManagement />
+            <CategoryDepartmentManagement
+              organizationId={organizationId}
+              workspaceId={workspaceId}
+            />
           </TabsContent>
         </Tabs>
       </div>

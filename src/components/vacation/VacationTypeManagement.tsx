@@ -104,10 +104,24 @@ const VacationTypeManagement = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedName = formData.name.trim();
+
+    // Check for duplicate name
+    const existingType = vacationTypes?.find(
+      (t: any) =>
+        t.name.toLowerCase() === normalizedName.toLowerCase() &&
+        t.id !== editingType?.id
+    );
+
+    if (existingType) {
+      toast.error(`A vacation type with the name "${normalizedName}" already exists.`);
+      return;
+    }
+
     if (editingType) {
-      updateMutation.mutate({ id: editingType.id, data: formData });
+      updateMutation.mutate({ id: editingType.id, data: { ...formData, name: normalizedName } });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate({ ...formData, name: normalizedName });
     }
   };
 
