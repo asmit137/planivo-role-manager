@@ -29,9 +29,19 @@ interface UnifiedUserCreationProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialOrganizationId?: string;
+  organizationId?: string;
+  scope?: 'system' | 'workspace' | 'facility' | 'department';
+  scopeId?: string;
 }
 
-const UnifiedUserCreation = ({ open, onOpenChange, initialOrganizationId }: UnifiedUserCreationProps) => {
+const UnifiedUserCreation = ({
+  open,
+  onOpenChange,
+  initialOrganizationId,
+  organizationId: propOrganizationId,
+  scope,
+  scopeId: propScopeId
+}: UnifiedUserCreationProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('12345678');
   const [fullName, setFullName] = useState('');
@@ -118,10 +128,10 @@ const UnifiedUserCreation = ({ open, onOpenChange, initialOrganizationId }: Unif
 
   // Sync with initial organization ID when dialog opens
   useEffect(() => {
-    if (open && initialOrganizationId) {
-      setOrganizationId(initialOrganizationId);
+    if (open && (initialOrganizationId || propOrganizationId)) {
+      setOrganizationId(initialOrganizationId || propOrganizationId || '');
     }
-  }, [open, initialOrganizationId]);
+  }, [open, initialOrganizationId, propOrganizationId]);
 
   // DIAGNOSTIC CHECK: Verify schema exists on mount
   useEffect(() => {
@@ -440,6 +450,8 @@ const UnifiedUserCreation = ({ open, onOpenChange, initialOrganizationId }: Unif
         throw new Error("No active session");
       }
 
+
+
       const { data, error } = await supabase.functions.invoke(
         "create-user",
         {
@@ -456,6 +468,9 @@ const UnifiedUserCreation = ({ open, onOpenChange, initialOrganizationId }: Unif
             custom_role_id: userData.custom_role_id,
             force_password_change: true,
           },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
         }
       );
 
@@ -481,7 +496,7 @@ const UnifiedUserCreation = ({ open, onOpenChange, initialOrganizationId }: Unif
       if (error.context && typeof error.context.json === 'function') {
         try {
           const body = await error.context.json();
-          console.log('Processed Error Body:', body);
+          console.log('Processed Error Body:', JSON.stringify(body, null, 2));
 
           if (body.error) {
             errorMessage = body.error;

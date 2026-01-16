@@ -17,7 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Switch } from '@/components/ui/switch';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { toast } from 'sonner';
-import { Loader2, Calendar, MapPin, Link as LinkIcon, Users, Video, UserCheck, Target, X, AlertCircle, Building } from 'lucide-react';
+import { Loader2, Calendar, MapPin, Link as LinkIcon, Users, Video, UserCheck, Target, X, AlertCircle, Building, ShieldCheck } from 'lucide-react';
 import UserSelectionDialog from './UserSelectionDialog';
 
 const eventSchema = z.object({
@@ -194,6 +194,17 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
       if (!adminRoles?.length) return [];
       const userIds = [...new Set(adminRoles.map(r => r.user_id))];
 
+      // Get roles
+      const { data: userRoles } = await supabase
+        .from('user_roles')
+        .select(`
+          user_id, 
+          role, 
+          custom_role:custom_roles(name)
+        `)
+        .in('user_id', userIds)
+        .in('role', ['general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head']) as any;
+
       // Get profiles
       const { data: profiles } = await supabase
         .from('profiles')
@@ -201,7 +212,14 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
         .in('id', userIds)
         .eq('is_active', true);
 
-      return profiles || [];
+      return profiles?.map(p => {
+        const roleData = userRoles?.find(r => r.user_id === p.id);
+        return {
+          ...p,
+          role: roleData?.role,
+          custom_role_name: roleData?.custom_role?.name
+        };
+      }) || [];
     },
     enabled: !!userOrganization?.id || !!organizations?.length,
   });
@@ -247,6 +265,8 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
   const enableVideoConference = form.watch('enable_video_conference');
   const registrationType = form.watch('registration_type');
   const organizationId = form.watch('organization_id');
+
+  const isEventPast = existingEvent?.end_datetime ? new Date(existingEvent.end_datetime) < new Date() : false;
 
   const createEventMutation = useMutation({
     mutationFn: async (data: EventFormData) => {
@@ -422,6 +442,12 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
   };
 
   const availableOrganizations = isSuperAdmin ? organizations : (userOrganization ? [userOrganization] : []);
+
+  const formatRole = (role?: string, customRoleName?: string) => {
+    if (customRoleName) return customRoleName;
+    if (!role) return 'User';
+    return role.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  };
 
   return (
     <Card>
@@ -736,9 +762,15 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {potentialCoordinators?.map((coord) => (
+                            {potentialCoordinators?.map((coord: any) => (
                               <SelectItem key={coord.id} value={coord.id}>
-                                {coord.full_name} ({coord.email})
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 flex items-center gap-0.5 bg-primary/5 shrink-0">
+                                    <ShieldCheck className="h-2.5 w-2.5" />
+                                    {formatRole(coord.role, coord.custom_role_name)}
+                                  </Badge>
+                                  <span className="truncate">{coord.full_name}</span>
+                                </div>
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -909,14 +941,25 @@ const TrainingEventForm = ({ eventId, onSuccess }: TrainingEventFormProps) => {
               </CardContent>
             </Card>
 
+            {isEventPast && (
+              <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                <p className="text-sm text-amber-700 dark:text-amber-400">
+                  This event has already ended and cannot be modified.
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-3 pt-4">
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting || isEventPast}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {eventId ? 'Update Event' : 'Create Event'}
               </Button>
-              <Button type="button" variant="outline" onClick={() => form.reset()}>
-                Reset
-              </Button>
+              {!isEventPast && (
+                <Button type="button" variant="outline" onClick={() => form.reset()}>
+                  Reset
+                </Button>
+              )}
             </div>
           </form>
         </Form>

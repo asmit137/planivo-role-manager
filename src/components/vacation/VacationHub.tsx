@@ -87,53 +87,47 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
           <ResponsiveTabsList>
             <TabsTrigger value="calendar" className="min-h-[44px] px-3 text-sm">
               <CalendarDays className="h-4 w-4 mr-1.5 sm:mr-2" />
-              <span className="hidden xs:inline">Calendar</span>
-              <span className="xs:hidden">Cal</span>
+              <span>Calendar</span>
             </TabsTrigger>
             <TabsTrigger value="planner" className="min-h-[44px] px-3 text-sm">
               <Calendar className="h-4 w-4 mr-1.5 sm:mr-2" />
-              <span className="hidden xs:inline">Plan Vacation</span>
-              <span className="xs:hidden">Plan</span>
+              <span>Plan Vacation</span>
             </TabsTrigger>
             <TabsTrigger value="plans" className="min-h-[44px] px-3 text-sm">
               <List className="h-4 w-4 mr-1.5 sm:mr-2" />
-              <span className="hidden xs:inline">My Plans</span>
-              <span className="xs:hidden">Mine</span>
+              <span>My Plans</span>
             </TabsTrigger>
             {isApprover && (
               <TabsTrigger value="team-plans" className="min-h-[44px] px-3 text-sm">
                 <List className="h-4 w-4 mr-1.5 sm:mr-2" />
-                <span className="hidden xs:inline">Team Vacations</span>
-                <span className="xs:hidden">Team</span>
+                <span>Team Vacations</span>
               </TabsTrigger>
             )}
             {isApprover && (
               <TabsTrigger value="approvals" className="min-h-[44px] px-3 text-sm">
                 <CheckSquare className="h-4 w-4 mr-1.5 sm:mr-2" />
-                <span className="hidden sm:inline">Approvals</span>
-                <span className="sm:hidden">OK</span>
+                <span>Approvals</span>
               </TabsTrigger>
             )}
             {isApprover && (
               <TabsTrigger value="conflicts" className="min-h-[44px] px-3 text-sm">
                 <AlertTriangle className="h-4 w-4 mr-1.5 sm:mr-2" />
-                <span className="hidden sm:inline">Conflicts</span>
-                <span className="sm:hidden">!</span>
+                <span>Conflicts</span>
               </TabsTrigger>
             )}
             {isSuperAdmin && (
               <>
                 <TabsTrigger value="types" className="min-h-[44px] px-3 text-sm">
                   <Settings className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  <span className="hidden sm:inline">Types</span>
+                  <span>Types</span>
                 </TabsTrigger>
                 <TabsTrigger value="balances" className="min-h-[44px] px-3 text-sm">
                   <CheckSquare className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  <span className="hidden sm:inline">Balances</span>
+                  <span>Balances</span>
                 </TabsTrigger>
                 <TabsTrigger value="rules" className="min-h-[44px] px-3 text-sm">
                   <Settings className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  <span className="hidden sm:inline">Rules</span>
+                  <span>Rules</span>
                 </TabsTrigger>
               </>
             )}
@@ -167,15 +161,14 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
             </TabsContent>
           )}
 
-          {isApprover && approvalInfo && (
-            <TabsContent value="team-plans">
-              <VacationPlansList
-                scopeType={approvalInfo.scopeType}
-                scopeId={approvalInfo.scopeId}
-                departmentId={departmentId}
-              />
-            </TabsContent>
-          )}
+          <TabsContent value="team-plans">
+            <VacationPlansList
+              scopeType={approvalInfo.scopeType}
+              scopeId={approvalInfo.scopeId}
+              departmentId={departmentId}
+              isSuperAdmin={isSuperAdmin}
+            />
+          </TabsContent>
 
           {isApprover && (
             <TabsContent value="conflicts">

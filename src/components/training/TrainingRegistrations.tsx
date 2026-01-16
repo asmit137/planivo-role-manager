@@ -94,15 +94,6 @@ const TrainingRegistrations = ({ eventId }: TrainingRegistrationsProps) => {
       header: 'Status',
       cell: (row: RegistrationRow) => getStatusBadge(row.status),
     },
-    {
-      key: 'reminder_sent',
-      header: 'Reminder Sent',
-      cell: (row: RegistrationRow) => row.reminder_sent ? (
-        <Badge variant="outline" className="bg-green-50 text-green-700">Yes</Badge>
-      ) : (
-        <Badge variant="outline">No</Badge>
-      ),
-    },
   ];
 
   const registeredCount = registrations?.filter(r => r.status === 'registered').length || 0;

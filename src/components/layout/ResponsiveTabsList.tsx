@@ -16,8 +16,9 @@ export const ResponsiveTabsList = ({ children, className }: ResponsiveTabsListPr
     <div className="w-full overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0 scrollbar-hide">
       <TabsList
         className={cn(
-          "inline-flex h-auto w-full justify-start gap-1 p-1 bg-muted/20",
-          "md:flex md:flex-wrap md:justify-center",
+          "inline-flex h-auto min-w-full w-fit justify-start gap-1 p-1 bg-muted/20",
+          "flex-nowrap", // Ensure no wrapping on mobile/tablet
+          "lg:flex-wrap lg:justify-center lg:w-full", // Reset for desktop (large screens)
           className
         )}
       >

@@ -7,8 +7,18 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LoadingState } from '@/components/layout/LoadingState';
 import { toast } from 'sonner';
-import { Save, UserPlus, RefreshCcw, Pencil } from 'lucide-react';
+import { Save, UserPlus, RefreshCcw, Pencil, AlertCircle } from 'lucide-react';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function AdminBalanceManager() {
     const { organization: currentOrganization } = useOrganization();
@@ -17,6 +27,14 @@ export function AdminBalanceManager() {
     const currentYear = new Date().getFullYear();
     const [updating, setUpdating] = useState<string | null>(null);
     const [editingCell, setEditingCell] = useState<string | null>(null);
+    const [resetCounter, setResetCounter] = useState(0);
+    const [pendingUpdate, setPendingUpdate] = useState<{
+        staffId: string;
+        typeId: string;
+        accrued: number;
+        staffName: string;
+        typeName: string;
+    } | null>(null);
 
     // Fetch all staff and their balances
     const { data: staffWithBalances, isLoading } = useQuery({
@@ -163,6 +181,7 @@ export function AdminBalanceManager() {
                                                 <TableCell key={type.id}>
                                                     <div className="flex items-center gap-2">
                                                         <Input
+                                                            key={`${member.user_id}-${type.id}-${balance?.accrued || 0}-${resetCounter}`}
                                                             type="number"
                                                             className="w-20"
                                                             defaultValue={balance?.accrued || 0}
@@ -179,11 +198,12 @@ export function AdminBalanceManager() {
                                                                 }
 
                                                                 if (val !== (balance?.accrued || 0)) {
-                                                                    setUpdating(`${member.user_id}-${type.id}`);
-                                                                    updateBalanceMutation.mutate({
+                                                                    setPendingUpdate({
                                                                         staffId: member.user_id,
                                                                         typeId: type.id,
-                                                                        accrued: val
+                                                                        accrued: val,
+                                                                        staffName: member.profiles?.full_name || 'Staff member',
+                                                                        typeName: type.name
                                                                     });
                                                                 }
                                                             }}
@@ -220,6 +240,45 @@ export function AdminBalanceManager() {
                     </div>
                 </CardContent>
             </Card>
+
+            <AlertDialog open={!!pendingUpdate} onOpenChange={(open) => !open && setPendingUpdate(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                            <AlertCircle className="h-5 w-5 text-primary" />
+                            Confirm Leave Change
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to change the **{pendingUpdate?.typeName}** allowance for **{pendingUpdate?.staffName}** to **{pendingUpdate?.accrued}** days?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel
+                            onClick={() => {
+                                setResetCounter(prev => prev + 1);
+                                setPendingUpdate(null);
+                            }}
+                        >
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                if (pendingUpdate) {
+                                    setUpdating(`${pendingUpdate.staffId}-${pendingUpdate.typeId}`);
+                                    updateBalanceMutation.mutate({
+                                        staffId: pendingUpdate.staffId,
+                                        typeId: pendingUpdate.typeId,
+                                        accrued: pendingUpdate.accrued
+                                    });
+                                    setPendingUpdate(null);
+                                }
+                            }}
+                        >
+                            Confirm Change
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

@@ -17,6 +17,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { LoadingState } from '@/components/layout/LoadingState';
 
 const StaffTaskView = () => {
   const { user } = useAuth();
@@ -51,7 +52,7 @@ const StaffTaskView = () => {
     }
   };
 
-  const { data: assignments } = useQuery({
+  const { data: assignments, isLoading } = useQuery({
     queryKey: ['my-task-assignments', user?.id],
     queryFn: async () => {
       const { data: roles } = await supabase
@@ -108,6 +109,7 @@ const StaffTaskView = () => {
   });
 
   const getKanbanColumns = () => {
+    // ... existing code ...
     const cols = {
       pending: { title: 'To Do', items: [] as any[] },
       in_progress: { title: 'In Progress', items: [] as any[] },
@@ -142,7 +144,7 @@ const StaffTaskView = () => {
         .eq('id', id);
       if (error) throw error;
 
-      // Also update the parent task status if completed
+      // Also update theparent task status if completed
       if (status === 'completed' && selectedAssignment?.task_id) {
         await supabase
           .from('tasks')
@@ -172,6 +174,10 @@ const StaffTaskView = () => {
         return null;
     }
   };
+
+  if (isLoading) {
+    return <LoadingState message="Loading tasks..." />;
+  }
 
   return (
     <div className="space-y-4">

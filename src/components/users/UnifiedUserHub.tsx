@@ -10,7 +10,8 @@ import { UserPlus, RefreshCw, Pencil, Trash2, FileSpreadsheet, Lock, Filter } fr
 import { format } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsTrigger } from '@/components/ui/tabs';
+import { ResponsiveTabsList } from '@/components/layout/ResponsiveTabsList';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
@@ -381,7 +382,7 @@ const UnifiedUserHub = ({
       key: 'roles',
       header: 'Roles',
       cell: (row) => (
-        <div className="flex flex-wrap gap-1 min-w-[150px]">
+        <div className="flex flex-wrap gap-1">
           {row.roles.map((roleData: any, idx: number) => (
             <Badge key={idx} variant="outline">
               {roleData.role === 'custom' && roleData.custom_role?.name
@@ -433,7 +434,7 @@ const UnifiedUserHub = ({
       key: 'workspaces',
       header: 'Workspaces',
       cell: (row) => (
-        <div className="flex flex-wrap gap-1 min-w-[120px]">
+        <div className="flex flex-wrap gap-1">
           {row.roles
             .filter((roleData: any) => roleData.workspace_id)
             .map((roleData: any, idx: number) => {
@@ -638,7 +639,7 @@ const UnifiedUserHub = ({
         />
       }
     >
-      <div className="space-y-4 w-full overflow-x-hidden">
+      <div className="space-y-4 w-full max-w-full overflow-x-hidden">
         <UnifiedUserCreation
           open={unifiedCreateOpen}
           onOpenChange={setUnifiedCreateOpen}
@@ -693,7 +694,7 @@ const UnifiedUserHub = ({
                 </div>
               </div>
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <Button
+                {/* <Button
                   variant="outline"
                   size="icon"
                   onClick={handleManualRefresh}
@@ -702,15 +703,15 @@ const UnifiedUserHub = ({
                   title="Refresh List"
                 >
                   <RefreshCw className={`h-4 w-4 ${usersLoading ? 'animate-spin' : ''}`} />
-                </Button>
+                </Button> */}
                 {hasEditPermission && (
                   <ActionButton
                     onClick={() => setUnifiedCreateOpen(true)}
-                    className="bg-[#6366f1] hover:bg-[#4f46e5] border-none text-white flex-1 sm:flex-none h-10 sm:h-9 px-3 sm:px-6"
+                    className="bg-[#6366f1] hover:bg-[#4f46e5] border-none flex-1 sm:flex-none h-10 sm:h-9 px-3 sm:px-6"
                     disabled={isAtUserLimit}
                     title={isAtUserLimit ? 'User limit reached' : undefined}
                   >
-                    <UserPlus className="mr-2 h-4 w-4 shrink-0" />
+                    <UserPlus className="mr-1 h-4 w-4 shrink-0" />
                     <span className="text-sm font-semibold whitespace-nowrap">{detectedScope === 'department' ? 'Add Staff' : 'Create User'}</span>
                   </ActionButton>
                 )}
@@ -726,18 +727,18 @@ const UnifiedUserHub = ({
 
           <CardContent className="p-0 sm:p-6 pt-0">
             {hasBulkUpload && detectedScope === 'system' ? (
-              <Tabs defaultValue="list" className="space-y-4">
-                <div className="px-0 pt-0 sm:pt-0">
-                  <TabsList className="w-full h-auto min-h-10 bg-[#1A1F2C]/50 border border-[#2D3139] p-1 grid grid-cols-2">
-                    <TabsTrigger value="list" className="px-2 sm:px-4 text-[11px] sm:text-sm font-medium data-[state=active]:bg-[#1A1F2C] data-[state=active]:border-[#2D3139] data-[state=active]:text-white h-8 sm:h-9">
+              <Tabs defaultValue="list" className="space-y-4 w-full">
+                <div className="w-full">
+                  <ResponsiveTabsList className="grid grid-cols-2">
+                    <TabsTrigger value="list" className="px-2 sm:px-4 text-[11px] sm:text-sm font-medium h-8 sm:h-9">
                       <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2 shrink-0" />
                       User List
                     </TabsTrigger>
-                    <TabsTrigger value="bulk" className="px-2 sm:px-4 text-[11px] sm:text-sm font-medium data-[state=active]:bg-[#1A1F2C] data-[state=active]:border-[#2D3139] data-[state=active]:text-white h-8 sm:h-9">
+                    <TabsTrigger value="bulk" className="px-2 sm:px-4 text-[11px] sm:text-sm font-medium h-8 sm:h-9">
                       <FileSpreadsheet className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2 shrink-0" />
                       Bulk Upload
                     </TabsTrigger>
-                  </TabsList>
+                  </ResponsiveTabsList>
                 </div>
 
                 <TabsContent value="list" className="space-y-4 px-3 sm:px-0">
