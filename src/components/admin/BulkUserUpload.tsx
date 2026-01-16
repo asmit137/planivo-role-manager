@@ -125,6 +125,9 @@ const BulkUserUpload = ({ organizationId }: BulkUserUploadProps) => {
           users,
           organizationId
         },
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        }
       });
 
       if (error) {
@@ -136,6 +139,8 @@ const BulkUserUpload = ({ organizationId }: BulkUserUploadProps) => {
     onSuccess: (result) => {
       setUploadResult(result);
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['unified-users'] });
+      queryClient.invalidateQueries({ queryKey: ['department-staff'] });
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
 
       if (result.failed === 0) {

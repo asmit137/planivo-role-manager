@@ -19,6 +19,7 @@ interface TrainingEventListProps {
   showOnlyPublished?: boolean;
   showOnlyRegistered?: boolean;
   showAll?: boolean;
+  showOnlyUpcoming?: boolean;
   isAdminView?: boolean;
   onSelectEvent?: (eventId: string | null) => void;
 }
@@ -27,6 +28,7 @@ const TrainingEventList = ({
   showOnlyPublished = false,
   showOnlyRegistered = false,
   showAll = false,
+  showOnlyUpcoming = false,
   isAdminView = false,
   onSelectEvent,
 }: TrainingEventListProps) => {
@@ -66,7 +68,7 @@ const TrainingEventList = ({
   const effectiveOrgId = isSuperAdmin ? selectedOrganizationId : userOrgId;
 
   const { data: events, isLoading, error } = useQuery({
-    queryKey: ['training-events', showOnlyPublished, showOnlyRegistered, showAll, effectiveOrgId, isSuperAdmin],
+    queryKey: ['training-events', showOnlyPublished, showOnlyRegistered, showAll, showOnlyUpcoming, effectiveOrgId, isSuperAdmin],
     queryFn: async () => {
       let query = supabase
         .from('training_events')
@@ -81,6 +83,11 @@ const TrainingEventList = ({
       // Filter by status
       if (showOnlyPublished) {
         query = query.eq('status', 'published');
+      }
+
+      // Filter by upcoming (end date >= now)
+      if (showOnlyUpcoming) {
+        query = query.gte('end_datetime', new Date().toISOString());
       }
 
       const { data, error } = await query;

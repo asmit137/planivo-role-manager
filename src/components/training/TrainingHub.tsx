@@ -1,4 +1,11 @@
-import { Tabs, TabsContent, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
+} from '@/components/ui/dialog';
 import { Calendar, Plus, List, Users, CalendarDays, UserCheck, UsersRound } from 'lucide-react';
 import TrainingEventList from './TrainingEventList';
 import TrainingEventForm from './TrainingEventForm';
@@ -18,9 +25,9 @@ const TrainingHub = () => {
   const { data: roles, isLoading } = useUserRole();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [attendanceEventId, setAttendanceEventId] = useState<string | null>(null);
-  
+
   const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
-  const isAdmin = roles?.some(r => 
+  const isAdmin = roles?.some(r =>
     ['super_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor'].includes(r.role)
   );
 
@@ -43,36 +50,33 @@ const TrainingHub = () => {
           <ResponsiveTabsList>
             <TabsTrigger value="calendar" className="min-h-[44px] px-3 text-sm">
               <CalendarDays className="h-4 w-4 mr-1.5 sm:mr-2" />
-              <span className="hidden xs:inline">Calendar</span>
-              <span className="xs:hidden">Cal</span>
+              <span>Calendar</span>
             </TabsTrigger>
             <TabsTrigger value="events" className="min-h-[44px] px-3 text-sm">
               <Calendar className="h-4 w-4 mr-1.5 sm:mr-2" />
-              <span className="hidden sm:inline">Upcoming</span>
-              <span className="sm:hidden">Events</span>
+              <span>Upcoming</span>
             </TabsTrigger>
             <TabsTrigger value="my-registrations" className="min-h-[44px] px-3 text-sm">
               <List className="h-4 w-4 mr-1.5 sm:mr-2" />
-              <span className="hidden xs:inline">My Registrations</span>
-              <span className="xs:hidden">Mine</span>
+              <span>My Registrations</span>
             </TabsTrigger>
             {isAdmin && (
               <>
                 <TabsTrigger value="create" className="min-h-[44px] px-3 text-sm">
                   <Plus className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  <span className="hidden sm:inline">Create</span>
+                  <span>Create</span>
                 </TabsTrigger>
                 <TabsTrigger value="manage" className="min-h-[44px] px-3 text-sm">
                   <Users className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  <span className="hidden sm:inline">Manage</span>
+                  <span>Manage</span>
                 </TabsTrigger>
                 <TabsTrigger value="attendance" onClick={() => setAttendanceEventId(null)} className="min-h-[44px] px-3 text-sm">
                   <UserCheck className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  <span className="hidden sm:inline">Attendance</span>
+                  <span>Attendance</span>
                 </TabsTrigger>
                 <TabsTrigger value="groups" className="min-h-[44px] px-3 text-sm">
                   <UsersRound className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  <span className="hidden sm:inline">Groups</span>
+                  <span>Groups</span>
                 </TabsTrigger>
               </>
             )}
@@ -83,14 +87,15 @@ const TrainingHub = () => {
           </TabsContent>
 
           <TabsContent value="events">
-            <TrainingEventList 
-              showOnlyPublished={true} 
+            <TrainingEventList
+              showOnlyPublished={true}
+              showOnlyUpcoming={true}
               onSelectEvent={setSelectedEventId}
             />
           </TabsContent>
 
           <TabsContent value="my-registrations">
-            <TrainingEventList 
+            <TrainingEventList
               showOnlyRegistered={true}
               onSelectEvent={setSelectedEventId}
             />
@@ -103,20 +108,31 @@ const TrainingHub = () => {
               </TabsContent>
 
               <TabsContent value="manage">
-                <TrainingEventList 
+                <TrainingEventList
                   showAll={true}
                   isAdminView={true}
                   onSelectEvent={setSelectedEventId}
                 />
-                {selectedEventId && (
-                  <div className="mt-6">
-                    <TrainingRegistrations eventId={selectedEventId} />
-                  </div>
-                )}
+
+                <Dialog open={!!selectedEventId} onOpenChange={(open) => !open && setSelectedEventId(null)}>
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+                    <DialogHeader className="p-6 pb-2">
+                      <DialogTitle>Event Registrations</DialogTitle>
+                      <DialogDescription>
+                        View participants who have registered for this event.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex-1 overflow-y-auto px-6 pb-6 mt-2">
+                      {selectedEventId && (
+                        <TrainingRegistrations eventId={selectedEventId} />
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </TabsContent>
 
               <TabsContent value="attendance">
-                <AttendanceEventSelector 
+                <AttendanceEventSelector
                   onSelectEvent={setAttendanceEventId}
                   selectedEventId={attendanceEventId}
                 />

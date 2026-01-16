@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import VacationApprovalTimeline from './VacationApprovalTimeline';
 import { cn } from '@/lib/utils';
 import { sendVacationStatusNotification } from '@/lib/vacationNotifications';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,38 +29,53 @@ interface VacationPlansListProps {
   scopeType?: 'workspace' | 'facility' | 'department' | 'all';
   scopeId?: string;
   staffView?: boolean;
+  isSuperAdmin?: boolean;
 }
 
-const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, staffView = false }: VacationPlansListProps) => {
+const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, staffView = false, isSuperAdmin = false }: VacationPlansListProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { organization } = useOrganization();
   const [deletingPlan, setDeletingPlan] = useState<string | null>(null);
   const [submittingPlan, setSubmittingPlan] = useState<string | null>(null);
 
   const { data: plans, isLoading } = useQuery({
-    queryKey: ['vacation-plans-list', departmentId, scopeType, scopeId, staffView, user?.id],
+    queryKey: ['vacation-plans-list', departmentId, scopeType, scopeId, staffView, user?.id, organization?.id, isSuperAdmin],
     queryFn: async () => {
-      let query: any = supabase
+      const isOrgFilter = isSuperAdmin && organization?.id && organization.id !== 'all';
+
+      const departmentsSelect = isOrgFilter
+        ? 'departments!inner(name, facility_id, facilities!inner(name, workspace_id, workspaces!inner(organization_id)))'
+        : 'departments(name, facility_id, facilities!facility_id(name, workspace_id))';
+
+      let query = supabase
         .from('vacation_plans')
         .select(`
           *,
           vacation_types(name),
-          departments(name, facility_id, facilities:facility_id(name, workspace_id)),
+          ${departmentsSelect},
           vacation_splits(*),
           vacation_approvals(
             *,
-            profiles:approver_id(full_name, email)
+            profiles!approver_id(full_name, email)
           )
-        `);
+        `) as any;
 
       if (staffView) {
         query = query.eq('staff_id', user?.id);
-      } else if (scopeType === 'facility' && scopeId) {
+      } else if (scopeType === 'facility' && scopeId && scopeId !== 'all') {
         query = query.eq('facility_id', scopeId) as any;
-      } else if (scopeType === 'workspace' && scopeId) {
+      } else if (scopeType === 'workspace' && scopeId && scopeId !== 'all') {
         query = query.eq('workspace_id', scopeId) as any;
       } else if (scopeType === 'department' && (departmentId || scopeId)) {
-        query = query.eq('department_id', departmentId || scopeId!);
+        const finalId = departmentId || scopeId;
+        if (finalId && finalId !== 'all') {
+          query = query.eq('department_id', finalId);
+        }
+      }
+
+      if (isOrgFilter) {
+        query = query.eq('departments.facilities.workspaces.organization_id', organization.id).eq('status', 'approved');
       }
 
 
@@ -153,12 +169,23 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
     );
   }
 
+  if (isSuperAdmin && (!organization || organization.id === 'all')) {
+    return (
+      <Card>
+        <CardContent className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center min-h-[200px]">
+          <p className="text-lg font-medium mb-2">Organization Selection Required</p>
+          <p>Please select a specific organization from the sidebar to view vacation plans.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <>
       <Card>
         <CardHeader>
           <CardTitle>
-            {staffView ? 'My Vacation Plans' : 'Department Vacation Plans'}
+            {staffView ? 'My Vacation Plans' : isSuperAdmin ? 'Organization Vacation Plan' : 'Department Vacation Plans'}
           </CardTitle>
         </CardHeader>
         <CardContent>

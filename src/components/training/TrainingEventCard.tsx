@@ -17,8 +17,27 @@ import {
   XCircle,
   ExternalLink,
   Loader2,
-  Play
+  Play,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface TrainingEvent {
   id: string;
@@ -95,7 +114,7 @@ const TrainingEventCard = ({
       }
 
       // Check vacation availability
-      const { data: availability, error: availabilityError } = await supabase.rpc('check_staff_availability', {
+      const { data: availability, error: availabilityError } = await (supabase as any).rpc('check_staff_availability', {
         _staff_id: user.id,
         _start_time: event.start_datetime,
         _end_time: event.end_datetime
@@ -103,8 +122,9 @@ const TrainingEventCard = ({
 
       if (availabilityError) throw availabilityError;
 
-      if (availability && availability.length > 0 && !availability[0].is_available) {
-        throw new Error(availability[0].conflict_reason || 'You are on vacation during this event.');
+      const availabilityData = availability as any;
+      if (availabilityData && availabilityData.length > 0 && !availabilityData[0].is_available) {
+        throw new Error(availabilityData[0].conflict_reason || 'You are on vacation during this event.');
       }
 
       const { error } = await supabase
@@ -156,6 +176,24 @@ const TrainingEventCard = ({
     },
   });
 
+  const deleteEventMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('training_events')
+        .delete()
+        .eq('id', event.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Event deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['training-events'] });
+      queryClient.invalidateQueries({ queryKey: ['training-events-calendar'] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to delete event');
+    },
+  });
+
   const startDate = new Date(event.start_datetime);
   const endDate = new Date(event.end_datetime);
   const isEventPast = isPast(endDate);
@@ -191,7 +229,7 @@ const TrainingEventCard = ({
   };
 
   return (
-    <Card className={`transition-all hover:shadow-md ${isEventPast ? 'opacity-60' : ''}`}>
+    <Card className={`transition-all hover:shadow-md flex flex-col h-full ${isEventPast ? 'opacity-60' : ''}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-1 flex-1">
@@ -212,7 +250,7 @@ const TrainingEventCard = ({
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 flex-1">
         {event.description && (
           <p className="text-sm text-muted-foreground line-clamp-2">{event.description}</p>
         )}
@@ -309,15 +347,65 @@ const TrainingEventCard = ({
         )}
 
         {isAdminView && (
-          <>
-            <Button variant="outline" size="sm" onClick={() => onEdit?.(event.id)}>
-              Edit
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => onViewRegistrations?.(event.id)}>
-              <Users className="h-4 w-4 mr-2" />
-              Registrations ({registrationCount || 0})
-            </Button>
-          </>
+          <div className="flex items-center gap-2 w-full">
+            <div className="flex gap-2 flex-1">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-block">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onEdit?.(event.id)}
+                        disabled={isEventPast}
+                      >
+                        Edit
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {isEventPast && (
+                    <TooltipContent>
+                      <p>Completed events cannot be edited</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+
+              <Button variant="outline" size="sm" onClick={() => onViewRegistrations?.(event.id)}>
+                <Users className="h-4 w-4 mr-2" />
+                Registrations ({registrationCount || 0})
+              </Button>
+            </div>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                    Delete Event
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete "{event.title}"? This action cannot be undone and all registrations will be lost.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteEventMutation.mutate()}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    disabled={deleteEventMutation.isPending}
+                  >
+                    {deleteEventMutation.isPending ? "Deleting..." : "Delete Event"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         )}
       </CardFooter>
     </Card>
