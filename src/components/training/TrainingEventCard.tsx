@@ -379,7 +379,7 @@ const TrainingEventCard = ({
 
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0">
+                <Button variant="destructive-ghost" size="sm" className="shrink-0">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </AlertDialogTrigger>

@@ -17,8 +17,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Switch } from '@/components/ui/switch';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { toast } from 'sonner';
-import { Loader2, Calendar, MapPin, Link as LinkIcon, Users, Video, UserCheck, Target, X, AlertCircle, Building, ShieldCheck } from 'lucide-react';
+import { Loader2, Calendar, MapPin, Link as LinkIcon, Users, Video, UserCheck, Target, X, AlertCircle, Building, ShieldCheck, Search } from 'lucide-react';
 import UserSelectionDialog from './UserSelectionDialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useMemo } from 'react';
 
 const eventSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(200),
@@ -55,10 +57,11 @@ type EventFormData = z.infer<typeof eventSchema>;
 interface TrainingEventFormProps {
   eventId?: string;
   organizationId?: string;
+  departmentId?: string;
   onSuccess?: () => void;
 }
 
-const TrainingEventForm = ({ eventId, organizationId, onSuccess }: TrainingEventFormProps) => {
+const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }: TrainingEventFormProps) => {
   const { user } = useAuth();
   const { data: roles } = useUserRole();
   const { selectedOrganizationId } = useOrganization();
@@ -67,6 +70,7 @@ const TrainingEventForm = ({ eventId, organizationId, onSuccess }: TrainingEvent
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
   const [showUserSelector, setShowUserSelector] = useState(false);
+  const [inviteeSearch, setInviteeSearch] = useState('');
 
   const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
 
@@ -183,6 +187,50 @@ const TrainingEventForm = ({ eventId, organizationId, onSuccess }: TrainingEvent
     enabled: selectedUsers.length > 0,
   });
 
+  // Fetch profiles for users in selected departments
+  const { data: usersInDepartments } = useQuery({
+    queryKey: ['users-in-depts', selectedDepartments],
+    queryFn: async () => {
+      if (!selectedDepartments.length) return [];
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select(`
+          user_id,
+          profiles:user_id(id, full_name, email)
+        `)
+        .in('department_id', selectedDepartments);
+      if (error) throw error;
+
+      // Extract unique profiles
+      const profiles = data
+        ?.map((r: any) => r.profiles)
+        .filter((p, index, self) => p && self.findIndex(s => s.id === p.id) === index);
+
+      return profiles || [];
+    },
+    enabled: selectedDepartments.length > 0,
+  });
+
+  const consolidatedInvitees = useMemo(() => {
+    const directUsers = selectedUserProfiles || [];
+    const deptUsers = usersInDepartments || [];
+
+    // Combine and unique by ID
+    const combined = [...directUsers];
+    deptUsers.forEach(u => {
+      if (!combined.find(c => c.id === u.id)) {
+        combined.push(u);
+      }
+    });
+
+    if (!inviteeSearch) return combined;
+    const term = inviteeSearch.toLowerCase();
+    return combined.filter(u =>
+      u.full_name?.toLowerCase().includes(term) ||
+      u.email?.toLowerCase().includes(term)
+    );
+  }, [selectedUserProfiles, usersInDepartments, inviteeSearch]);
+
   // Fetch potential coordinators (admins in org)
   const { data: potentialCoordinators } = useQuery({
     queryKey: ['potential-coordinators', organizationId || userOrganization?.id, organizations],
@@ -263,6 +311,14 @@ const TrainingEventForm = ({ eventId, organizationId, onSuccess }: TrainingEvent
       max_video_participants: existingEvent?.max_video_participants || 100,
     },
   });
+
+  // Pre-select department for new events if departmentId is provided
+  useEffect(() => {
+    if (!eventId && departmentId && !selectedDepartments.includes(departmentId)) {
+      setSelectedDepartments([departmentId]);
+      form.setValue('registration_type', 'mandatory');
+    }
+  }, [eventId, departmentId, form]);
 
   // Load existing targets when editing
   useEffect(() => {
@@ -886,6 +942,63 @@ const TrainingEventForm = ({ eventId, organizationId, onSuccess }: TrainingEvent
                         ))}
                       </div>
                     )}
+
+                    {/* Consolidated Invitee Preview */}
+                    {(selectedUsers.length > 0 || selectedDepartments.length > 0) && (
+                      <div className="space-y-3 pt-4 border-t border-dashed mt-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-primary" />
+                            <span className="text-sm font-semibold">Invitee Preview</span>
+                            <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
+                              {consolidatedInvitees.length} Effectively Invited
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                          <Input
+                            placeholder="Find an invitee..."
+                            className="h-8 pl-8 text-xs bg-muted/30"
+                            value={inviteeSearch}
+                            onChange={(e) => setInviteeSearch(e.target.value)}
+                          />
+                        </div>
+
+                        <ScrollArea className="h-[200px] rounded-md border bg-muted/10 p-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {consolidatedInvitees.map(invitee => {
+                              const isDirect = selectedUsers.includes(invitee.id);
+                              return (
+                                <div
+                                  key={invitee.id}
+                                  className="flex items-center justify-between p-2 rounded-lg bg-background border text-[11px] group"
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-semibold truncate">{invitee.full_name}</p>
+                                    <p className="text-muted-foreground truncate opacity-70">{invitee.email}</p>
+                                  </div>
+                                  {isDirect ? (
+                                    <Badge variant="secondary" className="h-4 text-[9px] uppercase px-1">Direct</Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="h-4 text-[9px] uppercase px-1 bg-primary/5">Dept</Badge>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {consolidatedInvitees.length === 0 && (
+                              <div className="col-span-full py-12 text-center text-muted-foreground text-xs italic">
+                                {inviteeSearch ? "No users match your preview search." : "No users matched by your selections."}
+                              </div>
+                            )}
+                          </div>
+                        </ScrollArea>
+                        <p className="text-[10px] text-muted-foreground italic px-1">
+                          * This list shows all unique staff members who will receive an invitation based on your selections.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -899,7 +1012,7 @@ const TrainingEventForm = ({ eventId, organizationId, onSuccess }: TrainingEvent
               onSelectionChange={setSelectedUsers}
               selectedDepartmentIds={selectedDepartments}
               onDepartmentSelectionChange={setSelectedDepartments}
-              organizationId={organizationId}
+              organizationId={currentOrgId}
               title={registrationType === 'mandatory' ? 'Select Mandatory Attendees' : 'Select Invited Users'}
             />
 

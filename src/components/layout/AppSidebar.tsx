@@ -24,7 +24,8 @@ import {
   Archive,
   Menu,
   Briefcase,
-  MapPin
+  MapPin,
+  UserCheck
 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
@@ -64,6 +65,7 @@ interface AppSidebarProps {
 // Module configuration with icons and labels
 const moduleConfig = [
   { key: 'core', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', alwaysShow: true },
+  { key: 'user_management', label: 'Users & Roles', icon: Users, path: '/dashboard?tab=users' },
   {
     key: 'organization',
     label: 'Organization',
@@ -73,7 +75,7 @@ const moduleConfig = [
       { key: 'facilities', label: 'Facilities', path: '/dashboard?tab=facilities', icon: MapPin },
     ]
   },
-  { key: 'user_management', label: 'Users & Roles', icon: Users, path: '/dashboard?tab=users' },
+  { key: 'staff', label: 'Staff', icon: UserCheck, path: '/dashboard?tab=staff' },
   { key: 'vacation_planning', label: 'Vacation', icon: Calendar, path: '/dashboard?tab=vacation' },
   { key: 'scheduling', label: 'Scheduling', icon: CalendarClock, path: '/dashboard?tab=scheduling' },
   { key: 'task_management', label: 'Tasks', icon: CheckSquare, path: '/dashboard?tab=tasks' },
@@ -342,27 +344,40 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
   };
 
   // Filter modules based on permissions
-  const visibleModules = moduleConfig.filter(module => {
-    // Broadcasts only for Super Admin
-    if (module.key === 'emails') {
-      return isSuperAdmin;
-    }
-
-    // Hide Users tab for Workspace and Facility Supervisors
-    if (module.key === 'user_management') {
-      if (['workplace_supervisor', 'workspace_supervisor', 'facility_supervisor'].includes(primaryRole || '')) {
-        return false;
+  const visibleModules = moduleConfig
+    .map(module => {
+      // For Super Admin: transform Organization to a flat link (removes sub-items)
+      if (module.key === 'organization' && isSuperAdmin) {
+        return {
+          key: 'organization',
+          label: 'Organization',
+          icon: module.icon,
+          path: '/dashboard?tab=organization',
+        };
       }
-    }
+      return module;
+    })
+    .filter(module => {
+      // Broadcasts only for Super Admin
+      if (module.key === 'emails') {
+        return isSuperAdmin;
+      }
 
-    // General Admin gets all modules except 'modules' (Module Access)
-    if (primaryRole === 'general_admin') {
-      if (module.key === 'modules') return false;
-      return true;
-    }
+      // Hide Users tab for Workspace and Facility Supervisors
+      if (module.key === 'user_management') {
+        if (['workplace_supervisor', 'workspace_supervisor', 'facility_supervisor'].includes(primaryRole || '')) {
+          return false;
+        }
+      }
 
-    return module.alwaysShow || hasAccess(module.key);
-  });
+      // General Admin gets all modules except 'modules' (Module Access)
+      if (primaryRole === 'general_admin') {
+        if (module.key === 'modules') return false;
+        return true;
+      }
+
+      return module.alwaysShow || hasAccess(module.key);
+    });
 
   const visibleSystemModules = systemModuleConfig.filter(module =>
     hasAccess(module.key)

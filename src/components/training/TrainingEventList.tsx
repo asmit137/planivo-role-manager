@@ -9,10 +9,11 @@ import TrainingEventForm from './TrainingEventForm';
 import { LoadingState } from '@/components/layout/LoadingState';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Search, Calendar, Filter } from 'lucide-react';
+import { Search, Calendar, Filter, XCircle } from 'lucide-react';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
 interface TrainingEventListProps {
@@ -22,6 +23,7 @@ interface TrainingEventListProps {
   showOnlyUpcoming?: boolean;
   isAdminView?: boolean;
   onSelectEvent?: (eventId: string | null) => void;
+  departmentId?: string;
 }
 
 const TrainingEventList = ({
@@ -31,6 +33,7 @@ const TrainingEventList = ({
   showOnlyUpcoming = false,
   isAdminView = false,
   onSelectEvent,
+  departmentId,
 }: TrainingEventListProps) => {
   const { user } = useAuth();
   const { data: roles } = useUserRole();
@@ -81,7 +84,7 @@ const TrainingEventList = ({
   const effectiveOrgId = isSuperAdmin ? selectedOrganizationId : userOrgId;
 
   const { data: events, isLoading, error } = useQuery({
-    queryKey: ['training-events', showOnlyPublished, showOnlyRegistered, showAll, showOnlyUpcoming, effectiveOrgId, isSuperAdmin],
+    queryKey: ['training-events', showOnlyPublished, showOnlyRegistered, showAll, showOnlyUpcoming, effectiveOrgId, isSuperAdmin, departmentId],
     queryFn: async () => {
       let query = supabase
         .from('training_events')
@@ -91,6 +94,23 @@ const TrainingEventList = ({
       // Filter by organization if we have one
       if (effectiveOrgId) {
         query = query.eq('organization_id', effectiveOrgId);
+      }
+
+      // Filter by department if provided (e.g. for department heads)
+      if (departmentId) {
+        // Since training_events doesn't have a direct department_id, 
+        // we filter by events that have this department in training_event_targets
+        const { data: targetEvents } = await supabase
+          .from('training_event_targets')
+          .select('event_id')
+          .eq('department_id', departmentId)
+          .eq('target_type', 'department');
+
+        const eventIds = targetEvents?.map(te => te.event_id) || [];
+
+        // Also include events created by this user (Department Head)
+        // or where they are the responsible user
+        query = query.or(`id.in.(${eventIds.length > 0 ? eventIds.join(',') : '00000000-0000-0000-0000-000000000000'}),created_by.eq.${user?.id},responsible_user_id.eq.${user?.id}`);
       }
 
       // Filter by status
@@ -190,6 +210,20 @@ const TrainingEventList = ({
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
+            {(searchQuery || eventTypeFilter !== 'all') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('');
+                  setEventTypeFilter('all');
+                }}
+                className="h-10 text-muted-foreground hover:bg-secondary transition-colors gap-2"
+              >
+                <XCircle className="h-4 w-4" />
+                <span className="text-xs font-semibold uppercase tracking-wider">Clear Filters</span>
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

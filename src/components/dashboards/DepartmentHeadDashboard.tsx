@@ -261,7 +261,7 @@ const DepartmentHeadDashboard = () => {
 
           {activeTab === 'training' && hasAccess('training') && (
             <ModuleGuard moduleKey="training">
-              <TrainingHub />
+              <TrainingHub departmentId={userRole.department_id} />
             </ModuleGuard>
           )}
 

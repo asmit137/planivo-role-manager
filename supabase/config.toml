@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.bulk-create-staff]
 verify_jwt = false
+
+[functions.validate-module-system]
+verify_jwt = false

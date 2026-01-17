@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useUserRole } from '@/hooks/useUserRole';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LoadingState } from '@/components/layout/LoadingState';
-import { Search, Users, Building, UserPlus, X, Phone, Mail, UsersRound } from 'lucide-react';
+import { Search, Users, Building, UserPlus, X, Phone, Mail, UsersRound, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface UserSelectionDialogProps {
@@ -188,7 +189,7 @@ const UserSelectionDialog = ({
             id,
             name,
             description,
-            user_group_members(id)
+            user_group_members(user_id)
           `);
 
         if (organizationId) {
@@ -208,7 +209,8 @@ const UserSelectionDialog = ({
           name: g.name,
           description: g.description,
           member_count: (g.user_group_members as any)?.length || 0,
-        })) as UserGroup[];
+          member_ids: (g.user_group_members as any[])?.map(m => m.user_id) || [],
+        })) as (UserGroup & { member_ids: string[] })[];
       } catch (err) {
         console.error('Error fetching groups:', err);
         return [];
@@ -251,6 +253,29 @@ const UserSelectionDialog = ({
     enabled: open && !!organizationId,
   });
 
+  // Fetch profiles for users in selected departments for preview
+  const { data: usersInSelectedDepartments } = useQuery({
+    queryKey: ['users-in-selected-depts', selectedDepartmentIds],
+    queryFn: async () => {
+      if (!selectedDepartmentIds?.length) return [];
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select(`
+          user_id,
+          profiles:user_id(id, full_name)
+        `)
+        .in('department_id', selectedDepartmentIds);
+      if (error) throw error;
+
+      const profiles = data
+        ?.map((r: any) => r.profiles)
+        .filter((p, index, self) => p && self.findIndex(s => s.id === p.id) === index);
+
+      return profiles || [];
+    },
+    enabled: open && selectedDepartmentIds.length > 0,
+  });
+
   // Filter users based on search
   const filteredUsers = useMemo(() => {
     if (!users) return [];
@@ -291,18 +316,67 @@ const UserSelectionDialog = ({
     if (members?.length) {
       const newIds = members.map(m => m.user_id).filter(id => !selectedUserIds.includes(id));
       onSelectionChange([...selectedUserIds, ...newIds]);
+      toast.success(`Added ${newIds.length} members from group`);
+    } else {
+      toast.error('No members found in this group');
     }
   };
 
   const addDepartmentMembers = async (departmentId: string) => {
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('user_id')
-      .eq('department_id', departmentId);
+    // Get current users for this department
+    const deptMemberIds = users?.filter(u =>
+      // This is a bit tricky as user profile might not have dept id directly in the SelectableUser interface
+      // but we can use the users we already fetched if we had their dept IDs.
+      // Actually, we can just query it to be safe or use what we have.
+      u.department_name === departments?.find(d => d.id === departmentId)?.name
+    ).map(u => u.id) || [];
 
-    if (roles?.length) {
-      const newIds = roles.map(r => r.user_id).filter(id => !selectedUserIds.includes(id));
-      onSelectionChange([...selectedUserIds, ...newIds]);
+    if (deptMemberIds.length === 0) {
+      // Fallback to query
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('department_id', departmentId);
+
+      if (roles?.length) {
+        const ids = roles.map(r => r.user_id);
+        const allSelected = ids.every(id => selectedUserIds.includes(id));
+        if (allSelected) {
+          onSelectionChange(selectedUserIds.filter(id => !ids.includes(id)));
+          toast.success(`Removed users from department`);
+        } else {
+          onSelectionChange([...new Set([...selectedUserIds, ...ids])]);
+          toast.success(`Added ${ids.length} users from department`);
+        }
+      } else {
+        toast.error('No users found in this department');
+      }
+      return;
+    }
+
+    const allSelected = deptMemberIds.every(id => selectedUserIds.includes(id));
+    if (allSelected) {
+      onSelectionChange(selectedUserIds.filter(id => !deptMemberIds.includes(id)));
+      toast.success(`Removed users from department`);
+    } else {
+      onSelectionChange([...new Set([...selectedUserIds, ...deptMemberIds])]);
+      toast.success(`Added ${deptMemberIds.filter(id => !selectedUserIds.includes(id)).length} users from department`);
+    }
+  };
+
+  const toggleGroupMembers = (groupId: string, memberIds: string[]) => {
+    if (!memberIds.length) {
+      toast.error('No members found in this group');
+      return;
+    }
+
+    const allSelected = memberIds.every(id => selectedUserIds.includes(id));
+    if (allSelected) {
+      onSelectionChange(selectedUserIds.filter(id => !memberIds.includes(id)));
+      toast.success('Removed members from group');
+    } else {
+      onSelectionChange([...new Set([...selectedUserIds, ...memberIds])]);
+      toast.success(`Added members from group`);
     }
   };
 
@@ -334,46 +408,71 @@ const UserSelectionDialog = ({
         <div className="flex-1 flex flex-col px-6 gap-4 overflow-hidden">
 
           {/* Selected users preview */}
-          {selectedUserIds.length > 0 && (
-            <div className="flex flex-wrap gap-1 p-2 bg-muted/50 rounded-lg max-h-20 overflow-y-auto">
-              {selectedUsers.slice(0, 10).map(user => (
-                <Badge key={user.id} variant="secondary" className="gap-1">
+          {(selectedUserIds.length > 0 || selectedDepartmentIds.length > 0) && (
+            <div className="flex flex-wrap gap-1 p-2 bg-muted/50 rounded-lg max-h-24 overflow-y-auto">
+              <span className="text-[10px] w-full text-muted-foreground mb-1 font-semibold uppercase px-1">Selected Directly:</span>
+              {selectedUsers.map(user => (
+                <Badge key={user.id} variant="secondary" className="gap-1 h-5 text-[10px]">
                   {user.full_name}
                   <button
                     onClick={() => toggleUser(user.id)}
                     className="hover:bg-destructive/20 rounded-full p-0.5"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-2.5 w-2.5" />
                   </button>
                 </Badge>
               ))}
-              {departments?.filter(d => selectedDepartmentIds.includes(d.id)).map(dept => (
-                <Badge key={dept.id} variant="secondary" className="bg-primary/20 gap-1">
-                  <Building className="h-3 w-3" />
-                  {dept.name}
-                  <button
-                    onClick={() => toggleDepartmentSelection(dept.id)}
-                    className="hover:bg-destructive/20 rounded-full p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              {(selectedUserIds.length + selectedDepartmentIds.length) > 10 && (
-                <Badge variant="outline">+{(selectedUserIds.length + selectedDepartmentIds.length) - 10} more</Badge>
+
+              {selectedDepartmentIds.length > 0 && (
+                <>
+                  <span className="text-[10px] w-full text-muted-foreground mb-1 mt-2 font-semibold uppercase px-1">Selected Departments:</span>
+                  {departments?.filter(d => selectedDepartmentIds.includes(d.id)).map(dept => (
+                    <Badge key={dept.id} variant="secondary" className="bg-primary/20 gap-1 h-5 text-[10px]">
+                      <Building className="h-2.5 w-2.5" />
+                      {dept.name}
+                      <button
+                        onClick={() => toggleDepartmentSelection(dept.id)}
+                        className="hover:bg-destructive/20 rounded-full p-0.5"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </Badge>
+                  ))}
+
+                  {usersInSelectedDepartments && usersInSelectedDepartments.length > 0 && (
+                    <div className="w-full mt-2 border-t border-dashed border-primary/20 pt-1">
+                      <span className="text-[9px] text-primary/70 font-medium italic block px-1">
+                        + Including {usersInSelectedDepartments.length} users from departments
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
 
           {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, email, or phone..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, email, or phone..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSearchTerm('')}
+                className="h-10 text-muted-foreground hover:bg-secondary transition-colors gap-2"
+              >
+                <XCircle className="h-4 w-4" />
+                <span className="text-xs font-semibold uppercase tracking-wider">Clear Search</span>
+              </Button>
+            )}
           </div>
 
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
@@ -487,11 +586,15 @@ const UserSelectionDialog = ({
                           </div>
                           <Button
                             size="sm"
-                            variant="outline"
-                            onClick={() => addGroupMembers(group.id)}
+                            variant={group.member_ids.every(id => selectedUserIds.includes(id)) ? "destructive" : "outline"}
+                            onClick={() => toggleGroupMembers(group.id, group.member_ids)}
                           >
-                            <UserPlus className="h-4 w-4 mr-1" />
-                            Add All
+                            {group.member_ids.every(id => selectedUserIds.includes(id)) ? (
+                              <X className="h-4 w-4 mr-1" />
+                            ) : (
+                              <UserPlus className="h-4 w-4 mr-1" />
+                            )}
+                            {group.member_ids.every(id => selectedUserIds.includes(id)) ? "Remove All" : "Add All"}
                           </Button>
                         </div>
                       ))
@@ -542,14 +645,28 @@ const UserSelectionDialog = ({
                         <Button
                           size="sm"
                           variant="link"
-                          className="text-primary hover:no-underline"
+                          className={cn(
+                            "hover:no-underline",
+                            users?.some(u => u.department_name === dept.name && selectedUserIds.includes(u.id))
+                              ? "text-destructive hover:text-destructive/80"
+                              : "text-primary"
+                          )}
                           onClick={(e) => {
                             e.stopPropagation();
                             addDepartmentMembers(dept.id);
                           }}
                         >
-                          <UserPlus className="h-4 w-4 mr-1" />
-                          Add All Users
+                          {users?.filter(u => u.department_name === dept.name).every(id => selectedUserIds.includes(id.id)) && users?.some(u => u.department_name === dept.name) ? (
+                            <>
+                              <X className="h-4 w-4 mr-1" />
+                              Remove All Users
+                            </>
+                          ) : (
+                            <>
+                              <UserPlus className="h-4 w-4 mr-1" />
+                              Add All Users
+                            </>
+                          )}
                         </Button>
                       </div>
                     ))

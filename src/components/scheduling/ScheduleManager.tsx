@@ -533,7 +533,7 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
                         </Button>
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant="destructive-ghost"
                           onClick={() => deleteSchedule.mutate(schedule.id)}
                         >
                           <Trash2 className="h-4 w-4" />

@@ -34,14 +34,14 @@ const NotificationBell = () => {
     queryKey: ['notifications', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      
+
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20);
-      
+
       if (error) throw error;
       return data as Notification[];
     },
@@ -58,7 +58,7 @@ const NotificationBell = () => {
         .from('notifications')
         .update({ is_read: true, read_at: new Date().toISOString() })
         .eq('id', notificationId);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -70,13 +70,29 @@ const NotificationBell = () => {
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
       if (!user) return;
-      
+
       const { error } = await supabase
         .from('notifications')
         .update({ is_read: true, read_at: new Date().toISOString() })
         .eq('user_id', user.id)
         .eq('is_read', false);
-      
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+
+  const deleteAllNotificationsMutation = useMutation({
+    mutationFn: async () => {
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', user.id);
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -130,8 +146,8 @@ const NotificationBell = () => {
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <Badge 
-              variant="destructive" 
+            <Badge
+              variant="destructive"
               className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
             >
               {unreadCount > 9 ? '9+' : unreadCount}
@@ -142,16 +158,29 @@ const NotificationBell = () => {
       <DropdownMenuContent align="end" className="w-[calc(100vw-2rem)] max-w-96 p-0">
         <div className="flex items-center justify-between p-4 border-b">
           <h3 className="font-semibold">Notifications</h3>
-          {unreadCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => markAllAsReadMutation.mutate()}
-              disabled={markAllAsReadMutation.isPending}
-            >
-              Mark all as read
-            </Button>
-          )}
+          <div className="flex gap-2">
+            {notifications.length > 0 && (
+              <Button
+                variant="destructive-ghost"
+                size="sm"
+                onClick={() => deleteAllNotificationsMutation.mutate()}
+                disabled={deleteAllNotificationsMutation.isPending}
+              >
+                Clear all
+              </Button>
+            )}
+            {unreadCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => markAllAsReadMutation.mutate()}
+                disabled={markAllAsReadMutation.isPending}
+                className="hover:bg-secondary"
+              >
+                Mark all as read
+              </Button>
+            )}
+          </div>
         </div>
         <ScrollArea className="h-[400px]">
           {notifications.length === 0 ? (

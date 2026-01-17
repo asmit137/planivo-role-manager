@@ -133,9 +133,6 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
             )}
           </ResponsiveTabsList>
 
-          <LeaveBalanceView />
-
-
           <TabsContent value="calendar">
             <ErrorBoundary fallback={<ErrorState title="Calendar Error" message="Failed to load calendar view" />}>
               <VacationCalendarView departmentId={departmentId} />
@@ -147,6 +144,7 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
           </TabsContent>
 
           <TabsContent value="plans">
+            <LeaveBalanceView />
             <VacationPlansList staffView={true} />
           </TabsContent>
 

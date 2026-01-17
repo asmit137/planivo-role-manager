@@ -1,31 +1,43 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ListTodo, CheckCircle2, CheckSquare } from 'lucide-react';
+import { ListTodo, CheckSquare, Users, Search, PlusCircle, XCircle } from 'lucide-react';
 import TaskManager from './TaskManager';
 import StaffTaskView from './StaffTaskView';
 import { useUserRole } from '@/hooks/useUserRole';
 import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorState } from '@/components/layout/ErrorState';
 import { LoadingState } from '@/components/layout/LoadingState';
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { cn } from '@/lib/utils';
 
 const TaskHub = () => {
-  const { data: roles, isLoading } = useUserRole();
+  const { data: roles, isLoading: rolesLoading } = useUserRole();
+  const { organization: currentOrganization } = useOrganization();
+  const [activeTab, setActiveTab] = useState('manage');
+  const [staffSearch, setStaffSearch] = useState('');
+  const [preSelectedStaff, setPreSelectedStaff] = useState<string[]>([]);
 
   // Determine user's scope for task management
   const managerRole = roles?.find(r =>
     ['super_admin', 'organization_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head'].includes(r.role)
   );
 
+  const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
   const canManageTasks = !!managerRole;
-
-  if (isLoading) {
-    return <LoadingState message="Loading tasks..." />;
-  }
 
   const getScopeInfo = () => {
     if (!managerRole) return null;
 
     if (managerRole.role === 'super_admin') {
-      return { scopeType: 'organization' as const, scopeId: 'global' };
+      // For Super Admin, use the currently selected organization from context
+      if (!currentOrganization?.id || currentOrganization.id === 'all') return null;
+      return { scopeType: 'organization' as const, scopeId: currentOrganization.id };
     }
 
     if (['organization_admin', 'general_admin', 'workplace_supervisor'].includes(managerRole.role)) {
@@ -40,6 +52,51 @@ const TaskHub = () => {
 
   const scopeInfo = getScopeInfo();
 
+  // Fetch all staff for the "Staff List" tab
+  const { data: allStaff, isLoading: staffLoading } = useQuery({
+    queryKey: ['hub-available-staff', scopeInfo?.scopeType, scopeInfo?.scopeId],
+    queryFn: async () => {
+      if (!scopeInfo) return [];
+
+      let query = (supabase.from('user_roles').select('user_id, role, profiles:user_id(id, full_name, email)') as any);
+
+      if (scopeInfo.scopeType === 'organization') {
+        query = query.eq('organization_id', scopeInfo.scopeId);
+      } else if (scopeInfo.scopeType === 'workspace') {
+        query = query.eq('workspace_id', scopeInfo.scopeId);
+      } else if (scopeInfo.scopeType === 'facility') {
+        query = query.eq('facility_id', scopeInfo.scopeId);
+      } else if (scopeInfo.scopeType === 'department') {
+        query = query.eq('department_id', scopeInfo.scopeId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Unique by user_id
+      const uniqueStaff = Array.from(new Map(data.map(item => [item.user_id, item])).values());
+      return uniqueStaff;
+    },
+    enabled: !!scopeInfo && canManageTasks,
+  });
+
+  const filteredStaff = useMemo(() => {
+    if (!allStaff) return [];
+    return allStaff.filter((s: any) =>
+      s.profiles?.full_name?.toLowerCase().includes(staffSearch.toLowerCase()) ||
+      s.profiles?.email?.toLowerCase().includes(staffSearch.toLowerCase())
+    );
+  }, [allStaff, staffSearch]);
+
+  const handleAssignTask = (staffId: string) => {
+    setPreSelectedStaff([staffId]);
+    setActiveTab('manage');
+  };
+
+  if (rolesLoading) {
+    return <LoadingState message="Loading task systems..." />;
+  }
+
   return (
     <ErrorBoundary
       fallback={
@@ -51,24 +108,105 @@ const TaskHub = () => {
       }
     >
       <div className="space-y-4">
-        <Tabs defaultValue={canManageTasks ? "manage" : "my-tasks"} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className={cn("grid w-full", canManageTasks ? "grid-cols-3" : "grid-cols-1")}>
             {canManageTasks && (
-              <TabsTrigger value="manage">
-                <ListTodo className="h-4 w-4 mr-2" />
-                Manage Tasks
-              </TabsTrigger>
+              <>
+                <TabsTrigger value="manage">
+                  <ListTodo className="h-4 w-4 mr-2" />
+                  Manage Tasks
+                </TabsTrigger>
+                <TabsTrigger value="staff">
+                  <Users className="h-4 w-4 mr-2" />
+                  Staff List
+                </TabsTrigger>
+              </>
             )}
             <TabsTrigger value="my-tasks">
               <CheckSquare className="h-4 w-4 mr-2" />
-              {roles?.some(r => r.role === 'super_admin') ? 'Global Task Progress' : 'My Tasks'}
+              {isSuperAdmin ? 'Global Task Progress' : 'My Tasks'}
             </TabsTrigger>
           </TabsList>
 
-          {canManageTasks && scopeInfo && (
-            <TabsContent value="manage">
-              <TaskManager scopeType={scopeInfo.scopeType} scopeId={scopeInfo.scopeId} />
-            </TabsContent>
+          {canManageTasks && (
+            <>
+              <TabsContent value="manage">
+                {scopeInfo ? (
+                  <TaskManager
+                    key={`mgr-${preSelectedStaff.join(',')}`} // Force re-render if selection changes
+                    scopeType={scopeInfo.scopeType}
+                    scopeId={scopeInfo.scopeId}
+                    hideTaskList={true}
+                    initialSelectedStaffIds={preSelectedStaff}
+                  />
+                ) : (
+                  <Card className="p-12 text-center text-muted-foreground border-2 border-dashed">
+                    {isSuperAdmin ? "Please select an organization from the sidebar to manage tasks." : "No scope assigned for task management."}
+                  </Card>
+                )}
+              </TabsContent>
+
+              <TabsContent value="staff">
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search staff by name or email..."
+                        className="pl-8"
+                        value={staffSearch}
+                        onChange={(e) => setStaffSearch(e.target.value)}
+                      />
+                    </div>
+                    {staffSearch && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setStaffSearch('')}
+                        className="h-10 text-muted-foreground hover:bg-secondary transition-colors gap-2"
+                      >
+                        <XCircle className="h-4 w-4" />
+                        <span className="text-xs font-semibold uppercase tracking-wider">Clear Search</span>
+                      </Button>
+                    )}
+                  </div>
+
+                  {staffLoading ? (
+                    <LoadingState message="Fetching staff members..." />
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {filteredStaff.map((staff: any) => (
+                        <Card key={staff.user_id} className="overflow-hidden hover:shadow-md transition-shadow">
+                          <CardContent className="p-4 flex items-center justify-between">
+                            <div className="space-y-1">
+                              <p className="font-semibold text-sm leading-none">{staff.profiles?.full_name || 'Unknown User'}</p>
+                              <p className="text-xs text-muted-foreground">{staff.profiles?.email}</p>
+                              <Badge variant="outline" className="text-[10px] uppercase font-bold px-1.5 py-0">
+                                {staff.role?.replace('_', ' ')}
+                              </Badge>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
+                              onClick={() => handleAssignTask(staff.user_id)}
+                            >
+                              <PlusCircle className="h-4 w-4" />
+                              Assign
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                      {filteredStaff.length === 0 && (
+                        <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed rounded-lg">
+                          No staff members found.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </>
           )}
 
           <TabsContent value="my-tasks">

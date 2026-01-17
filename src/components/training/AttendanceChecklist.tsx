@@ -158,47 +158,37 @@ const AttendanceChecklist = ({ eventId }: AttendanceChecklistProps) => {
   // Bulk check-in all
   const bulkCheckInMutation = useMutation({
     mutationFn: async () => {
-      const unchecked = attendees?.filter(a => !a.attendance?.checked_in_at) || [];
-      
-      for (const attendee of unchecked) {
-        const { data: existing } = await supabase
-          .from('training_attendance')
-          .select('id')
-          .eq('event_id', eventId)
-          .eq('user_id', attendee.user_id)
-          .maybeSingle();
-
-        if (existing) {
-          await supabase
-            .from('training_attendance')
-            .update({
-              check_in_method: 'manual',
-              checked_in_at: new Date().toISOString(),
-              checked_in_by: user?.id,
-              attendance_status: 'present',
-            })
-            .eq('id', existing.id);
-        } else {
-          await supabase
-            .from('training_attendance')
-            .insert({
-              event_id: eventId,
-              user_id: attendee.user_id,
-              joined_at: new Date().toISOString(),
-              check_in_method: 'manual',
-              checked_in_at: new Date().toISOString(),
-              checked_in_by: user?.id,
-              attendance_status: 'present',
-            });
-        }
+      const unchecked = attendees?.filter(a => !a.attendance?.checked_in_at && a.attendance?.check_in_method !== 'auto') || [];
+      if (unchecked.length === 0) {
+        throw new Error('No pending attendees to check in');
       }
+
+      const upsertData = unchecked.map(attendee => ({
+        event_id: eventId,
+        user_id: attendee.user_id,
+        joined_at: attendee.attendance?.joined_at || new Date().toISOString(),
+        check_in_method: 'manual',
+        checked_in_at: new Date().toISOString(),
+        checked_in_by: user?.id,
+        attendance_status: 'present',
+      }));
+
+      const { error } = await supabase
+        .from('training_attendance')
+        .upsert(upsertData, {
+          onConflict: 'event_id,user_id',
+          ignoreDuplicates: false
+        });
+
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['event-attendees-checklist', eventId] });
-      toast.success('All attendees checked in');
+      toast.success('Successfully checked in all available attendees');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to bulk check-in');
+      console.error('Bulk check-in error:', error);
+      toast.error(`Check-in failed: ${error.message}`);
     },
   });
 
@@ -211,8 +201,8 @@ const AttendanceChecklist = ({ eventId }: AttendanceChecklistProps) => {
       'Registration Status': record.status,
       'Attendance Status': getAttendanceStatus(record),
       'Check-in Method': record.attendance?.check_in_method || 'N/A',
-      'Check-in Time': record.attendance?.checked_in_at 
-        ? format(new Date(record.attendance.checked_in_at), 'PPpp') 
+      'Check-in Time': record.attendance?.checked_in_at
+        ? format(new Date(record.attendance.checked_in_at), 'PPpp')
         : 'N/A',
       'Duration (minutes)': record.attendance?.duration_minutes || 0,
     }));
@@ -254,7 +244,7 @@ const AttendanceChecklist = ({ eventId }: AttendanceChecklistProps) => {
     return name.includes(search) || email.includes(search);
   });
 
-  const checkedInCount = attendees?.filter(a => 
+  const checkedInCount = attendees?.filter(a =>
     a.attendance?.checked_in_at || a.attendance?.check_in_method === 'auto'
   ).length || 0;
   const totalCount = attendees?.length || 0;
@@ -277,9 +267,9 @@ const AttendanceChecklist = ({ eventId }: AttendanceChecklistProps) => {
             </CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => bulkCheckInMutation.mutate()}
               disabled={bulkCheckInMutation.isPending}
             >
@@ -340,16 +330,16 @@ const AttendanceChecklist = ({ eventId }: AttendanceChecklistProps) => {
               <TableBody>
                 {filteredAttendees.map((record) => {
                   const isCheckedIn = Boolean(record.attendance?.checked_in_at || record.attendance?.check_in_method === 'auto');
-                  
+
                   return (
                     <TableRow key={record.id}>
                       <TableCell>
                         <Checkbox
                           checked={isCheckedIn}
                           onCheckedChange={(checked) => {
-                            checkInMutation.mutate({ 
-                              userId: record.user_id, 
-                              checkIn: checked as boolean 
+                            checkInMutation.mutate({
+                              userId: record.user_id,
+                              checkIn: checked as boolean
                             });
                           }}
                         />

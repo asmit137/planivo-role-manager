@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { LoadingState } from '@/components/layout/LoadingState';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { format, isToday, isTomorrow, startOfWeek, endOfWeek, isWithinInterval, addMinutes, isBefore } from 'date-fns';
-import { Calendar, Clock, Search, Users, MapPin, Video, Lock, CheckCircle } from 'lucide-react';
+import { Calendar, Clock, Search, Users, MapPin, Video, Lock, CheckCircle, XCircle } from 'lucide-react';
 
 interface AttendanceEventSelectorProps {
   onSelectEvent: (eventId: string) => void;
@@ -31,17 +31,17 @@ const AttendanceEventSelector = ({ onSelectEvent, selectedEventId }: AttendanceE
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return null;
-      
-      const { data, error } = await supabase
+
+      const { data, error } = await (supabase as any)
         .from('user_roles')
-        .select('workspaces(organization_id)')
+        .select('organization_id')
         .eq('user_id', userData.user.id)
-        .not('workspace_id', 'is', null)
+        .not('organization_id', 'is', null)
         .limit(1)
         .maybeSingle();
-      
+
       if (error) throw error;
-      return data?.workspaces?.organization_id;
+      return (data as any)?.organization_id ?? null;
     },
   });
 
@@ -88,7 +88,7 @@ const AttendanceEventSelector = ({ onSelectEvent, selectedEventId }: AttendanceE
         break;
     }
 
-    const matchesSearch = 
+    const matchesSearch =
       event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       event.description?.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -109,7 +109,7 @@ const AttendanceEventSelector = ({ onSelectEvent, selectedEventId }: AttendanceE
     const openTime = addMinutes(eventStart, -10);
     const diffMs = openTime.getTime() - now.getTime();
     const diffMins = Math.ceil(diffMs / (1000 * 60));
-    
+
     if (diffMins > 60) {
       const hours = Math.floor(diffMins / 60);
       const mins = diffMins % 60;
@@ -169,14 +169,30 @@ const AttendanceEventSelector = ({ onSelectEvent, selectedEventId }: AttendanceE
           </div>
 
           {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search events..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search events..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            {(searchQuery || dateFilter !== 'today') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('');
+                  setDateFilter('today');
+                }}
+                className="h-10 text-muted-foreground hover:bg-secondary transition-colors gap-2"
+              >
+                <XCircle className="h-4 w-4" />
+                <span className="text-xs font-semibold uppercase tracking-wider">Clear Filters</span>
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -187,7 +203,7 @@ const AttendanceEventSelector = ({ onSelectEvent, selectedEventId }: AttendanceE
           icon={Calendar}
           title="No Events Found"
           description={
-            dateFilter === 'today' 
+            dateFilter === 'today'
               ? "No events scheduled for today."
               : dateFilter === 'tomorrow'
                 ? "No events scheduled for tomorrow."
@@ -202,11 +218,10 @@ const AttendanceEventSelector = ({ onSelectEvent, selectedEventId }: AttendanceE
             const eventDate = new Date(event.start_datetime);
 
             return (
-              <Card 
+              <Card
                 key={event.id}
-                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
-                  isSelected ? 'ring-2 ring-primary border-primary' : ''
-                } ${!canOpen ? 'opacity-75' : ''}`}
+                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${isSelected ? 'ring-2 ring-primary border-primary' : ''
+                  } ${!canOpen ? 'opacity-75' : ''}`}
                 onClick={() => canOpen && onSelectEvent(event.id)}
               >
                 <CardContent className="pt-4 space-y-3">
@@ -256,9 +271,9 @@ const AttendanceEventSelector = ({ onSelectEvent, selectedEventId }: AttendanceE
                       </span>
                     </div>
                   ) : (
-                    <Button 
-                      variant={isSelected ? 'default' : 'outline'} 
-                      size="sm" 
+                    <Button
+                      variant={isSelected ? 'default' : 'outline'}
+                      size="sm"
                       className="w-full"
                       onClick={(e) => {
                         e.stopPropagation();

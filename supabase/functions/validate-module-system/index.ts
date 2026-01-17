@@ -1,4 +1,7 @@
+// @ts-ignore
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.84.0';
+
+declare const Deno: any;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,16 +15,68 @@ interface TestResult {
   details?: any;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
+    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+    // 1. Verify the requesting user using the token from the Authorization header
+    const authHeader = req.headers.get('Authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
+    const { data: { user: requestingUser }, error: authError } = await authClient.auth.getUser(token);
+
+    if (authError || !requestingUser) {
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({
+          error: 'Unauthorized',
+          details: authError?.message || 'Invalid token',
+          diagnostic: {
+            authErrorMessage: authError?.message,
+          }
+        }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 2. Perform actions using the SERVICE ROLE client
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // 3. Security Check: Ensure requesting user is a Super Admin
+    const { data: roleData, error: roleError } = await supabaseClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', requestingUser.id)
+      .eq('role', 'super_admin')
+      .single();
+
+    if (roleError || !roleData) {
+      console.error('Super Admin check failed:', roleError);
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: Super Admin access required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const results: TestResult[] = [];
 
@@ -40,9 +95,9 @@ Deno.serve(async (req) => {
       });
     } else {
       const expectedModules = ['core', 'user_management', 'organization', 'staff_management', 'vacation_planning', 'task_management', 'messaging', 'notifications'];
-      const actualModules = modules.map(m => m.key);
+      const actualModules = modules.map((m: any) => m.key);
       const missing = expectedModules.filter(k => !actualModules.includes(k));
-      
+
       if (missing.length > 0) {
         results.push({
           test: 'Module Definitions',
@@ -63,10 +118,10 @@ Deno.serve(async (req) => {
     // Test 2: Verify dependency integrity
     console.log('Test 2: Dependency integrity check');
     if (modules) {
-      const moduleKeys = modules.map(m => m.key);
+      const moduleKeys = modules.map((m: any) => m.key);
       let dependencyIssues: string[] = [];
 
-      modules.forEach(module => {
+      modules.forEach((module: any) => {
         if (module.depends_on && Array.isArray(module.depends_on)) {
           module.depends_on.forEach((dep: string) => {
             if (!moduleKeys.includes(dep)) {
@@ -109,7 +164,7 @@ Deno.serve(async (req) => {
       const roles = ['super_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff'];
       const accessByRole = roles.map(role => ({
         role,
-        moduleCount: roleAccess.filter(ra => ra.role === role && ra.can_view).length,
+        moduleCount: roleAccess.filter((ra: any) => ra.role === role && ra.can_view).length,
       }));
 
       // Super admin should have access to all modules
@@ -184,7 +239,7 @@ Deno.serve(async (req) => {
 
     // Test 6: Verify Core module cannot be disabled
     console.log('Test 6: Core module protection check');
-    const coreModule = modules?.find(m => m.key === 'core');
+    const coreModule = modules?.find((m: any) => m.key === 'core');
     if (coreModule && !coreModule.is_active) {
       results.push({
         test: 'Core Module Protection',

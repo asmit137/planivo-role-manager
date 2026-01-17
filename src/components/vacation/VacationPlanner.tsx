@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -11,12 +11,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format, addDays } from 'date-fns';
-import { CalendarIcon, Plus, Trash2, Info } from 'lucide-react';
+import { format, addDays, parseISO, isWithinInterval, eachDayOfInterval } from 'date-fns';
+import { CalendarIcon, Plus, Trash2, Info, AlertCircle, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { sendVacationStatusNotification } from '@/lib/vacationNotifications';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 
 interface VacationSplit {
   start_date: Date;
@@ -44,11 +46,15 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   const { user } = useAuth();
   const { organization: currentOrganization } = useOrganization();
   const queryClient = useQueryClient();
-  const [selectedStaff, setSelectedStaff] = useState('');
-  const [selectedVacationType, setSelectedVacationType] = useState('');
+  const [selectedStaff, setSelectedStaff] = useState<string>('');
+  const [selectionMode, setSelectionMode] = useState<'single' | 'group'>('single');
+  const [selectedRole, setSelectedRole] = useState<string>('staff');
+  const [selectedVacationType, setSelectedVacationType] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
-  const [splits, setSplits] = useState<VacationSplit[]>([]);
+  const [splits, setSplits] = useState<VacationSplit[]>([
+    { start_date: new Date(), end_date: new Date(), days: 1 }
+  ]);
 
   // Fetch current user's role to auto-detect behavior
   const { data: currentUserRole } = useQuery({
@@ -85,18 +91,31 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   const { data: allDepartments } = useQuery({
     queryKey: ['all-departments', currentOrganization?.id],
     queryFn: async () => {
+      // First, get all department IDs that actually have staff members
+      const { data: rolesData } = await supabase
+        .from('user_roles')
+        .select('department_id')
+        .eq('role', 'staff');
+
+      const activeDeptIds = [...new Set((rolesData || []).map(r => r.department_id).filter(Boolean))];
+
       let query = supabase
         .from('departments')
         .select('id, name, facilities!inner(name, workspaces!inner(organizations!inner(id, is_active)))')
-        .eq('facilities.workspaces.organizations.is_active', true)
-        .order('name');
+        .eq('facilities.workspaces.organizations.is_active', true);
+
+      if (activeDeptIds.length > 0) {
+        query = query.in('id', activeDeptIds);
+      } else {
+        return []; // No departments with staff
+      }
 
       // If specific organization is selected (and not 'all'), filter by it
       if (currentOrganization?.id && currentOrganization.id !== 'all') {
         query = query.eq('facilities.workspaces.organizations.id', currentOrganization.id);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.order('name');
       if (error) throw error;
       return data;
     },
@@ -187,6 +206,19 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   // Solution: If the user is a Supervisor, just allow them to be the "selectedStaff" even if not in the list, 
   // OR fetch their profile specifically.
 
+  if (!user) return null;
+
+  // Note: 'organization' and 'staffView' are not defined in the current scope.
+  // Assuming 'currentOrganization' is intended for 'organization' and 'staffOnly' for 'staffView'.
+  // If these are meant to be different, they need to be passed as props or defined.
+  if (isSuperAdmin && !currentOrganization?.id && !staffOnly) {
+    return (
+      <Card className="p-8 text-center text-muted-foreground border-2 border-dashed">
+        Initializing Organization Context...
+      </Card>
+    );
+  }
+
   const { data: userProfile } = useQuery({
     queryKey: ['user-profile', user?.id],
     queryFn: async () => {
@@ -213,16 +245,125 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     queryKey: ['staff-leave-balances', targetStaffIdForBalance, new Date().getFullYear()],
     queryFn: async () => {
       if (!targetStaffIdForBalance) return [];
-      const { data, error } = await (supabase
+
+      // 1. Get the target user's role and organization
+      const { data: userRoleData, error: roleError } = await (supabase
+        .from('user_roles' as any)
+        .select('role, organization_id')
+        .eq('user_id', targetStaffIdForBalance)
+        .maybeSingle() as any);
+
+      if (roleError) throw roleError;
+
+      // 2. Get existing individual balances
+      const { data: balances, error: balancesError } = await (supabase
         .from('leave_balances' as any) as any)
         .select('*')
         .eq('staff_id', targetStaffIdForBalance)
         .eq('year', new Date().getFullYear());
-      if (error) throw error;
-      return data;
+
+      if (balancesError) throw balancesError;
+
+      // 3. If we have a role/org, fetch the defaults
+      let defaults: any[] = [];
+      if (userRoleData?.role && userRoleData?.organization_id) {
+        const { data: defaultsData, error: defaultsError } = await (supabase
+          .from('role_vacation_defaults' as any)
+          .select('*')
+          .eq('role', userRoleData.role)
+          .eq('organization_id', userRoleData.organization_id)
+          .eq('year', new Date().getFullYear()) as any);
+
+        if (!defaultsError) defaults = defaultsData || [];
+      }
+
+      // 4. Merge: For each vacation type, use individual balance if exists, otherwise use default
+      // We need to fetch vacation types too or use the already fetched ones if possible
+      // But queryFn should be self-contained or use closures. 
+      // Since vacationTypes is available in the component, we can use it, but vacationTypes might be null initially.
+
+      const { data: vTypes } = await supabase
+        .from('vacation_types')
+        .select('id, name')
+        .eq('is_active', true);
+
+      return (vTypes || []).map(type => {
+        const individual = balances?.find((b: any) => b.vacation_type_id === type.id);
+        const roleDefault = defaults?.find((d: any) => d.vacation_type_id === type.id);
+
+        if (individual) return individual;
+
+        // Return a mock balance object based on default
+        return {
+          vacation_type_id: type.id,
+          accrued: roleDefault?.default_days || 0,
+          balance: roleDefault?.default_days || 0,
+          used: 0,
+          is_default: true // Marker for UI if needed
+        };
+      });
     },
-    enabled: !!targetStaffIdForBalance, // Removed && currentOrganization?.vacation_mode === 'full'
+    enabled: !!targetStaffIdForBalance,
   });
+
+  // Fetch team vacations for busy date indicators
+  const { data: teamVacations } = useQuery({
+    queryKey: ['team-vacations', effectiveDepartmentId],
+    queryFn: async () => {
+      if (!effectiveDepartmentId) return [];
+      const { data, error } = await supabase
+        .from('vacation_plans')
+        .select(`
+          id, staff_id, status,
+          vacation_splits(start_date, end_date, days),
+          profiles:staff_id(full_name)
+        `)
+        .eq('department_id', effectiveDepartmentId)
+        .in('status', ['pending_approval', 'approved'])
+        .neq('staff_id', user?.id || '');
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!effectiveDepartmentId,
+  });
+
+  // Calculate busy dates from team vacations
+  const busyDatesMap = useMemo(() => {
+    const map = new Map<string, { names: string[], count: number }>();
+    if (!teamVacations) return map;
+
+    teamVacations.forEach((plan: any) => {
+      const staffName = plan.profiles?.full_name || 'Unknown';
+      plan.vacation_splits?.forEach((split: any) => {
+        try {
+          const start = parseISO(split.start_date);
+          const end = parseISO(split.end_date);
+          const days = eachDayOfInterval({ start, end });
+
+          days.forEach(day => {
+            const key = format(day, 'yyyy-MM-dd');
+            const existing = map.get(key) || { names: [], count: 0 };
+            if (!existing.names.includes(staffName)) {
+              existing.names.push(staffName);
+              existing.count++;
+            }
+            map.set(key, existing);
+          });
+        } catch (e) {
+          // Skip invalid dates
+        }
+      });
+    });
+
+    return map;
+  }, [teamVacations]);
+
+  const getBusyInfo = (date: Date) => {
+    const key = format(date, 'yyyy-MM-dd');
+    return busyDatesMap.get(key);
+  };
+
 
   const createPlanMutation = useMutation({
     mutationFn: async (planData: any) => {
@@ -351,13 +492,18 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       toast.error(`Maximum ${maxSplits} splits allowed`);
       return;
     }
+    const lastSplit = splits[splits.length - 1];
+    const newStartDate = lastSplit ? addDays(new Date(lastSplit.end_date), 1) : new Date();
+    const newEndDate = addDays(newStartDate, 0); // Default to same day (1 day total)
+
     setSplits([
       ...splits,
-      { start_date: new Date(), end_date: new Date(), days: 1 },
+      { start_date: newStartDate, end_date: newEndDate, days: 1 },
     ]);
   };
 
   const removeSplit = (index: number) => {
+    if (index === 0) return; // First split is mandatory
     setSplits(splits.filter((_, i) => i !== index));
   };
 
@@ -418,7 +564,9 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     setSelectedVacationType('');
     setNotes('');
     setSelectedDepartment('');
-    setSplits([]);
+    setSplits([
+      { start_date: new Date(), end_date: new Date(), days: 1 }
+    ]);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -446,54 +594,64 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
     const totalDays = splits.reduce((sum, split) => sum + split.days, 0);
 
-    // Manager Auto-Approval Logic
-    const isManagerPlanning = (isSuperAdmin || isSupervisor || isDepartmentHead) && selectedStaff && selectedStaff !== user?.id;
-    let initialStatus = 'pending_approval';
-
-    if (isManagerPlanning) {
-      if (currentOrganization?.vacation_mode === 'full') {
-        const typeBalance = (staffBalances as any)?.find((b: any) => b.vacation_type_id === selectedVacationType);
-
-        // Strict balance check for Managers in Full Mode
-        if (!typeBalance || totalDays > (typeBalance as any).balance) {
-          const typeName = vacationTypes?.find(t => t.id === selectedVacationType)?.name || 'this vacation type';
-          const balance = typeBalance ? (typeBalance as any).balance : 0;
-          toast.error(`Insufficient leave balance. You are requesting ${totalDays} days, but only ${balance} days remain for ${typeName}. Cannot auto-approve.`);
-          return;
-        }
-        initialStatus = 'approved';
-      } else if (currentOrganization?.vacation_mode === 'planning') {
-        // Planning mode: Skip balance check and Auto-Approve
-        initialStatus = 'approved';
-      }
-    } else {
-      // Regular user or Self-Planning
-      const typeBalance = (staffBalances as any)?.find((b: any) => b.vacation_type_id === selectedVacationType);
-
-      // Balance check (Always enforce if balance exists and not in planning mode)
-      if (currentOrganization?.vacation_mode === 'full') {
-        if (typeBalance) {
-          if (totalDays > (typeBalance as any).balance) {
-            const typeName = vacationTypes?.find(t => t.id === selectedVacationType)?.name || 'this vacation type';
-            toast.error(`Insufficient leave balance. You are requesting ${totalDays} days, but only ${(typeBalance as any).balance} days remain for ${typeName}.`);
-            return;
-          }
-        }
-      }
-    }
-
-    createPlanMutation.mutate({
-      staff_id: selectedStaff,
+    const commonData = {
       vacation_type_id: selectedVacationType,
       total_days: totalDays,
       notes,
-      status: initialStatus, // Pass status to mutation
       splits: splits.map(split => ({
         start_date: format(split.start_date, 'yyyy-MM-dd'),
         end_date: format(split.end_date, 'yyyy-MM-dd'),
         days: split.days,
       })),
-    });
+    };
+
+    if (selectionMode === 'single') {
+      // Manager Auto-Approval Logic
+      const isManagerPlanning = (isSuperAdmin || isSupervisor || isDepartmentHead) && selectedStaff && selectedStaff !== user?.id;
+      let initialStatus = 'pending_approval';
+
+      if (isManagerPlanning) {
+        if (currentOrganization?.vacation_mode === 'full') {
+          const typeBalance = (staffBalances as any)?.find((b: any) => b.vacation_type_id === selectedVacationType);
+          if (!typeBalance || totalDays > (typeBalance as any).balance) {
+            const typeName = vacationTypes?.find(t => t.id === selectedVacationType)?.name || 'this vacation type';
+            const balance = typeBalance ? (typeBalance as any).balance : 0;
+            toast.error(`Insufficient leave balance for ${selectedStaff}. REQUEST: ${totalDays} days, REMAINING: ${balance} days. Cannot auto-approve.`);
+            return;
+          }
+          initialStatus = 'approved';
+        } else if (currentOrganization?.vacation_mode === 'planning') {
+          initialStatus = 'approved';
+        }
+      }
+
+      createPlanMutation.mutate({
+        ...commonData,
+        staff_id: selectedStaff,
+        status: initialStatus,
+      });
+    } else {
+      // Group Selection Mode
+      const targetUsers = (effectiveStaffList || []).filter(s => s.role === selectedRole);
+
+      if (targetUsers.length === 0) {
+        toast.error(`No users found with role: ${selectedRole}`);
+        return;
+      }
+
+      toast.info(`Creating vacations for ${targetUsers.length} users...`);
+
+      // We'll use a sequence of mutations for now or handle them via Promise.all if we had a bulk endpoint
+      // For simplicity and matching current flow, we iterate. 
+      // NOTE: In planning mode, this is safe. In full mode, some might fail due to balance.
+      targetUsers.forEach(staff => {
+        createPlanMutation.mutate({
+          ...commonData,
+          staff_id: staff.user_id,
+          status: currentOrganization?.vacation_mode === 'planning' ? 'approved' : 'pending_approval',
+        });
+      });
+    }
   };
 
   return (
@@ -530,22 +688,64 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
             </div>
           )}
 
-          {!effectiveStaffOnly && effectiveDepartmentId && (
-            <div>
-              <Label>Staff Member</Label>
-              <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select staff" />
-                </SelectTrigger>
-                <SelectContent>
-                  {effectiveStaffList?.map((staff: DepartmentStaffMember) => (
-                    <SelectItem key={staff.user_id} value={staff.user_id}>
-                      {staff.profiles?.full_name || 'Unknown User'} ({staff.profiles?.email || 'No email'})
-                      {staff.role === 'department_head' && ' (Department Head)'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {!effectiveStaffOnly && (
+            <div className="space-y-4 pt-2 border-t mt-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Selection Mode</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={selectionMode === 'single' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectionMode('single')}
+                  >
+                    Individual
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={selectionMode === 'group' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectionMode('group')}
+                  >
+                    Group / Role
+                  </Button>
+                </div>
+              </div>
+
+              {selectionMode === 'single' ? (
+                <div>
+                  <Label>Select Staff Member *</Label>
+                  <Select value={selectedStaff} onValueChange={setSelectedStaff}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select staff member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {effectiveStaffList.map((staff) => (
+                        <SelectItem key={staff.user_id} value={staff.user_id}>
+                          {staff.profiles?.full_name || 'Unknown User'} ({staff.role})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div>
+                  <Label>Select Role to Apply *</Label>
+                  <Select value={selectedRole} onValueChange={setSelectedRole}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="staff">All Staff</SelectItem>
+                      <SelectItem value="intern">All Interns</SelectItem>
+                      <SelectItem value="department_head">Department Heads</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1 italic">
+                    This will create a vacation request for all users in the selected department with this role.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -578,15 +778,17 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                 <div key={index} className="border p-3 sm:p-4 rounded-lg space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="font-semibold text-sm sm:text-base">Split {index + 1}</span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => removeSplit(index)}
-                      className="min-h-[44px] min-w-[44px]"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {index > 0 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive-ghost"
+                        onClick={() => removeSplit(index)}
+                        className="min-h-[44px] min-w-[44px]"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
@@ -608,6 +810,12 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0 z-50 pointer-events-auto max-w-[calc(100vw-2rem)]" align="start" side="bottom">
+                          <div className="p-2 pb-0">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                              <div className="w-3 h-3 bg-warning/30 rounded" />
+                              <span>Team member on leave</span>
+                            </div>
+                          </div>
                           <Calendar
                             mode="single"
                             selected={split.start_date}
@@ -615,6 +823,12 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                             disabled={{ before: new Date() }}
                             initialFocus
                             className="pointer-events-auto"
+                            modifiers={{
+                              busy: (date) => !!getBusyInfo(date)
+                            }}
+                            modifiersClassNames={{
+                              busy: 'bg-warning/30 hover:bg-warning/40 font-semibold'
+                            }}
                           />
                         </PopoverContent>
                       </Popover>
@@ -638,6 +852,12 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0 z-50 pointer-events-auto max-w-[calc(100vw-2rem)]" align="start" side="bottom">
+                          <div className="p-2 pb-0">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                              <div className="w-3 h-3 bg-warning/30 rounded" />
+                              <span>Team member on leave</span>
+                            </div>
+                          </div>
                           <Calendar
                             mode="single"
                             selected={split.end_date}
@@ -648,6 +868,12 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                             ]}
                             initialFocus
                             className="pointer-events-auto"
+                            modifiers={{
+                              busy: (date) => !!getBusyInfo(date)
+                            }}
+                            modifiersClassNames={{
+                              busy: 'bg-warning/30 hover:bg-warning/40 font-semibold'
+                            }}
                           />
                         </PopoverContent>
                       </Popover>

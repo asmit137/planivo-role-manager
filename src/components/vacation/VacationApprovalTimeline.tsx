@@ -110,209 +110,89 @@ const VacationApprovalTimeline = ({
     },
   ];
 
-  // Check if any approval has conflicts
+  // Find the final approver (the one who actually approved or rejected)
+  const finalApproval = approvals?.find(a => a.status === 'approved' || a.status === 'rejected');
   const hasAnyConflicts = approvals?.some(a => a.has_conflict);
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="h-px flex-1 bg-border" />
-        <span className="text-xs font-medium text-muted-foreground px-2">
-          APPROVAL WORKFLOW
-        </span>
-        <div className="h-px flex-1 bg-border" />
-      </div>
+  // Get role name from approval level
+  const getRoleName = (level: number) => {
+    if (level === 1) return 'Department Head';
+    if (level === 2) return 'Facility Supervisor';
+    if (level === 3) return 'Workspace Supervisor';
+    return 'Approver';
+  };
 
-      {/* Conflict Alert Banner */}
-      {hasAnyConflicts && (
-        <div className="bg-warning/10 border-2 border-warning rounded-lg p-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-warning" />
-            <span className="font-semibold text-warning">APPROVED WITH CONFLICT</span>
+  // If no approval yet (pending), show pending status
+  if (!finalApproval && currentStatus === 'pending_approval') {
+    return (
+      <div className="p-4 rounded-lg border-2 border-warning bg-warning/5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center">
+            <Clock className="h-5 w-5 text-warning" />
           </div>
-          <p className="text-sm text-muted-foreground">
-            This vacation was approved despite staffing conflicts. See details below in each approval stage.
-          </p>
+          <div>
+            <p className="font-semibold text-sm">Pending Approval</p>
+            <p className="text-xs text-muted-foreground">Waiting for supervisor approval</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If draft, don't show approval info
+  if (currentStatus === 'draft') {
+    return null;
+  }
+
+  return (
+    <div className="p-4 rounded-lg border-2 border-success bg-success/5">
+      {/* Conflict Alert if any */}
+      {hasAnyConflicts && (
+        <div className="flex items-center gap-2 mb-3 pb-3 border-b border-warning/30">
+          <AlertCircle className="h-4 w-4 text-warning" />
+          <span className="text-sm font-medium text-warning">Approved with conflict</span>
         </div>
       )}
 
-      {/* Visual Progress Line - Responsive */}
-      <div className="mb-6 sm:mb-8 overflow-x-auto">
-        <div className="min-w-[320px] px-2 sm:px-8">
-          {/* Circles and connecting lines */}
-          <div className="flex items-center justify-between sm:justify-center mb-3 sm:mb-4">
-            {stages.map((stage, index) => (
-              <div key={stage.level} className="flex items-center">
-                {/* Circle */}
-                <div
-                  className={cn(
-                    'w-10 h-10 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border-2 transition-all shrink-0',
-                    stage.status === 'approved' &&
-                    'bg-success border-success text-success-foreground',
-                    stage.status === 'rejected' &&
-                    'bg-destructive border-destructive text-destructive-foreground',
-                    stage.status === 'pending' &&
-                    'bg-warning border-warning text-warning-foreground animate-pulse',
-                    stage.status === 'waiting' && (currentStatus === 'approved' || currentStatus === 'rejected') &&
-                    'bg-success/20 border-success/40 text-success',
-                    stage.status === 'waiting' && currentStatus === 'pending_approval' &&
-                    'bg-muted border-border text-muted-foreground'
-                  )}
-                >
-                  {stage.status === 'approved' && <CheckCircle2 className="h-4 w-4 sm:h-6 sm:w-6" />}
-                  {stage.status === 'rejected' && <XCircle className="h-4 w-4 sm:h-6 sm:w-6" />}
-                  {stage.status === 'pending' && <Clock className="h-4 w-4 sm:h-6 sm:w-6" />}
-                  {stage.status === 'waiting' && (currentStatus === 'approved' || currentStatus === 'rejected') &&
-                    <CheckCircle2 className="h-4 w-4 sm:h-6 sm:w-6 opacity-50" />}
-                  {stage.status === 'waiting' && currentStatus === 'pending_approval' &&
-                    <Hourglass className="h-4 w-4 sm:h-6 sm:w-6" />}
-                </div>
-
-                {/* Connecting Line */}
-                {index < stages.length - 1 && (
-                  <div
-                    className={cn(
-                      'h-0.5 w-8 sm:w-24 md:w-32 mx-1 sm:mx-4 transition-all',
-                      (stage.status === 'approved' || currentStatus === 'approved') ? 'bg-success' : 'bg-border'
-                    )}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Labels below circles */}
-          <div className="flex items-start justify-between sm:justify-center sm:gap-24 md:gap-40">
-            {stages.map((stage) => (
-              <div key={`label-${stage.level}`} className="text-center w-20 sm:w-32">
-                <span className="text-xs sm:text-sm font-medium block mb-1">
-                  L{stage.level}
-                </span>
-              </div>
-            ))}
-          </div>
+      <div className="flex items-center gap-3">
+        <div className={cn(
+          "w-10 h-10 rounded-full flex items-center justify-center",
+          finalApproval?.status === 'approved' && "bg-success/20",
+          finalApproval?.status === 'rejected' && "bg-destructive/20"
+        )}>
+          {finalApproval?.status === 'approved' && <CheckCircle2 className="h-5 w-5 text-success" />}
+          {finalApproval?.status === 'rejected' && <XCircle className="h-5 w-5 text-destructive" />}
         </div>
-      </div>
-
-      {/* Detailed Stage Cards */}
-      <div className="space-y-3">
-        {stages.map((stage) => {
-          const stageApproval = approvals?.find(a => a.approval_level === stage.level);
-          const stageHasConflict = stageApproval?.has_conflict;
-
-          return (
-            <div
-              key={stage.level}
-              className={cn(
-                'p-4 rounded-lg border-2 transition-all',
-                stageHasConflict && 'border-warning bg-warning/5',
-                !stageHasConflict && stage.status === 'approved' && 'border-success bg-success/5',
-                !stageHasConflict && stage.status === 'rejected' && 'border-destructive bg-destructive/5',
-                !stageHasConflict && stage.status === 'pending' && 'border-warning bg-warning/5',
-                !stageHasConflict && stage.status === 'waiting' && 'border-border bg-muted/30'
-              )}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold text-sm">{stage.level}. {stage.role}</span>
-                    {getStatusBadge(stage.status, currentStatus)}
-                    {stageHasConflict && stageApproval?.conflicting_plans && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge className="bg-warning text-warning-foreground flex items-center gap-1 cursor-help">
-                              <AlertCircle className="h-3 w-3" />
-                              Conflict
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <div className="space-y-1">
-                              <p className="font-semibold text-xs">Conflicting Staff:</p>
-                              {Array.isArray(stageApproval.conflicting_plans) && stageApproval.conflicting_plans.map((cp: any, idx: number) => (
-                                <p key={idx} className="text-xs">
-                                  • {cp.staff_name}: {format(new Date(cp.start_date), 'MMM dd')} - {format(new Date(cp.end_date), 'MMM dd')} ({cp.days} days)
-                                </p>
-                              ))}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {stage.status === 'approved' ? '✅ Approved by: ' :
-                      stage.status === 'rejected' ? '❌ Rejected by: ' :
-                        stage.status === 'waiting' && (currentStatus === 'approved' || currentStatus === 'rejected') ? '🏁 Resolved by parallel action' :
-                          '⏳ Pending with: '}
-                    {(stage.status !== 'waiting' || (currentStatus !== 'approved' && currentStatus !== 'rejected')) && (
-                      <span className="font-medium text-foreground">{stage.role}</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {stage.timestamp && (
-                <p className="text-xs text-muted-foreground mb-2">
-                  {stage.status === 'approved' && 'Completed on '}
-                  {stage.status === 'rejected' && 'Action taken on '}
-                  {stage.status === 'pending' && 'Waiting since '}
-                  {format(new Date(stage.timestamp), 'PPP p')}
-                </p>
-              )}
-
-              {stage.status === 'pending' && (
-                <div className="mt-2 p-2 bg-warning/10 border border-warning/20 rounded-md">
-                  <p className="text-xs text-warning flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Currently pending final decision from {stage.role}
-                  </p>
-                </div>
-              )}
-
-              {stage.status === 'waiting' && currentStatus === 'pending_approval' && (
-                <p className="text-xs text-muted-foreground">
-                  ⏸️ Waiting for previous approval
-                </p>
-              )}
-
-              {/* Show conflict details if this stage had conflicts */}
-              {stageHasConflict && stageApproval && (
-                <div className="mt-3 p-3 bg-warning/10 border border-warning rounded-md space-y-2">
-                  <p className="text-sm font-semibold text-warning flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
-                    Conflicting Staff Identified
-                  </p>
-                  {stageApproval.conflicting_plans && Array.isArray(stageApproval.conflicting_plans) && (
-                    <div className="space-y-1 pl-4">
-                      {stageApproval.conflicting_plans.map((cp: any, idx: number) => (
-                        <div key={idx} className="text-sm border-l-2 border-warning pl-2">
-                          <p className="font-medium">{cp.staff_name}</p>
-                          <p className="text-muted-foreground text-xs">
-                            {format(new Date(cp.start_date), 'MMM dd')} - {format(new Date(cp.end_date), 'MMM dd, yyyy')} ({cp.days} days)
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {stageApproval.conflict_reason && (
-                    <div className="mt-2 p-2 bg-background rounded text-xs">
-                      <span className="font-medium">Approval Reason: </span>
-                      <span className="text-muted-foreground">{stageApproval.conflict_reason}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {stage.comments && (
-                <div className="mt-2 p-2 bg-background rounded text-xs">
-                  <span className="font-medium">💬 Comment: </span>
-                  <span className="text-muted-foreground">{stage.comments}</span>
-                </div>
-              )}
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <Badge className={cn(
+              "text-xs",
+              finalApproval?.status === 'approved' && "bg-success text-success-foreground",
+              finalApproval?.status === 'rejected' && "bg-destructive text-destructive-foreground"
+            )}>
+              {finalApproval?.status === 'approved' ? 'Approved' : 'Rejected'}
+            </Badge>
+          </div>
+          <p className="text-sm">
+            <span className="text-muted-foreground">
+              {finalApproval?.status === 'approved' ? 'Approved by: ' : 'Rejected by: '}
+            </span>
+            <span className="font-medium">
+              {finalApproval?.profiles?.full_name || getRoleName(finalApproval?.approval_level || 3)}
+            </span>
+          </p>
+          {finalApproval?.updated_at && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {format(new Date(finalApproval.updated_at), 'PPP p')}
+            </p>
+          )}
+          {finalApproval?.comments && (
+            <div className="mt-2 p-2 bg-background rounded text-xs">
+              <span className="font-medium">Comment: </span>
+              <span className="text-muted-foreground">{finalApproval.comments}</span>
             </div>
-          );
-        })}
+          )}
+        </div>
       </div>
     </div>
   );

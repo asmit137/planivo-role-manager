@@ -242,42 +242,58 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
             </div>
 
             {/* Time Range Filters Row */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-              <span className="text-[9px] sm:text-sm font-semibold uppercase tracking-wider text-muted-foreground shrink-0 w-10 sm:w-auto">Range</span>
-              <div className="flex flex-wrap gap-1 sm:gap-2">
-                <Button
-                  variant={timeFilter === '30' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setTimeFilter('30')}
-                  className="h-6 sm:h-9 px-1.5 sm:px-3 text-[9px] sm:text-sm min-w-[40px] sm:min-w-0"
-                >
-                  30d
-                </Button>
-                <Button
-                  variant={timeFilter === '60' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setTimeFilter('60')}
-                  className="h-6 sm:h-9 px-1.5 sm:px-3 text-[9px] sm:text-sm min-w-[40px] sm:min-w-0"
-                >
-                  60d
-                </Button>
-                <Button
-                  variant={timeFilter === '90' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setTimeFilter('90')}
-                  className="h-6 sm:h-9 px-1.5 sm:px-3 text-[9px] sm:text-sm min-w-[40px] sm:min-w-0"
-                >
-                  90d
-                </Button>
-                <Button
-                  variant={timeFilter === 'all' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setTimeFilter('all')}
-                  className="h-6 sm:h-9 px-1.5 sm:px-3 text-[9px] sm:text-sm min-w-[40px] sm:min-w-0"
-                >
-                  All
-                </Button>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                <span className="text-[9px] sm:text-sm font-semibold uppercase tracking-wider text-muted-foreground shrink-0 w-10 sm:w-auto">Range</span>
+                <div className="flex flex-wrap gap-1 sm:gap-2">
+                  <Button
+                    variant={timeFilter === '30' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTimeFilter('30')}
+                    className="h-6 sm:h-9 px-1.5 sm:px-3 text-[9px] sm:text-sm min-w-[40px] sm:min-w-0"
+                  >
+                    30d
+                  </Button>
+                  <Button
+                    variant={timeFilter === '60' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTimeFilter('60')}
+                    className="h-6 sm:h-9 px-1.5 sm:px-3 text-[9px] sm:text-sm min-w-[40px] sm:min-w-0"
+                  >
+                    60d
+                  </Button>
+                  <Button
+                    variant={timeFilter === '90' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTimeFilter('90')}
+                    className="h-6 sm:h-9 px-1.5 sm:px-3 text-[9px] sm:text-sm min-w-[40px] sm:min-w-0"
+                  >
+                    90d
+                  </Button>
+                  <Button
+                    variant={timeFilter === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTimeFilter('all')}
+                    className="h-6 sm:h-9 px-1.5 sm:px-3 text-[9px] sm:text-sm min-w-[40px] sm:min-w-0"
+                  >
+                    All
+                  </Button>
+                </div>
               </div>
+
+              {(timeFilter !== '30' || statusFilter !== 'all') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setTimeFilter('30');
+                    setStatusFilter('all');
+                  }}
+                  className="h-6 sm:h-8 text-[9px] sm:text-sm text-muted-foreground hover:bg-secondary transition-colors"
+                >
+                  Clear Filters
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>

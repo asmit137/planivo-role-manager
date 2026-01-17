@@ -45,7 +45,7 @@ const DepartmentManagement = () => {
         .from('facilities')
         .select('*, workspaces(name)')
         .order('name');
-      
+
       if (error) throw error;
       return data;
     },
@@ -60,7 +60,7 @@ const DepartmentManagement = () => {
         .eq('is_active', true)
         .order('is_system_default', { ascending: false })
         .order('name');
-      
+
       if (error) throw error;
       return data;
     },
@@ -74,7 +74,7 @@ const DepartmentManagement = () => {
         .select('*, facilities(name, workspaces(name))')
         .is('parent_department_id', null)
         .order('name');
-      
+
       if (error) throw error;
 
       const deptsWithSubs = await Promise.all(
@@ -84,7 +84,7 @@ const DepartmentManagement = () => {
             .select('*')
             .eq('parent_department_id', dept.id)
             .order('name');
-          
+
           if (subError) throw subError;
 
           return {
@@ -139,7 +139,7 @@ const DepartmentManagement = () => {
         .eq('parent_department_id', departmentId);
 
       if (checkError) throw checkError;
-      
+
       if (subdepts && subdepts.length > 0) {
         throw new Error('Cannot delete department with subdepartments. Delete subdepartments first.');
       }
@@ -150,7 +150,7 @@ const DepartmentManagement = () => {
         .eq('department_id', departmentId);
 
       if (userError) throw userError;
-      
+
       if (users && users.length > 0) {
         throw new Error('Cannot delete department with assigned users. Reassign users first.');
       }
@@ -421,12 +421,12 @@ const DepartmentManagement = () => {
                             <Pencil className="h-3 w-3" />
                           </Button>
                           <Button
-                            variant="ghost"
+                            variant="destructive-ghost"
                             size="icon"
                             onClick={() => deleteDepartmentMutation.mutate(dept.id)}
                             disabled={deleteDepartmentMutation.isPending}
                           >
-                            <Trash2 className="h-3 w-3 text-destructive" />
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
                       </TableCell>
@@ -455,12 +455,12 @@ const DepartmentManagement = () => {
                               <Pencil className="h-3 w-3" />
                             </Button>
                             <Button
-                              variant="ghost"
+                              variant="destructive-ghost"
                               size="icon"
                               onClick={() => deleteDepartmentMutation.mutate(sub.id)}
                               disabled={deleteDepartmentMutation.isPending}
                             >
-                              <Trash2 className="h-3 w-3 text-destructive" />
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
                         </TableCell>

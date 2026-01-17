@@ -39,6 +39,16 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
   const [deletingPlan, setDeletingPlan] = useState<string | null>(null);
   const [submittingPlan, setSubmittingPlan] = useState<string | null>(null);
 
+  if (!user) return null;
+
+  if (isSuperAdmin && !organization?.id && !staffView) {
+    return (
+      <Card className="p-8 text-center text-muted-foreground border-2 border-dashed">
+        Initializing Organization Context...
+      </Card>
+    );
+  }
+
   const { data: plans, isLoading } = useQuery({
     queryKey: ['vacation-plans-list', departmentId, scopeType, scopeId, staffView, user?.id, organization?.id, isSuperAdmin],
     queryFn: async () => {
@@ -53,6 +63,7 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
         .select(`
           *,
           vacation_types(name),
+          profiles:staff_id(full_name, email),
           ${departmentsSelect},
           vacation_splits(*),
           vacation_approvals(
@@ -78,23 +89,10 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
         query = query.eq('departments.facilities.workspaces.organization_id', organization.id).eq('status', 'approved');
       }
 
-
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
 
-      // Fetch staff profiles
-      const enrichedPlans = await Promise.all(
-        (data || []).map(async (plan) => {
-          const { data: staffProfile } = await supabase
-            .from('profiles')
-            .select('full_name, email')
-            .eq('id', plan.staff_id)
-            .single();
-          return { ...plan, staff_profile: staffProfile };
-        })
-      );
-
-      return enrichedPlans;
+      return data || [];
     },
     enabled: !!user,
   });
@@ -246,10 +244,10 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
                             <div className="flex items-center gap-2 mb-2">
                               <User className="h-4 w-4 text-muted-foreground" />
                               <span className="font-semibold">
-                                {plan.staff_profile?.full_name}
+                                {plan.profiles?.full_name}
                               </span>
                               <span className="text-sm text-muted-foreground">
-                                ({plan.staff_profile?.email})
+                                ({plan.profiles?.email})
                               </span>
                             </div>
                           )}
@@ -404,7 +402,7 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
                             Submit for Approval
                           </Button>
                           <Button
-                            variant="destructive"
+                            variant="destructive-ghost"
                             onClick={() => setDeletingPlan(plan.id)}
                             disabled={deleteMutation.isPending}
                           >
