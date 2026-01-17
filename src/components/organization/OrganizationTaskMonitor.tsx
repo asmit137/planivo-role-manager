@@ -10,6 +10,12 @@ import { format } from 'date-fns';
 import { safeProfileName } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { MessageSquare } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '@/lib/auth';
 import {
   Dialog,
   DialogContent,
@@ -18,15 +24,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import TaskManager from '../tasks/TaskManager';
-import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 
 interface OrganizationTaskMonitorProps {
   organizationId: string;
 }
 
 const OrganizationTaskMonitor = ({ organizationId }: OrganizationTaskMonitorProps) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isMessaging, setIsMessaging] = useState(false);
   const queryClient = useQueryClient();
 
   const handleTaskSuccess = () => {
@@ -119,15 +126,98 @@ const OrganizationTaskMonitor = ({ organizationId }: OrganizationTaskMonitorProp
         .select('id, full_name')
         .in('id', creatorIds);
 
+      // Fetch task assignments and assigned profiles
+      const taskIds = tasks?.map(t => t.id) || [];
+      const { data: assignments } = await supabase
+        .from('task_assignments')
+        .select('task_id, assigned_to, profiles:assigned_to(id, full_name)')
+        .in('task_id', taskIds);
+
       return tasks?.map(task => ({
         ...task,
         creatorName: safeProfileName(profiles?.find(p => p.id === task.created_by)),
+        assignments: assignments?.filter(a => a.task_id === task.id) || [],
       })) || [];
     },
     enabled: !!workspaceIds && workspaceIds.length > 0,
   });
 
   const isLoading = statsLoading || tasksLoading;
+
+  const handleMessageUser = async (targetUserId: string) => {
+    if (!user || !targetUserId) return;
+    if (user.id === targetUserId) {
+      toast.info("You're messaging yourself (Note to Self)");
+    }
+
+    setIsMessaging(true);
+    try {
+      const { data: existingParticipant, error: searchError } = await (supabase.from('conversation_participants') as any)
+        .select('conversation_id')
+        .eq('user_id', user.id);
+
+      if (searchError) throw searchError;
+
+      let existingConvoId = null;
+
+      if (existingParticipant && existingParticipant.length > 0) {
+        const convoIds = existingParticipant.map(p => p.conversation_id);
+        const { data: otherParticipants, error: otherError } = await (supabase.from('conversation_participants') as any)
+          .select('conversation_id')
+          .in('conversation_id', convoIds)
+          .eq('user_id', targetUserId);
+
+        if (otherError) throw otherError;
+
+        if (otherParticipants && otherParticipants.length > 0) {
+          const targetConvoIds = otherParticipants.map(p => p.conversation_id);
+          const { data: dms, error: dmsError } = await (supabase.from('conversations') as any)
+            .select('id')
+            .in('id', targetConvoIds)
+            .eq('is_group', false)
+            .neq('type', 'channel');
+
+          if (dmsError) throw dmsError;
+          if (dms && dms.length > 0) existingConvoId = dms[0].id;
+        }
+      }
+
+      if (existingConvoId) {
+        navigate(`/dashboard?tab=messaging&convo=${existingConvoId}`);
+      } else {
+        const { data: conversation, error: convError } = await (supabase.from('conversations') as any)
+          .insert({
+            title: null,
+            is_group: false,
+            type: 'dm',
+            created_by: user.id,
+          } as any)
+          .select()
+          .single();
+
+        if (convError) throw convError;
+
+        const participants = [
+          { conversation_id: conversation.id, user_id: user.id },
+          { conversation_id: conversation.id, user_id: targetUserId }
+        ];
+
+        const { error: partError } = await (supabase.from('conversation_participants') as any)
+          .insert(participants);
+
+        if (partError) throw partError;
+
+        queryClient.invalidateQueries({ queryKey: ['discord-dms'] });
+        navigate(`/dashboard?tab=messaging&convo=${conversation.id}`);
+        toast.success('Starting new conversation');
+      }
+    } catch (error: any) {
+      console.error('Error in handleMessageUser:', error);
+      toast.error('Failed to initiate messaging');
+    } finally {
+      setIsMessaging(false);
+    }
+  };
 
   if (isLoading) {
     return <LoadingState message="Loading task data..." />;
@@ -234,7 +324,7 @@ const OrganizationTaskMonitor = ({ organizationId }: OrganizationTaskMonitorProp
             <div className="space-y-3">
               {recentTasks.map((task: any) => (
                 <div key={task.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border bg-muted/30 gap-3">
-                  <div className="space-y-1">
+                  <div className="space-y-2 flex-1 min-w-0">
                     <div className="flex items-center justify-between sm:justify-start gap-2">
                       <p className="font-medium text-sm sm:text-base line-clamp-1">{task.title}</p>
                       <div className="sm:hidden flex gap-1">
@@ -242,11 +332,46 @@ const OrganizationTaskMonitor = ({ organizationId }: OrganizationTaskMonitorProp
                         {getStatusBadge(task.status)}
                       </div>
                     </div>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                      By {task.creatorName} · {task.scope_type}
-                    </p>
+
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
+                        By {task.creatorName}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 text-primary hover:text-primary hover:bg-primary/20"
+                        onClick={() => handleMessageUser(task.created_by)}
+                        disabled={isMessaging}
+                        title="Message Creator"
+                      >
+                        <MessageSquare className="h-3 w-3" />
+                      </Button>
+                      <span className="text-xs text-muted-foreground">· {task.scope_type}</span>
+                    </div>
+
+                    {task.assignments && task.assignments.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {task.assignments.map((a: any) => (
+                          <div key={a.assigned_to} className="flex items-center gap-1 bg-accent/30 px-1.5 py-0.5 rounded border border-accent/20">
+                            <span className="text-[10px] font-medium max-w-[80px] truncate">{a.profiles?.full_name || 'User'}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-4 w-4 text-primary hover:text-primary hover:bg-primary/20 p-0"
+                              onClick={() => handleMessageUser(a.assigned_to)}
+                              disabled={isMessaging}
+                              title="Message Staff"
+                            >
+                              <MessageSquare className="h-2.5 w-2.5" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     {task.due_date && (
-                      <p className="text-[10px] sm:text-xs text-muted-foreground">
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
                         Due: {format(new Date(task.due_date), 'MMM d, yyyy')}
                       </p>
                     )}
