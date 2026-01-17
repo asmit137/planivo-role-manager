@@ -598,13 +598,13 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
                   {/* Only show delete if NOT in scoped mode */}
                   {!workspaceId && (
                     <Button
-                      variant="ghost"
+                      variant="destructive-ghost"
                       size="sm"
                       className="h-8 w-8 sm:h-9 sm:w-9 p-0 ml-auto sm:ml-0"
                       onClick={() => deleteMutation.mutate(workspace.id)}
                       disabled={deleteMutation.isPending}
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
                 </div>

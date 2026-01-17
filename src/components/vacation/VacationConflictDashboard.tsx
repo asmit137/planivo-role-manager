@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,9 +9,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { format, parseISO, isWithinInterval } from 'date-fns';
-import { AlertCircle, Calendar, Users, Filter, X } from 'lucide-react';
+import { AlertCircle, Calendar, Users, Filter, X, Mail, ExternalLink, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { useAuth } from '@/lib/auth';
+import { sendVacationStatusNotification } from '@/lib/vacationNotifications';
 
 interface ConflictDashboardProps {
   scopeType?: 'workspace' | 'facility' | 'department' | 'all';
@@ -19,15 +31,114 @@ interface ConflictDashboardProps {
 }
 
 const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashboardProps) => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [selectedPlanToReject, setSelectedPlanToReject] = useState<any>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
+  const clearFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setSelectedDepartment('all');
+  };
+
+  // Reject vacation mutation
+  const rejectMutation = useMutation({
+    mutationFn: async ({ planId, reason }: { planId: string; reason: string }) => {
+      // Update vacation plan status to rejected
+      const { error: planError } = await supabase
+        .from('vacation_plans')
+        .update({ status: 'rejected' })
+        .eq('id', planId);
+
+      if (planError) throw planError;
+
+      // Update all splits to rejected
+      const { error: splitsError } = await supabase
+        .from('vacation_splits')
+        .update({ status: 'rejected' })
+        .eq('vacation_plan_id', planId);
+
+      if (splitsError) throw splitsError;
+
+      // Add approval record with rejection
+      const { error: approvalError } = await supabase
+        .from('vacation_approvals')
+        .insert({
+          vacation_plan_id: planId,
+          approval_level: 1,
+          approver_id: user?.id || '',
+          status: 'rejected',
+          comments: `Rejected due to conflict: ${reason}`,
+          has_conflict: true,
+          conflict_reason: reason,
+        });
+
+      if (approvalError) throw approvalError;
+
+      // Return the plan data for notification
+      return { planId, reason };
+    },
+    onSuccess: async (data) => {
+      // Send notification to staff
+      if (data && selectedPlanToReject) {
+        await sendVacationStatusNotification(
+          data.planId,
+          'rejected',
+          selectedPlanToReject.staff_id,
+          undefined,
+          `Conflict found: ${data.reason}`
+        );
+      }
+      queryClient.invalidateQueries({ queryKey: ['vacation-conflicts'] });
+      queryClient.invalidateQueries({ queryKey: ['vacation-plans'] });
+      toast.success('Vacation rejected successfully');
+      setShowRejectDialog(false);
+      setSelectedPlanToReject(null);
+      setRejectReason('');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to reject vacation');
+    },
+  });
+
+  const handleRejectClick = (plan: any) => {
+    setSelectedPlanToReject(plan);
+    setShowRejectDialog(true);
+  };
+
+  const confirmReject = () => {
+    if (!selectedPlanToReject || !rejectReason.trim()) {
+      toast.error('Please provide a reason for rejection');
+      return;
+    }
+    rejectMutation.mutate({
+      planId: selectedPlanToReject.id,
+      reason: rejectReason,
+    });
+  };
   // Fetch departments for filtering
   const { data: departments } = useQuery({
     queryKey: ['departments', scopeId],
     queryFn: async () => {
-      let query = supabase.from('departments').select('id, name, facility_id, facilities(workspace_id)');
+      // First, get all department IDs that actually have staff members
+      const { data: rolesData } = await supabase
+        .from('user_roles')
+        .select('department_id')
+        .eq('role', 'staff');
+
+      const activeDeptIds = [...new Set((rolesData || []).map(r => r.department_id).filter(Boolean))];
+
+      if (activeDeptIds.length === 0) return [];
+
+      let query = supabase
+        .from('departments')
+        .select('id, name, facility_id, facilities(workspace_id)')
+        .in('id', activeDeptIds);
 
       if (scopeType === 'facility' && scopeId) {
         query = query.eq('facility_id', scopeId);
@@ -186,11 +297,7 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
     },
   });
 
-  const clearFilters = () => {
-    setStartDate('');
-    setEndDate('');
-    setSelectedDepartment('all');
-  };
+
 
   const hasActiveFilters = startDate || endDate || selectedDepartment !== 'all';
 
@@ -208,7 +315,7 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
             </CardDescription>
           </div>
           {hasActiveFilters && (
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="w-full sm:w-auto min-h-[40px]">
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="w-full sm:w-auto min-h-[40px] text-muted-foreground hover:bg-secondary transition-colors">
               <X className="h-4 w-4 mr-2" />
               Clear Filters
             </Button>
@@ -219,10 +326,23 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
         {/* Filters */}
         <Card className="mb-6 bg-muted/50">
           <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              Filters
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                <CardTitle>Filters</CardTitle>
+              </div>
+              {(startDate || endDate || selectedDepartment !== 'all') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="h-8 text-muted-foreground hover:bg-secondary transition-colors"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Clear Filters
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -363,6 +483,35 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
                         </p>
                       </div>
                     )}
+
+                    {/* Quick Actions */}
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {conflict.plans.map((plan: any) => (
+                        <div key={plan.id} className="flex gap-2">
+                          {plan.profiles?.email && (
+                            <a
+                              href={`mailto:${plan.profiles.email}?subject=Vacation Conflict - Schedule Adjustment Needed&body=Hi ${plan.profiles.full_name},%0D%0A%0D%0AYour vacation request has a scheduling conflict with another team member. Please review and coordinate your dates.%0D%0A%0D%0AThank you.`}
+                              className="inline-flex"
+                            >
+                              <Button variant="outline" size="sm" className="gap-1">
+                                <Mail className="h-3 w-3" />
+                                Contact {plan.profiles.full_name?.split(' ')[0]}
+                              </Button>
+                            </a>
+                          )}
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => handleRejectClick(plan)}
+                            disabled={rejectMutation.isPending}
+                          >
+                            <XCircle className="h-3 w-3" />
+                            Reject {plan.profiles?.full_name?.split(' ')[0]}'s Leave
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -380,6 +529,69 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
           )}
         </ScrollArea>
       </CardContent>
+
+      {/* Reject Confirmation Dialog */}
+      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <XCircle className="h-5 w-5" />
+              Reject Vacation Request
+            </DialogTitle>
+            <DialogDescription>
+              You are about to reject the vacation request for{' '}
+              <strong>{selectedPlanToReject?.profiles?.full_name}</strong>.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+              <p className="text-sm font-medium">Vacation Details:</p>
+              <p className="text-sm text-muted-foreground">
+                Type: {selectedPlanToReject?.vacation_types?.name}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Duration: {selectedPlanToReject?.vacation_splits?.reduce((sum: number, s: any) => sum + s.days, 0)} days
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="reject-reason" className="text-sm font-medium">
+                Reason for Rejection <span className="text-destructive">*</span>
+              </Label>
+              <Textarea
+                id="reject-reason"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Please explain why this vacation is being rejected due to the conflict..."
+                rows={3}
+                className="mt-1.5"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRejectDialog(false);
+                setSelectedPlanToReject(null);
+                setRejectReason('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmReject}
+              disabled={rejectMutation.isPending || !rejectReason.trim()}
+            >
+              {rejectMutation.isPending ? 'Rejecting...' : 'Confirm Rejection'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

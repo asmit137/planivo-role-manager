@@ -21,14 +21,18 @@ import { LoadingState } from '@/components/layout/LoadingState';
 import { ResponsiveTabsList } from '@/components/layout/ResponsiveTabsList';
 import { useState } from 'react';
 
-const TrainingHub = () => {
+interface TrainingHubProps {
+  departmentId?: string;
+}
+
+const TrainingHub = ({ departmentId }: TrainingHubProps) => {
   const { data: roles, isLoading } = useUserRole();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [attendanceEventId, setAttendanceEventId] = useState<string | null>(null);
 
   const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
   const isAdmin = roles?.some(r =>
-    ['super_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor'].includes(r.role)
+    ['super_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head'].includes(r.role)
   );
 
   const orgAdminRole = roles?.find(r => r.role === 'organization_admin');
@@ -94,6 +98,7 @@ const TrainingHub = () => {
               showOnlyPublished={true}
               showOnlyUpcoming={true}
               onSelectEvent={setSelectedEventId}
+              departmentId={departmentId}
             />
           </TabsContent>
 
@@ -107,7 +112,10 @@ const TrainingHub = () => {
           {isAdmin && (
             <>
               <TabsContent value="create">
-                <TrainingEventForm organizationId={userOrgId || undefined} />
+                <TrainingEventForm
+                  organizationId={userOrgId || undefined}
+                  departmentId={departmentId}
+                />
               </TabsContent>
 
               <TabsContent value="manage">
@@ -115,6 +123,7 @@ const TrainingHub = () => {
                   showAll={true}
                   isAdminView={true}
                   onSelectEvent={setSelectedEventId}
+                  departmentId={departmentId}
                 />
 
                 <Dialog open={!!selectedEventId} onOpenChange={(open) => !open && setSelectedEventId(null)}>

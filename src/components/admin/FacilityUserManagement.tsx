@@ -458,9 +458,9 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
                                         <span className="text-[10px] text-muted-foreground uppercase">{dept.category}</span>
                                       </div>
                                       <Button
-                                        variant="ghost"
+                                        variant="destructive-ghost"
                                         size="icon"
-                                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
+                                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                                         onClick={() => {
                                           if (confirm(`Are you sure you want to remove ${dept.name}?`)) {
                                             deleteDeptMutation.mutate(dept.id);

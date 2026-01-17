@@ -60,6 +60,21 @@ const NotificationHub = () => {
     },
   });
 
+  const deleteAllNotificationsMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      toast.success('All notifications cleared');
+    },
+  });
+
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
@@ -93,78 +108,92 @@ const NotificationHub = () => {
       }
     >
       <Card className="border-2">
-      <CardHeader className="pb-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <CardTitle className="text-lg sm:text-xl">All Notifications</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">View and manage your notifications</CardDescription>
+        <CardHeader className="pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-lg sm:text-xl">All Notifications</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">View and manage your notifications</CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+              {notifications && notifications.length > 0 && (
+                <Button
+                  variant="destructive-outline"
+                  size="sm"
+                  onClick={() => deleteAllNotificationsMutation.mutate()}
+                  disabled={deleteAllNotificationsMutation.isPending}
+                  className="flex-1 sm:flex-none min-h-[40px]"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clear All
+                </Button>
+              )}
+              {unreadCount > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => markAllAsReadMutation.mutate()}
+                  disabled={markAllAsReadMutation.isPending}
+                  className="flex-1 sm:flex-none min-h-[40px] hover:bg-secondary"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Mark All as Read
+                </Button>
+              )}
+            </div>
           </div>
-          {unreadCount > 0 && (
-            <Button
-              variant="outline"
-              onClick={() => markAllAsReadMutation.mutate()}
-              disabled={markAllAsReadMutation.isPending}
-              className="w-full sm:w-auto min-h-[44px]"
-            >
-              <Check className="h-4 w-4 mr-2" />
-              Mark All as Read
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        {notifications && notifications.length > 0 ? (
-          <div className="space-y-3">
-            {notifications.map((notification) => (
-              <div
-                key={notification.id}
-                className={`p-3 sm:p-4 border rounded-lg ${
-                  !notification.is_read ? 'bg-primary/5 border-primary/20' : 'bg-muted/30'
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-semibold">{notification.title}</h4>
-                      {!notification.is_read && (
-                        <Badge variant="default" className="text-xs">New</Badge>
-                      )}
+        </CardHeader>
+        <CardContent>
+          {notifications && notifications.length > 0 ? (
+            <div className="space-y-3">
+              {notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`p-3 sm:p-4 border rounded-lg ${!notification.is_read ? 'bg-primary/5 border-primary/20' : 'bg-muted/30'
+                    }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-semibold">{notification.title}</h4>
+                        {!notification.is_read && (
+                          <Badge variant="default" className="text-xs">New</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{notification.message}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(notification.created_at || ''), { addSuffix: true })}
+                      </p>
                     </div>
-                    <p className="text-sm text-muted-foreground">{notification.message}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(notification.created_at || ''), { addSuffix: true })}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!notification.is_read && (
+                    <div className="flex items-center gap-2">
+                      {!notification.is_read && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => markAsReadMutation.mutate(notification.id)}
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
-                        variant="ghost"
+                        variant="destructive-ghost"
                         size="icon"
-                        onClick={() => markAsReadMutation.mutate(notification.id)}
+                        onClick={() => deleteNotificationMutation.mutate(notification.id)}
                       >
-                        <Check className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => deleteNotificationMutation.mutate(notification.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No notifications</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No notifications</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </ErrorBoundary>
   );
 };

@@ -12,26 +12,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { CalendarIcon, Plus } from 'lucide-react';
+import { CalendarIcon, Plus, Check, ChevronsUpDown, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
 interface TaskManagerProps {
   scopeType: 'workspace' | 'facility' | 'department' | 'organization';
   scopeId: string;
   hideTaskList?: boolean;
   onSuccess?: () => void;
+  initialSelectedStaffIds?: string[];
 }
 
-const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess }: TaskManagerProps) => {
+const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelectedStaffIds }: TaskManagerProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState<Date>();
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
-  const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState<string[]>(initialSelectedStaffIds || []);
+  const [staffSearch, setStaffSearch] = useState('');
+  const [staffDropdownOpen, setStaffDropdownOpen] = useState(false);
 
   // Real-time subscriptions for live updates
   useRealtimeSubscription({
@@ -50,7 +54,7 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess }: TaskManage
       if (scopeType === 'organization') {
         const { data: userRoles, error: rolesError } = await (supabase
           .from('user_roles' as any)
-          .select('user_id')
+          .select('user_id, role')
           .eq('organization_id', scopeId) as any);
 
         if (rolesError) throw rolesError;
@@ -67,16 +71,19 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess }: TaskManage
 
         if (error) throw error;
 
-        return profiles.map(profile => ({
-          user_id: profile.id,
-          profiles: profile
-        }));
+        return profiles.map(profile => {
+          const userRole = (userRoles as any[]).find(r => r.user_id === profile.id);
+          return {
+            user_id: profile.id,
+            role: userRole?.role || 'staff',
+            profiles: profile
+          };
+        });
       }
 
       let query = supabase
         .from('user_roles')
-        .select('user_id')
-        .eq('role', 'staff');
+        .select('user_id, role');
 
       if (scopeType === 'workspace') {
         query = query.eq('workspace_id', scopeId);
@@ -103,6 +110,7 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess }: TaskManage
 
       return roles.map(role => ({
         user_id: role.user_id,
+        role: role.role || 'staff',
         profiles: profilesArray.find(p => p.id === role.user_id) || {
           id: role.user_id,
           full_name: 'Unknown User',
@@ -241,6 +249,11 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess }: TaskManage
       return;
     }
 
+    if (selectedStaff.length === 0) {
+      toast.error('Please assign at least one staff member');
+      return;
+    }
+
     createTaskMutation.mutate({
       title,
       description,
@@ -339,7 +352,7 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess }: TaskManage
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label>Assign To (Optional)</Label>
+                <Label>Assign To *</Label>
                 {availableStaff && availableStaff.length > 0 && (
                   <Button
                     type="button"
@@ -358,29 +371,94 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess }: TaskManage
                   </Button>
                 )}
               </div>
-              <div className="border rounded-lg p-2 max-h-40 overflow-y-auto">
-                {availableStaff?.map((staff: any) => (
-                  <label
-                    key={staff.user_id}
-                    className="flex items-center space-x-2 p-2 hover:bg-accent rounded cursor-pointer"
+
+              {/* Dropdown Combobox for Staff Selection */}
+              <Popover open={staffDropdownOpen} onOpenChange={setStaffDropdownOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={staffDropdownOpen}
+                    className="w-full justify-between h-auto min-h-[44px] text-left"
                   >
-                    <input
-                      type="checkbox"
-                      checked={selectedStaff.includes(staff.user_id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedStaff([...selectedStaff, staff.user_id]);
-                        } else {
-                          setSelectedStaff(selectedStaff.filter((id) => id !== staff.user_id));
-                        }
-                      }}
-                    />
-                    <span className="text-sm">
-                      {staff.profiles?.full_name || 'Unknown User'} ({staff.profiles?.email || 'No email'})
-                    </span>
-                  </label>
-                ))}
-              </div>
+                    {selectedStaff.length > 0
+                      ? `${selectedStaff.length} staff member(s) selected`
+                      : "Select staff members..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[300px] p-0" align="start">
+                  <Command>
+                    <div className="flex items-center border-b px-3">
+                      <CommandInput
+                        placeholder="Search staff..."
+                        value={staffSearch}
+                        onValueChange={setStaffSearch}
+                        className="flex-1"
+                      />
+                      {staffSearch && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setStaffSearch('')}
+                          className="h-8 px-2 text-muted-foreground hover:bg-secondary transition-colors"
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <CommandList>
+                      <CommandEmpty>No staff found.</CommandEmpty>
+                      <CommandGroup>
+                        {availableStaff?.map((staff: any) => (
+                          <CommandItem
+                            key={staff.user_id}
+                            value={`${staff.profiles?.full_name || ''} ${staff.profiles?.email || ''}`}
+                            onSelect={() => {
+                              if (selectedStaff.includes(staff.user_id)) {
+                                setSelectedStaff(selectedStaff.filter((id) => id !== staff.user_id));
+                              } else {
+                                setSelectedStaff([...selectedStaff, staff.user_id]);
+                              }
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedStaff.includes(staff.user_id) ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex items-center gap-2 flex-1">
+                              <span className="font-medium">{staff.profiles?.full_name || 'Unknown User'}</span>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                {(staff.role || 'staff').replace('_', ' ')}
+                              </Badge>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
+              {/* Selected Staff Display */}
+              {selectedStaff.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {availableStaff?.filter((s: any) => selectedStaff.includes(s.user_id)).map((staff: any) => (
+                    <Badge key={staff.user_id} variant="secondary" className="gap-1">
+                      {staff.profiles?.full_name}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedStaff(selectedStaff.filter((id) => id !== staff.user_id))}
+                        className="hover:bg-destructive/20 rounded-full p-0.5"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2">

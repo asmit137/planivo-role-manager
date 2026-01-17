@@ -27,6 +27,7 @@ import { NotificationHub } from '@/modules/notifications';
 import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
 import { AuditLogsDashboard } from '@/components/admin/AuditLogsDashboard';
 import { EmailManagement } from '@/components/admin/EmailManagement';
+import { SystemSettingsHub } from '@/components/admin/SystemSettingsHub';
 
 const OrganizationAdminDashboard = () => {
   const { user } = useAuth();
@@ -40,7 +41,6 @@ const OrganizationAdminDashboard = () => {
       'staff': 'users',
       'scheduling': 'schedules',
       'organization': 'workspaces',
-      'settings': '',
     };
     return mapping[activeTab] || activeTab;
   };
@@ -439,6 +439,10 @@ const OrganizationAdminDashboard = () => {
 
         <TabsContent value="emails" className="mt-4 sm:mt-6 px-4 sm:px-0">
           <EmailManagement />
+        </TabsContent>
+
+        <TabsContent value="settings" className="mt-4 sm:mt-6 px-4 sm:px-0">
+          <SystemSettingsHub />
         </TabsContent>
       </Tabs>
     </div>

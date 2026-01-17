@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { UserPlus, RefreshCw, Pencil, Trash2, FileSpreadsheet, Lock, Filter } from 'lucide-react';
+import { UserPlus, RefreshCw, Pencil, Trash2, FileSpreadsheet, Lock, Filter, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,6 +26,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorState } from '@/components/layout/ErrorState';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { OTPVerificationDialog } from '@/components/auth/OTPVerificationDialog';
 
 interface UnifiedUserHubProps {
   scope?: 'system' | 'workspace' | 'facility' | 'department';
@@ -50,6 +51,7 @@ const UnifiedUserHub = ({
   const [editOpen, setEditOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [showOtpDialog, setShowOtpDialog] = useState(false);
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
 
   const queryClient = useQueryClient();
@@ -173,7 +175,7 @@ const UnifiedUserHub = ({
   const { data: users, isLoading: usersLoading, error: usersError } = useQuery({
     queryKey: ['unified-users', detectedScope, detectedScopeId, activeOrganizationId, filterWorkspace, filterDepartment],
     queryFn: async () => {
-      console.log(`[UnifiedUserHub] Scope: ${detectedScope}, ScopeId: ${detectedScopeId}, OrgId: ${activeOrganizationId}`);
+      console.log(`[UnifiedUserHub] Scope: ${detectedScope}, ScopeId: ${detectedScopeId}, OrgId: ${activeOrganizationId} `);
 
       // Build optimized query based on scope
       // Use !inner for scoped views to filter profiles to those in the scope
@@ -185,16 +187,16 @@ const UnifiedUserHub = ({
       let query = supabase
         .from('profiles')
         .select(`
-          *,
-          user_roles${joinType}(
+  *,
+  user_roles${joinType} (
             *,
-            custom_role:custom_roles(id, name)
+    custom_role: custom_roles(id, name)
           )
-        `)
+`)
         .order('created_at', { ascending: false });
 
       if (detectedScope === 'department' && detectedScopeId) {
-        console.log(`[UnifiedUserHub] Filtering by Department: ${detectedScopeId}`);
+        console.log(`[UnifiedUserHub] Filtering by Department: ${detectedScopeId} `);
         query = query
           .eq('user_roles.department_id', detectedScopeId);
       } else if (detectedScope === 'facility' && detectedScopeId) {
@@ -293,7 +295,7 @@ const UnifiedUserHub = ({
       return { previousUsers };
     },
     onSuccess: (_, variables) => {
-      toast.success(`User ${variables.isActive ? 'activated' : 'deactivated'}`);
+      toast.success(`User ${variables.isActive ? 'activated' : 'deactivated'} `);
       // Refresh to ensure sync with server
       queryClient.invalidateQueries({ queryKey: ['unified-users'] });
     },
@@ -304,7 +306,7 @@ const UnifiedUserHub = ({
           context.previousUsers
         );
       }
-      toast.error(`Failed to update status: ${error.message}`);
+      toast.error(`Failed to update status: ${error.message} `);
     },
   });
 
@@ -321,7 +323,7 @@ const UnifiedUserHub = ({
         const { data, error } = await supabase.functions.invoke('delete-user', {
           body: { userId },
           headers: {
-            Authorization: `Bearer ${session.access_token}`
+            Authorization: `Bearer ${session.access_token} `
           }
         });
 
@@ -353,6 +355,7 @@ const UnifiedUserHub = ({
       toast.success('User removed successfully');
       queryClient.invalidateQueries({ queryKey: ['unified-users'] });
       setDeleteUserId(null);
+      setShowOtpDialog(false); // Close OTP dialog on success
     },
     onError: async (error: any) => {
       let errorMessage = 'Failed to remove user';
@@ -363,7 +366,7 @@ const UnifiedUserHub = ({
           const body = await error.context.json();
           if (body.error) {
             errorMessage = body.error;
-            if (body.details) errorMessage += `: ${body.details}`;
+            if (body.details) errorMessage += `: ${body.details} `;
             if (body.hint) errorMessage += ` (Hint: ${body.hint})`;
           }
         } catch (e) {
@@ -374,6 +377,7 @@ const UnifiedUserHub = ({
       }
 
       toast.error(errorMessage);
+      setShowOtpDialog(false); // Close OTP dialog on error
     },
   });
 
@@ -386,8 +390,24 @@ const UnifiedUserHub = ({
   };
 
   const handleDeleteConfirm = () => {
+    if (isSuperAdmin) {
+      setShowOtpDialog(true);
+      // We don't close the deleteUserId until OTP is successful
+      // But we hide the AlertDialog
+      const currentId = deleteUserId;
+      setDeleteUserId(null);
+      // Re-set it internally or pass it to OTP handler
+      setDeleteUserId(currentId);
+    } else {
+      deleteUserMutation.mutate(deleteUserId!);
+      setDeleteUserId(null);
+    }
+  };
+
+  const handleOtpVerified = () => {
     if (deleteUserId) {
       deleteUserMutation.mutate(deleteUserId);
+      // setDeleteUserId(null); // This is handled in onSuccess/onError of mutation
     }
   };
 
@@ -606,11 +626,11 @@ const UnifiedUserHub = ({
             )}
             {(hasDeletePermission && detectedScope === 'department') || isSuperAdmin ? (
               <Button
-                variant="outline"
+                variant="destructive-ghost"
                 size="sm"
                 onClick={() => handleDeleteClick(user.id)}
                 disabled={deleteUserMutation.isPending && deleteUserId === user.id}
-                className="h-8 text-[11px] sm:text-xs text-destructive border-destructive/20 hover:bg-destructive/10 flex-1 px-2"
+                className="h-8 text-[11px] sm:text-xs flex-1 px-2"
               >
                 <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
                 Remove
@@ -730,6 +750,15 @@ const UnifiedUserHub = ({
           </AlertDialogContent>
         </AlertDialog>
 
+        <OTPVerificationDialog
+          open={showOtpDialog}
+          onOpenChange={setShowOtpDialog}
+          onVerify={handleOtpVerified}
+          title="Confirm User Deletion"
+          description="Deletion is a critical action. Please enter the security code to proceed with deleting this user permanently."
+          actionLabel="Verify & Delete"
+        />
+
         <Card className="border-2 shadow-sm">
           <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4 gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -832,6 +861,22 @@ const UnifiedUserHub = ({
                           </Select>
                         </div>
                       )}
+                      {(filterWorkspace !== 'all' || filterDepartment !== 'all') && (
+                        <div className="flex items-end pb-0.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setFilterWorkspace('all');
+                              setFilterDepartment('all');
+                            }}
+                            className="h-10 sm:h-11 text-muted-foreground hover:bg-secondary transition-colors gap-2"
+                          >
+                            <XCircle className="h-4 w-4" />
+                            <span className="text-xs font-semibold uppercase tracking-wider">Clear Filters</span>
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
                   <UserListContent />
@@ -878,6 +923,22 @@ const UnifiedUserHub = ({
                             ))}
                           </SelectContent>
                         </Select>
+                      </div>
+                    )}
+                    {(filterWorkspace !== 'all' || filterDepartment !== 'all') && (
+                      <div className="flex items-end pb-0.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setFilterWorkspace('all');
+                            setFilterDepartment('all');
+                          }}
+                          className="h-10 sm:h-11 text-muted-foreground hover:bg-secondary transition-colors gap-2"
+                        >
+                          <XCircle className="h-4 w-4" />
+                          <span className="text-xs font-semibold uppercase tracking-wider">Clear Filters</span>
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -927,7 +988,7 @@ const UnifiedUserHub = ({
                             <Badge variant="outline" className="text-[9px] sm:text-xs">{limit.action_type}</Badge>
                           </TableCell>
                           <TableCell className="text-center">
-                            <span className={`text-xs font-medium ${(limit.request_count || 0) >= 10 ? 'text-red-500 font-bold' : ''}`}>
+                            <span className={`text - xs font - medium ${(limit.request_count || 0) >= 10 ? 'text-red-500 font-bold' : ''} `}>
                               {limit.request_count}
                             </span>
                           </TableCell>

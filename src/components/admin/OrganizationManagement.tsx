@@ -650,7 +650,7 @@ const OrganizationManagement = () => {
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
-                          variant="ghost"
+                          variant="destructive-ghost"
                           size="sm"
                           onClick={() => {
                             if (orgWorkspaces.length > 0) {
@@ -661,7 +661,7 @@ const OrganizationManagement = () => {
                           }}
                           disabled={deleteMutation.isPending}
                         >
-                          <Trash2 className="h-4 w-4 text-destructive" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>

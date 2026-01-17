@@ -29,7 +29,7 @@ const CategoryManagement = () => {
         .select('*')
         .order('is_system_default', { ascending: false })
         .order('name');
-      
+
       if (error) throw error;
       return data;
     },
@@ -93,7 +93,7 @@ const CategoryManagement = () => {
         .limit(1);
 
       if (checkError) throw checkError;
-      
+
       if (departments && departments.length > 0) {
         throw new Error('Cannot delete category that is assigned to departments');
       }
@@ -244,12 +244,12 @@ const CategoryManagement = () => {
                         </Button>
                         {!category.is_system_default && (
                           <Button
-                            variant="ghost"
+                            variant="destructive-ghost"
                             size="icon"
                             onClick={() => deleteCategoryMutation.mutate(category.id)}
                             disabled={deleteCategoryMutation.isPending}
                           >
-                            <Trash2 className="h-3 w-3 text-destructive" />
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         )}
                       </div>

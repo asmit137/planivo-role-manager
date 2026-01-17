@@ -88,12 +88,21 @@ const BulkUserUpload = ({ organizationId }: BulkUserUploadProps) => {
     });
   };
 
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
+    if (selectedFile.size > MAX_FILE_SIZE) {
+      toast.error(`File is too large. Maximum size is 5MB. Your file is ${(selectedFile.size / (1024 * 1024)).toFixed(2)}MB.`);
+      e.target.value = ''; // Reset input
+      return;
+    }
+
     if (!selectedFile.name.endsWith('.xlsx') && !selectedFile.name.endsWith('.xls')) {
       toast.error('Please upload an Excel file (.xlsx or .xls)');
+      e.target.value = '';
       return;
     }
 

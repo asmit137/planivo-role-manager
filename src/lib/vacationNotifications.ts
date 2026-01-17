@@ -47,28 +47,24 @@ export const sendVacationStatusNotification = async (
       let message = `Your ${vacationType} request for ${totalDays} days${dateRange} has been fully approved${approverName ? ` by ${approverName}` : ''}.`;
       if (comment) message += ` Note: ${comment}`;
 
-      await supabase.functions.invoke('create-notification', {
-        body: {
-          user_id: staffId,
-          title,
-          message,
-          type: 'vacation',
-          related_id: vacationPlanId,
-        },
+      await supabase.from('notifications').insert({
+        user_id: staffId,
+        title,
+        message,
+        type: 'vacation',
+        related_id: vacationPlanId,
       });
     } else if (newStatus === 'rejected') {
       let title = '❌ Vacation Rejected';
       let message = `Your ${vacationType} request for ${totalDays} days${dateRange} has been rejected${approverName ? ` by ${approverName}` : ''}.`;
       if (comment) message += ` Reason: ${comment}`;
 
-      await supabase.functions.invoke('create-notification', {
-        body: {
-          user_id: staffId,
-          title,
-          message,
-          type: 'vacation',
-          related_id: vacationPlanId,
-        },
+      await supabase.from('notifications').insert({
+        user_id: staffId,
+        title,
+        message,
+        type: 'vacation',
+        related_id: vacationPlanId,
       });
     } else if (newStatus === 'pending_approval' || newStatus === 'department_pending' || newStatus === 'facility_pending' || newStatus === 'workspace_pending') {
       let title = '📋 New Vacation Request';
@@ -118,14 +114,12 @@ export const sendVacationStatusNotification = async (
         // Notify each unique supervisor
         const uniqueApprovers = [...new Set(approversToNotify)];
         for (const approverId of uniqueApprovers) {
-          await supabase.functions.invoke('create-notification', {
-            body: {
-              user_id: approverId,
-              title,
-              message,
-              type: 'vacation',
-              related_id: vacationPlanId,
-            },
+          await supabase.from('notifications').insert({
+            user_id: approverId,
+            title,
+            message,
+            type: 'vacation',
+            related_id: vacationPlanId,
           });
         }
       }
