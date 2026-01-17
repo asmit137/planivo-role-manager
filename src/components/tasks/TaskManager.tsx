@@ -12,11 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { CalendarIcon, Plus, Check, ChevronsUpDown, XCircle } from 'lucide-react';
+import { CalendarIcon, Plus, Check, ChevronsUpDown, XCircle, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { useNavigate } from 'react-router-dom';
 
 interface TaskManagerProps {
   scopeType: 'workspace' | 'facility' | 'department' | 'organization';
@@ -28,7 +29,9 @@ interface TaskManagerProps {
 
 const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelectedStaffIds }: TaskManagerProps) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [isMessaging, setIsMessaging] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState<Date>();
@@ -138,7 +141,12 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
         // Organization tasks don't have a specific ID, they are global
       }
 
-      const { data: tasksData, error: tasksError } = await query.order('created_at', { ascending: false });
+      const { data: tasksData, error: tasksError } = await query
+        .select(`
+          *,
+          creator_profile:profiles!tasks_created_by_fkey(id, full_name, email)
+        `)
+        .order('created_at', { ascending: false });
       if (tasksError) throw tasksError;
 
       if (!tasksData || tasksData.length === 0) return [];
@@ -239,6 +247,89 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
     setDueDate(undefined);
     setPriority('medium');
     setSelectedStaff([]);
+  };
+
+  const handleMessageUser = async (targetUserId: string) => {
+    if (!user || !targetUserId) return;
+    if (user.id === targetUserId) {
+      toast.info("You're messaging yourself (Note to Self)");
+    }
+
+    setIsMessaging(true);
+    try {
+      // Search for existing DM
+      const { data: existingParticipant, error: searchError } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', user.id);
+
+      if (searchError) throw searchError;
+
+      let existingConvoId = null;
+
+      if (existingParticipant && existingParticipant.length > 0) {
+        const convoIds = existingParticipant.map(p => p.conversation_id);
+
+        const { data: otherParticipants, error: otherError } = await (supabase.from('conversation_participants') as any)
+          .select('conversation_id')
+          .in('conversation_id', convoIds)
+          .eq('user_id', targetUserId);
+
+        if (otherError) throw otherError;
+
+        if (otherParticipants && otherParticipants.length > 0) {
+          const targetConvoIds = otherParticipants.map(p => p.conversation_id);
+          const { data: dms, error: dmsError } = await (supabase.from('conversations') as any)
+            .select('id')
+            .in('id', targetConvoIds)
+            .eq('is_group', false)
+            .neq('type', 'channel');
+
+          if (dmsError) throw dmsError;
+
+          if (dms && dms.length > 0) {
+            existingConvoId = dms[0].id;
+          }
+        }
+      }
+
+      if (existingConvoId) {
+        navigate(`/dashboard?tab=messaging&convo=${existingConvoId}`);
+      } else {
+        const { data: conversation, error: convError } = await supabase
+          .from('conversations')
+          .insert({
+            title: null,
+            is_group: false,
+            type: 'dm',
+            created_by: user.id,
+          } as any)
+          .select()
+          .single();
+
+        if (convError) throw convError;
+
+        const participants = [
+          { conversation_id: conversation.id, user_id: user.id },
+          { conversation_id: conversation.id, user_id: targetUserId }
+        ];
+
+        const { error: partError } = await supabase
+          .from('conversation_participants')
+          .insert(participants);
+
+        if (partError) throw partError;
+
+        queryClient.invalidateQueries({ queryKey: ['discord-dms'] });
+        navigate(`/dashboard?tab=messaging&convo=${conversation.id}`);
+        toast.success('Starting new conversation');
+      }
+    } catch (error: any) {
+      console.error('Error in handleMessageUser:', error);
+      toast.error('Failed to initiate messaging');
+    } finally {
+      setIsMessaging(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -446,15 +537,27 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
               {selectedStaff.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {availableStaff?.filter((s: any) => selectedStaff.includes(s.user_id)).map((staff: any) => (
-                    <Badge key={staff.user_id} variant="secondary" className="gap-1">
+                    <Badge key={staff.user_id} variant="secondary" className="gap-1.5 py-1">
                       {staff.profiles?.full_name}
-                      <button
-                        type="button"
-                        onClick={() => setSelectedStaff(selectedStaff.filter((id) => id !== staff.user_id))}
-                        className="hover:bg-destructive/20 rounded-full p-0.5"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-                      </button>
+                      <div className="flex items-center gap-1 border-l pl-1 ml-1 border-muted-foreground/30">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-4 w-4 text-primary hover:text-primary hover:bg-primary/20"
+                          onClick={() => handleMessageUser(staff.user_id)}
+                          disabled={isMessaging}
+                        >
+                          <MessageSquare className="h-2.5 w-2.5" />
+                        </Button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStaff(selectedStaff.filter((id) => id !== staff.user_id))}
+                          className="hover:bg-destructive/20 rounded-full p-0.5"
+                        >
+                          <XCircle className="h-3 w-3" />
+                        </button>
+                      </div>
                     </Badge>
                   ))}
                 </div>
@@ -489,25 +592,51 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
                       {task.priority}
                     </span>
                   </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="text-xs text-muted-foreground whitespace-nowrap">
+                      By {task.creator_profile?.full_name || 'Unknown'}
+                    </p>
+                    {task.created_by && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 text-primary hover:text-primary hover:bg-primary/20"
+                        onClick={() => handleMessageUser(task.created_by)}
+                        disabled={isMessaging}
+                        title="Message Creator"
+                      >
+                        <MessageSquare className="h-3 w-3" />
+                      </Button>
+                    )}
+                    {task.due_date && (
+                      <span className="text-xs text-muted-foreground">
+                        · Due: {format(new Date(task.due_date), 'PPP')}
+                      </span>
+                    )}
+                  </div>
                   {task.description && (
                     <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
-                  )}
-                  {task.due_date && (
-                    <p className="text-sm">
-                      Due: {format(new Date(task.due_date), 'PPP')}
-                    </p>
                   )}
                   {task.task_assignments && task.task_assignments.length > 0 && (
                     <div className="mt-2">
                       <p className="text-sm font-medium">Assigned to:</p>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {task.task_assignments.map((assignment: any) => (
-                          <span
-                            key={assignment.id}
-                            className="text-xs bg-accent px-2 py-1 rounded"
-                          >
-                            {assignment.profiles?.full_name || 'Unknown User'} ({assignment.status})
-                          </span>
+                          <div key={assignment.id} className="flex items-center gap-1.5 bg-accent/50 p-1 rounded-md border border-accent">
+                            <span className="text-xs px-1 font-medium">
+                              {assignment.profiles?.full_name || 'User'} ({assignment.status})
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 text-primary hover:text-primary hover:bg-primary/20"
+                              onClick={() => handleMessageUser(assignment.assigned_to)}
+                              disabled={isMessaging}
+                              title="Message Staff"
+                            >
+                              <MessageSquare className="h-3 w-3" />
+                            </Button>
+                          </div>
                         ))}
                       </div>
                     </div>

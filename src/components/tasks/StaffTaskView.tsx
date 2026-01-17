@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { CheckCircle2, Clock, PlayCircle, Eye } from 'lucide-react';
+import { CheckCircle2, Clock, PlayCircle, Eye, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -22,9 +23,11 @@ import { LoadingState } from '@/components/layout/LoadingState';
 const StaffTaskView = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [selectedAssignment, setSelectedAssignment] = useState<any | null>(null);
   const [notes, setNotes] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isMessaging, setIsMessaging] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -162,6 +165,94 @@ const StaffTaskView = () => {
     onError: () => toast.error('Failed to update task status'),
   });
 
+  const handleMessageUser = async (targetUserId: string) => {
+    if (!user || !targetUserId) return;
+    if (user.id === targetUserId) {
+      toast.info("You're messaging yourself (Note to Self)");
+    }
+
+    setIsMessaging(true);
+    try {
+      // Search for existing DM
+      const { data: existingParticipant, error: searchError } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', user.id);
+
+      if (searchError) throw searchError;
+
+      let existingConvoId = null;
+
+      if (existingParticipant && existingParticipant.length > 0) {
+        const convoIds = existingParticipant.map(p => p.conversation_id);
+
+        // Check which of these are DMs with the target user
+        const { data: otherParticipants, error: otherError } = await (supabase.from('conversation_participants') as any)
+          .select('conversation_id')
+          .in('conversation_id', convoIds)
+          .eq('user_id', targetUserId);
+
+        if (otherError) throw otherError;
+
+        if (otherParticipants && otherParticipants.length > 0) {
+          // Now check if it's a DM (not a group)
+          const targetConvoIds = otherParticipants.map(p => p.conversation_id);
+          const { data: dms, error: dmsError } = await (supabase.from('conversations') as any)
+            .select('id')
+            .in('id', targetConvoIds)
+            .eq('is_group', false)
+            .neq('type', 'channel');
+
+          if (dmsError) throw dmsError;
+
+          if (dms && dms.length > 0) {
+            existingConvoId = dms[0].id;
+          }
+        }
+      }
+
+      if (existingConvoId) {
+        navigate(`/dashboard?tab=messaging&convo=${existingConvoId}`);
+        setIsModalOpen(false);
+      } else {
+        // Create new DM
+        const { data: conversation, error: convError } = await supabase
+          .from('conversations')
+          .insert({
+            title: null,
+            is_group: false,
+            type: 'dm',
+            created_by: user.id,
+          } as any)
+          .select()
+          .single();
+
+        if (convError) throw convError;
+
+        const participants = [
+          { conversation_id: conversation.id, user_id: user.id },
+          { conversation_id: conversation.id, user_id: targetUserId }
+        ];
+
+        const { error: partError } = await supabase
+          .from('conversation_participants')
+          .insert(participants);
+
+        if (partError) throw partError;
+
+        queryClient.invalidateQueries({ queryKey: ['discord-dms'] });
+        navigate(`/dashboard?tab=messaging&convo=${conversation.id}`);
+        setIsModalOpen(false);
+        toast.success('Starting new conversation');
+      }
+    } catch (error: any) {
+      console.error('Error in handleMessageUser:', error);
+      toast.error('Failed to initiate messaging');
+    } finally {
+      setIsMessaging(false);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':
@@ -197,11 +288,33 @@ const StaffTaskView = () => {
                       {item.tasks.priority}
                     </span>
                   </div>
-                  {item.assigned_to_profile && (
-                    <p className="text-xs font-semibold text-primary/80">
-                      {item.assigned_to_profile.full_name}
-                    </p>
-                  )}
+                  <div className="flex items-center justify-between">
+                    {item.assigned_to_profile && (
+                      <p className="text-xs font-semibold text-primary/80">
+                        Assigned: {item.assigned_to_profile.full_name}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-[10px] text-muted-foreground whitespace-nowrap">
+                        By {item.tasks.creator_name}
+                      </p>
+                      {item.tasks.created_by && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 text-primary hover:text-primary hover:bg-primary/20"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMessageUser(item.tasks.created_by);
+                          }}
+                          disabled={isMessaging}
+                          title="Message Creator"
+                        >
+                          <MessageSquare className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                   {item.tasks.due_date && (
                     <p className="text-[10px] text-muted-foreground">
                       Due: {format(new Date(item.tasks.due_date), 'MMM dd')}
@@ -249,9 +362,23 @@ const StaffTaskView = () => {
             <div className="flex justify-between items-start pr-8">
               <div>
                 <DialogTitle className="text-xl">{selectedAssignment?.tasks.title}</DialogTitle>
-                <DialogDescription className="mt-1">
-                  Created by: {selectedAssignment?.tasks.creator_name}
-                </DialogDescription>
+                <div className="flex items-center gap-2 mt-1">
+                  <DialogDescription>
+                    Created by: {selectedAssignment?.tasks.creator_name}
+                  </DialogDescription>
+                  {selectedAssignment?.tasks.created_by && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-2 text-primary hover:text-primary hover:bg-primary/10 border-primary/20"
+                      onClick={() => handleMessageUser(selectedAssignment.tasks.created_by)}
+                      disabled={isMessaging}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Message</span>
+                    </Button>
+                  )}
+                </div>
               </div>
               <Badge className={cn(getStatusColor(selectedAssignment?.status || ''))}>
                 {selectedAssignment && getStatusIcon(selectedAssignment.status)}
@@ -290,9 +417,21 @@ const StaffTaskView = () => {
             {selectedAssignment?.assigned_to_profile && (
               <div className="space-y-1">
                 <p className="text-sm font-semibold">Assigned To</p>
-                <p className="text-sm text-primary">
-                  {selectedAssignment.assigned_to_profile.full_name}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-primary">
+                    {selectedAssignment.assigned_to_profile.full_name}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-2 text-primary hover:text-primary hover:bg-primary/10 border-primary/20"
+                    onClick={() => handleMessageUser(selectedAssignment.assigned_to)}
+                    disabled={isMessaging}
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Message</span>
+                  </Button>
+                </div>
               </div>
             )}
 

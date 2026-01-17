@@ -1,5 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ListTodo, CheckSquare, Users, Search, PlusCircle, XCircle } from 'lucide-react';
+import { ListTodo, CheckSquare, Users, Search, PlusCircle, XCircle, MessageSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import TaskManager from './TaskManager';
 import StaffTaskView from './StaffTaskView';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -7,8 +9,9 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorState } from '@/components/layout/ErrorState';
 import { LoadingState } from '@/components/layout/LoadingState';
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/lib/auth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,9 +22,13 @@ import { cn } from '@/lib/utils';
 const TaskHub = () => {
   const { data: roles, isLoading: rolesLoading } = useUserRole();
   const { organization: currentOrganization } = useOrganization();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('manage');
   const [staffSearch, setStaffSearch] = useState('');
   const [preSelectedStaff, setPreSelectedStaff] = useState<string[]>([]);
+  const [isMessaging, setIsMessaging] = useState(false);
 
   // Determine user's scope for task management
   const managerRole = roles?.find(r =>
@@ -87,6 +94,81 @@ const TaskHub = () => {
       s.profiles?.email?.toLowerCase().includes(staffSearch.toLowerCase())
     );
   }, [allStaff, staffSearch]);
+
+  const handleMessageUser = async (targetUserId: string) => {
+    if (!user || !targetUserId) return;
+    if (user.id === targetUserId) {
+      toast.info("You're messaging yourself (Note to Self)");
+    }
+
+    setIsMessaging(true);
+    try {
+      const { data: existingParticipant, error: searchError } = await (supabase.from('conversation_participants') as any)
+        .select('conversation_id')
+        .eq('user_id', user.id);
+
+      if (searchError) throw searchError;
+
+      let existingConvoId = null;
+
+      if (existingParticipant && existingParticipant.length > 0) {
+        const convoIds = existingParticipant.map(p => p.conversation_id);
+        const { data: otherParticipants, error: otherError } = await (supabase.from('conversation_participants') as any)
+          .select('conversation_id')
+          .in('conversation_id', convoIds)
+          .eq('user_id', targetUserId);
+
+        if (otherError) throw otherError;
+
+        if (otherParticipants && otherParticipants.length > 0) {
+          const targetConvoIds = otherParticipants.map(p => p.conversation_id);
+          const { data: dms, error: dmsError } = await (supabase.from('conversations') as any)
+            .select('id')
+            .in('id', targetConvoIds)
+            .eq('is_group', false)
+            .neq('type', 'channel');
+
+          if (dmsError) throw dmsError;
+          if (dms && dms.length > 0) existingConvoId = dms[0].id;
+        }
+      }
+
+      if (existingConvoId) {
+        navigate(`/dashboard?tab=messaging&convo=${existingConvoId}`);
+      } else {
+        const { data: conversation, error: convError } = await (supabase.from('conversations') as any)
+          .insert({
+            title: null,
+            is_group: false,
+            type: 'dm',
+            created_by: user.id,
+          } as any)
+          .select()
+          .single();
+
+        if (convError) throw convError;
+
+        const participants = [
+          { conversation_id: conversation.id, user_id: user.id },
+          { conversation_id: conversation.id, user_id: targetUserId }
+        ];
+
+        const { error: partError } = await (supabase.from('conversation_participants') as any)
+          .insert(participants);
+
+        if (partError) throw partError;
+
+        queryClient.invalidateQueries({ queryKey: ['discord-dms'] });
+        navigate(`/dashboard?tab=messaging&convo=${conversation.id}`);
+        toast.success('Starting new conversation');
+      }
+    } catch (error: any) {
+      console.error('Error in handleMessageUser:', error);
+      toast.error('Failed to initiate messaging');
+    } finally {
+      setIsMessaging(false);
+    }
+  };
 
   const handleAssignTask = (staffId: string) => {
     setPreSelectedStaff([staffId]);
@@ -185,15 +267,27 @@ const TaskHub = () => {
                                 {staff.role?.replace('_', ' ')}
                               </Badge>
                             </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
-                              onClick={() => handleAssignTask(staff.user_id)}
-                            >
-                              <PlusCircle className="h-4 w-4" />
-                              Assign
-                            </Button>
+                            <div className="flex flex-col gap-2">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
+                                onClick={() => handleAssignTask(staff.user_id)}
+                              >
+                                <PlusCircle className="h-4 w-4" />
+                                Assign
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
+                                onClick={() => handleMessageUser(staff.user_id)}
+                                disabled={isMessaging}
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                                Message
+                              </Button>
+                            </div>
                           </CardContent>
                         </Card>
                       ))}
