@@ -18,7 +18,7 @@ export const OrganizationSwitcher: React.FC = () => {
     const { state } = useSidebar();
     const isCollapsed = state === 'collapsed';
 
-    const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
+    const isSuperAdmin = roles?.some(r => r.role === 'super_admin' || r.role === 'general_admin');
 
     if (!isSuperAdmin || organizations.length === 0) return null;
 

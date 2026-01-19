@@ -3,6 +3,8 @@ import { HeroSection } from "@/components/landing/HeroSection";
 import { FeaturesSection } from "@/components/landing/FeaturesSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FooterSection } from "@/components/landing/FooterSection";
+import { TestimonialSection } from "@/components/landing/TestimonialSection";
+import { FAQSection } from "@/components/landing/FAQSection";
 
 export default function Landing() {
   return (
@@ -14,6 +16,8 @@ export default function Landing() {
           <FeaturesSection />
         </section>
         <PricingSection />
+        <TestimonialSection />
+        <FAQSection />
       </main>
       <FooterSection />
     </div>

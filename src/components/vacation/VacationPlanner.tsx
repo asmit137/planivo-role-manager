@@ -16,7 +16,7 @@ import { CalendarIcon, Plus, Trash2, Info, AlertCircle, Users } from 'lucide-rea
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
-import { sendVacationStatusNotification } from '@/lib/vacationNotifications';
+import { sendVacationStatusNotification, sendVacationMessage } from '@/lib/vacationNotifications';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 
@@ -76,7 +76,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   const isStaff = (currentUserRole?.role as any) === 'staff' || (currentUserRole?.role as any) === 'intern';
   const isDepartmentHead = (currentUserRole?.role as any) === 'department_head';
   const isSupervisor = ['facility_supervisor', 'workplace_supervisor', 'workspace_supervisor'].includes(currentUserRole?.role as any);
-  const isSuperAdmin = (currentUserRole?.role as any) === 'super_admin' || (currentUserRole?.role as any) === 'organization_admin';
+  const isSuperAdmin = (currentUserRole?.role as any) === 'super_admin' || (currentUserRole?.role as any) === 'organization_admin' || (currentUserRole?.role as any) === 'general_admin';
   const effectiveDepartmentId = departmentId || selectedDepartment || currentUserRole?.department_id;
   const effectiveStaffOnly = staffOnly || isStaff;
 
@@ -477,6 +477,16 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
         toast.success('Vacation plan created and approved successfully');
       } else {
         toast.success('Vacation plan created');
+      }
+
+      // Send chat message if created by manager for staff
+      if (user?.id && variables.staff_id && user.id !== variables.staff_id) {
+        await sendVacationMessage(
+          data.id,
+          variables.staff_id,
+          user.id,
+          userProfile?.full_name || 'Manager'
+        );
       }
 
       resetForm();

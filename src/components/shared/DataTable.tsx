@@ -33,6 +33,8 @@ interface DataTableProps<T> {
     };
   };
   className?: string;
+  maxHeight?: string | number;
+  enableStickyHeader?: boolean;
 }
 
 export function DataTable<T>({
@@ -45,6 +47,8 @@ export function DataTable<T>({
   onSearchChange,
   searchPlaceholder = 'Search...',
   emptyState,
+  maxHeight,
+  enableStickyHeader = false,
   className,
 }: DataTableProps<T>) {
   // Loading state
@@ -98,9 +102,12 @@ export function DataTable<T>({
       )}
 
       {/* Table with horizontal scroll for mobile */}
-      <div className="rounded-md border overflow-x-auto">
+      <div
+        className="rounded-md border overflow-x-auto"
+        style={maxHeight ? { maxHeight, overflowY: 'auto' } : undefined}
+      >
         <Table>
-          <TableHeader>
+          <TableHeader className={cn(enableStickyHeader && "sticky top-0 z-10 bg-card shadow-sm")}>
             <TableRow>
               {columns.map((column) => (
                 <TableHead key={column.key} className="whitespace-nowrap">{column.header}</TableHead>

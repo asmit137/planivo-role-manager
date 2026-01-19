@@ -26,7 +26,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorState } from '@/components/layout/ErrorState';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { OTPVerificationDialog } from '@/components/auth/OTPVerificationDialog';
 
 interface UnifiedUserHubProps {
   scope?: 'system' | 'workspace' | 'facility' | 'department';
@@ -51,8 +50,8 @@ const UnifiedUserHub = ({
   const [editOpen, setEditOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
-  const [showOtpDialog, setShowOtpDialog] = useState(false);
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
@@ -60,7 +59,7 @@ const UnifiedUserHub = ({
   const { canEdit, canDelete, canAdmin } = useModuleContext();
 
   // Check if current user is super admin
-  const isSuperAdmin = userRoles?.some(r => r.role === 'super_admin');
+  const isSuperAdmin = userRoles?.some(r => r.role === 'super_admin' || r.role === 'general_admin');
 
   // Improved Scope Detection
   const superAdminRole = userRoles?.find(r => r.role === 'super_admin' || r.role === 'organization_admin');
@@ -246,6 +245,14 @@ const UnifiedUserHub = ({
       }
     }
 
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const nameMatch = user.full_name?.toLowerCase().includes(query);
+      const emailMatch = user.email?.toLowerCase().includes(query);
+      if (!nameMatch && !emailMatch) return false;
+    }
+
     return true;
   });
 
@@ -323,22 +330,24 @@ const UnifiedUserHub = ({
         const { data, error } = await supabase.functions.invoke('delete-user', {
           body: { userId },
           headers: {
-            Authorization: `Bearer ${session.access_token} `
+            Authorization: `Bearer ${session.access_token}`
           }
         });
 
         if (error) {
           console.error("Delete user error:", error);
+          let errorMessage = error.message;
+
           if (error.context && typeof error.context.json === 'function') {
             try {
               const body = await error.context.json();
               console.log("Delete error body:", body);
-              if (body.error) throw new Error(body.error);
+              if (body.error) errorMessage = body.error;
             } catch (e) {
               console.error("Failed to parse delete error body", e);
             }
           }
-          throw error;
+          throw new Error(errorMessage);
         }
         return data;
       } else {
@@ -355,7 +364,6 @@ const UnifiedUserHub = ({
       toast.success('User removed successfully');
       queryClient.invalidateQueries({ queryKey: ['unified-users'] });
       setDeleteUserId(null);
-      setShowOtpDialog(false); // Close OTP dialog on success
     },
     onError: async (error: any) => {
       let errorMessage = 'Failed to remove user';
@@ -377,7 +385,6 @@ const UnifiedUserHub = ({
       }
 
       toast.error(errorMessage);
-      setShowOtpDialog(false); // Close OTP dialog on error
     },
   });
 
@@ -390,26 +397,13 @@ const UnifiedUserHub = ({
   };
 
   const handleDeleteConfirm = () => {
-    if (isSuperAdmin) {
-      setShowOtpDialog(true);
-      // We don't close the deleteUserId until OTP is successful
-      // But we hide the AlertDialog
-      const currentId = deleteUserId;
-      setDeleteUserId(null);
-      // Re-set it internally or pass it to OTP handler
-      setDeleteUserId(currentId);
-    } else {
-      deleteUserMutation.mutate(deleteUserId!);
+    if (deleteUserId) {
+      deleteUserMutation.mutate(deleteUserId);
       setDeleteUserId(null);
     }
   };
 
-  const handleOtpVerified = () => {
-    if (deleteUserId) {
-      deleteUserMutation.mutate(deleteUserId);
-      // setDeleteUserId(null); // This is handled in onSuccess/onError of mutation
-    }
-  };
+
 
   // Define columns based on permissions and scope
   const columns: Column<any>[] = [
@@ -662,44 +656,7 @@ const UnifiedUserHub = ({
     );
   };
 
-  const UserListContent = () => {
-    return (
-      <>
-        {/* Mobile-Only Card View */}
-        <div className="md:hidden space-y-3">
-          {filteredProfiles.length > 0 ? (
-            filteredProfiles.map((user: any) => (
-              <UserCard key={user.id} user={user} />
-            ))
-          ) : (
-            <div className="p-8 text-center border-2 border-dashed rounded-lg bg-muted/20">
-              <p className="text-sm text-muted-foreground">No users found</p>
-            </div>
-          )}
-        </div>
 
-        {/* Desktop-Only Table View */}
-        <div className="hidden md:block">
-          <DataTable
-            data={filteredProfiles}
-            columns={columns}
-            isLoading={usersLoading}
-            error={usersError as Error}
-            emptyState={{
-              title: 'No users found',
-              description: detectedScope === 'department'
-                ? 'Add staff members to your department to get started.'
-                : 'Create your first user to get started.',
-              action: hasEditPermission ? {
-                label: detectedScope === 'department' ? 'Add Staff' : 'Create User',
-                onClick: () => setUnifiedCreateOpen(true),
-              } : undefined,
-            }}
-          />
-        </div>
-      </>
-    );
-  };
 
 
   return (
@@ -750,14 +707,7 @@ const UnifiedUserHub = ({
           </AlertDialogContent>
         </AlertDialog>
 
-        <OTPVerificationDialog
-          open={showOtpDialog}
-          onOpenChange={setShowOtpDialog}
-          onVerify={handleOtpVerified}
-          title="Confirm User Deletion"
-          description="Deletion is a critical action. Please enter the security code to proceed with deleting this user permanently."
-          actionLabel="Verify & Delete"
-        />
+
 
         <Card className="border-2 shadow-sm">
           <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4 gap-4">
@@ -829,10 +779,10 @@ const UnifiedUserHub = ({
                       <div className="space-y-2 focus-within:text-primary">
                         <Label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground ml-1">WORKSPACE</Label>
                         <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
-                          <SelectTrigger className="h-10 sm:h-11 border-[#2D3139] bg-[#1A1F2C] text-sm font-medium">
+                          <SelectTrigger className="h-10 sm:h-11 border-input bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139] text-sm font-medium">
                             <SelectValue placeholder="All Workspaces" />
                           </SelectTrigger>
-                          <SelectContent className="bg-[#1A1F2C] border-[#2D3139]">
+                          <SelectContent className="bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139]">
                             <SelectItem value="all">All Workspaces</SelectItem>
                             {workspaces?.map((workspace) => (
                               <SelectItem key={workspace.id} value={workspace.id}>
@@ -847,10 +797,10 @@ const UnifiedUserHub = ({
                         <div className="space-y-2 focus-within:text-primary">
                           <Label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground ml-1">DEPARTMENT</Label>
                           <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-                            <SelectTrigger className="h-10 sm:h-11 border-[#2D3139] bg-[#1A1F2C] text-sm font-medium">
+                            <SelectTrigger className="h-10 sm:h-11 border-input bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139] text-sm font-medium">
                               <SelectValue placeholder="All Departments" />
                             </SelectTrigger>
-                            <SelectContent className="bg-[#1A1F2C] border-[#2D3139]">
+                            <SelectContent className="bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139]">
                               <SelectItem value="all">All Departments</SelectItem>
                               {allDepartments?.map((department) => (
                                 <SelectItem key={department.id} value={department.id}>
@@ -879,7 +829,41 @@ const UnifiedUserHub = ({
                       )}
                     </div>
                   )}
-                  <UserListContent />
+                  {/* Mobile-Only Card View */}
+                  <div className="md:hidden space-y-3">
+                    {filteredProfiles.length > 0 ? (
+                      filteredProfiles.map((user: any) => (
+                        <UserCard key={user.id} user={user} />
+                      ))
+                    ) : (
+                      <div className="p-8 text-center border-2 border-dashed rounded-lg bg-muted/20">
+                        <p className="text-sm text-muted-foreground">No users found</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Desktop-Only Table View */}
+                  <div className="hidden md:block">
+                    <DataTable
+                      data={filteredProfiles}
+                      columns={columns}
+                      isLoading={usersLoading}
+                      error={usersError as Error}
+                      searchValue={searchQuery}
+                      onSearchChange={setSearchQuery}
+                      searchPlaceholder="Search users by name or email..."
+                      maxHeight="calc(100vh - 220px)"
+                      enableStickyHeader={true}
+                      emptyState={{
+                        title: 'No users found',
+                        description: 'Create your first user to get started.',
+                        action: hasEditPermission ? {
+                          label: 'Create User',
+                          onClick: () => setUnifiedCreateOpen(true),
+                        } : undefined,
+                      }}
+                    />
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="bulk" className="px-3 sm:px-0 pb-4">
@@ -893,10 +877,10 @@ const UnifiedUserHub = ({
                     <div className="space-y-2 focus-within:text-primary">
                       <Label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground ml-1">WORKSPACE</Label>
                       <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
-                        <SelectTrigger className="h-10 sm:h-11 border-[#2D3139] bg-[#1A1F2C] text-sm font-medium">
+                        <SelectTrigger className="h-10 sm:h-11 border-input bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139] text-sm font-medium">
                           <SelectValue placeholder="All Workspaces" />
                         </SelectTrigger>
-                        <SelectContent className="bg-[#1A1F2C] border-[#2D3139]">
+                        <SelectContent className="bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139]">
                           <SelectItem value="all">All Workspaces</SelectItem>
                           {workspaces?.map((workspace) => (
                             <SelectItem key={workspace.id} value={workspace.id}>
@@ -911,10 +895,10 @@ const UnifiedUserHub = ({
                       <div className="space-y-2 focus-within:text-primary">
                         <Label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground ml-1">DEPARTMENT</Label>
                         <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-                          <SelectTrigger className="h-10 sm:h-11 border-[#2D3139] bg-[#1A1F2C] text-sm font-medium">
+                          <SelectTrigger className="h-10 sm:h-11 border-input bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139] text-sm font-medium">
                             <SelectValue placeholder="All Departments" />
                           </SelectTrigger>
-                          <SelectContent className="bg-[#1A1F2C] border-[#2D3139]">
+                          <SelectContent className="bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139]">
                             <SelectItem value="all">All Departments</SelectItem>
                             {allDepartments?.map((department) => (
                               <SelectItem key={department.id} value={department.id}>
@@ -943,7 +927,43 @@ const UnifiedUserHub = ({
                     )}
                   </div>
                 )}
-                <UserListContent />
+                {/* Mobile-Only Card View */}
+                <div className="md:hidden space-y-3">
+                  {filteredProfiles.length > 0 ? (
+                    filteredProfiles.map((user: any) => (
+                      <UserCard key={user.id} user={user} />
+                    ))
+                  ) : (
+                    <div className="p-8 text-center border-2 border-dashed rounded-lg bg-muted/20">
+                      <p className="text-sm text-muted-foreground">No users found</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Desktop-Only Table View */}
+                <div className="hidden md:block">
+                  <DataTable
+                    data={filteredProfiles}
+                    columns={columns}
+                    isLoading={usersLoading}
+                    error={usersError as Error}
+                    searchValue={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    searchPlaceholder="Search users by name or email..."
+                    maxHeight="calc(100vh - 220px)"
+                    enableStickyHeader={true}
+                    emptyState={{
+                      title: 'No users found',
+                      description: detectedScope === 'department'
+                        ? 'Add staff members to your department to get started.'
+                        : 'Create your first user to get started.',
+                      action: hasEditPermission ? {
+                        label: detectedScope === 'department' ? 'Add Staff' : 'Create User',
+                        onClick: () => setUnifiedCreateOpen(true),
+                      } : undefined,
+                    }}
+                  />
+                </div>
               </div>
             )}
           </CardContent>

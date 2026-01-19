@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
 
 const facilitySchema = z.object({
   name: z.string().min(2, 'Facility name must be at least 2 characters'),
@@ -52,6 +53,16 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
   useRealtimeSubscription({
     table: 'facilities',
     invalidateQueries: ['workspaces-with-facilities'],
+  });
+
+  useRealtimeSubscription({
+    table: 'workspace_departments',
+    invalidateQueries: ['workspaces-with-facilities', 'workspace-dept-templates'],
+  });
+
+  useRealtimeSubscription({
+    table: 'workspace_categories',
+    invalidateQueries: ['workspaces-with-facilities', 'workspace-dept-templates'],
   });
 
   const { data: workspaces, isLoading, isError, error } = useQuery({
@@ -192,7 +203,8 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
 
       if (!facility) return [];
 
-      const { data, error } = await supabase
+      // 1. Get explicitly assigned departments
+      const { data: directDepts, error: directError } = await supabase
         .from('workspace_departments')
         .select(`
           department_template_id,
@@ -200,8 +212,43 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
         `)
         .eq('workspace_id', facility.workspace_id);
 
-      if (error) throw error;
-      return data.map(item => item.departments);
+      if (directError) throw directError;
+
+      // 2. Get departments from assigned categories
+      const { data: assignedCategories, error: catError } = await supabase
+        .from('workspace_categories')
+        .select(`
+          category_id,
+          categories (
+            name
+          )
+        `)
+        .eq('workspace_id', facility.workspace_id);
+
+      if (catError) throw catError;
+
+      const categoryNames = assignedCategories
+        .map((c: any) => c.categories?.name)
+        .filter(Boolean);
+
+      let categoryDepts: any[] = [];
+      if (categoryNames.length > 0) {
+        const { data: catDepts, error: catDeptsError } = await supabase
+          .from('departments')
+          .select('*')
+          .in('category', categoryNames)
+          .eq('is_template', true);
+
+        if (catDeptsError) throw catDeptsError;
+        categoryDepts = catDepts || [];
+      }
+
+      // Combine and remove duplicates by ID
+      const direct = directDepts?.map(item => item.departments) || [];
+      const combined = [...direct, ...categoryDepts];
+      const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+
+      return unique;
     },
   });
 
@@ -215,6 +262,18 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
         .single();
 
       if (templateError) throw templateError;
+
+      // Check for duplicate in this facility
+      const { data: existing } = await supabase
+        .from('departments')
+        .select('id')
+        .eq('facility_id', facilityId)
+        .eq('name', template.name)
+        .maybeSingle();
+
+      if (existing) {
+        throw new Error(`Department "${template.name}" already exists in this facility`);
+      }
 
       // Create new department instance
       const { data, error } = await supabase
@@ -343,21 +402,16 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label>Available Templates</Label>
-                      <Select value={selectedDeptTemplateId} onValueChange={setSelectedDeptTemplateId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a template" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {deptTemplates?.map((template: any) => (
-                            <SelectItem key={template.id} value={template.id}>
-                              {template.name} ({template.category || 'No Category'})
-                            </SelectItem>
-                          ))}
-                          {(!deptTemplates || deptTemplates.length === 0) && (
-                            <SelectItem value="none" disabled>No templates available</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
+                      <SearchableSelect
+                        options={deptTemplates?.map((template: any) => ({
+                          label: `${template.name} (${template.category || 'No Category'})`,
+                          value: template.id
+                        })) || []}
+                        value={selectedDeptTemplateId}
+                        onChange={setSelectedDeptTemplateId}
+                        placeholder="Select a template"
+                        emptyMessage="No templates found."
+                      />
                     </div>
                     <Button
                       className="w-full"
@@ -480,7 +534,7 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
                               <span>Users</span>
                             </div>
                             {facility.users && facility.users.length > 0 && (
-                              <div className="space-y-2">
+                              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                                 {facility.users.map((user: any) => (
                                   <div key={user.role_id} className="flex items-center justify-between text-sm p-2 rounded bg-background">
                                     <div>

@@ -25,7 +25,7 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const { data: roles } = useUserRole();
     const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
 
-    const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
+    const isSuperAdmin = roles?.some(r => r.role === 'super_admin' || r.role === 'general_admin');
 
     const { data: organizations = [], isLoading } = useQuery({
         queryKey: ['super-admin-organizations', user?.id],

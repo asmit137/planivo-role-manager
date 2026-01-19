@@ -32,7 +32,7 @@ const Dashboard = () => {
         .select('force_password_change')
         .eq('id', user.id)
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -69,7 +69,7 @@ const Dashboard = () => {
             </p>
           </div>
           <div className="flex flex-col gap-3">
-            <Button 
+            <Button
               size="lg"
               onClick={async () => {
                 await supabase.auth.signOut();
@@ -78,7 +78,7 @@ const Dashboard = () => {
             >
               Log Out
             </Button>
-            <Button 
+            <Button
               variant="outline"
               size="lg"
               onClick={() => {
@@ -128,7 +128,7 @@ const Dashboard = () => {
       return (
         <UnifiedLayout>
           <ErrorBoundary fallbackTitle="General Admin Dashboard Error">
-            <GeneralAdminDashboard />
+            <SuperAdminDashboard />
           </ErrorBoundary>
         </UnifiedLayout>
       );

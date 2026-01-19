@@ -70,18 +70,20 @@ serve(async (req: Request) => {
             },
         });
 
-        // Check if requesting user is a Super Admin
-        const { data: roles, error: roleError } = await adminClient
+        // Check if requesting user is a Super Admin or General Admin
+        const { data: roleRecords, error: roleError } = await adminClient
             .from("user_roles")
             .select("role")
             .eq("user_id", requestingUser.id)
-            .eq("role", "super_admin")
-            .single();
+            .in("role", ["super_admin", "general_admin"]);
 
-        if (roleError || !roles) {
-            console.error("Super Admin check failed:", roleError);
+        if (roleError || !roleRecords || roleRecords.length === 0) {
+            console.error("Authorization check failed:", roleError);
             return new Response(
-                JSON.stringify({ error: "Forbidden: Super Admin access required" }),
+                JSON.stringify({
+                    error: "Forbidden: Administrative access required",
+                    details: roleError?.message
+                }),
                 { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
@@ -92,6 +94,8 @@ serve(async (req: Request) => {
                 { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
+
+        console.log(`Attempting to delete user: ${userId} by admin: ${requestingUser.id}`);
 
         if (userId === requestingUser.id) {
             return new Response(
@@ -104,7 +108,31 @@ serve(async (req: Request) => {
         const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
 
         if (deleteError) {
-            console.error("User deletion error:", deleteError);
+            console.error("User deletion error from Auth:", deleteError);
+
+            // If user not found in Auth, they might still have a public profile (orphaned)
+            // Let's try to delete from public.profiles manually to be sure
+            if (deleteError.message === "User not found") {
+                console.log("User not found in Auth, attempting to remove orphaned public profile...");
+                const { error: profileError } = await adminClient
+                    .from("profiles")
+                    .delete()
+                    .eq("id", userId);
+
+                if (profileError) {
+                    console.error("Failed to delete orphaned profile:", profileError);
+                    return new Response(
+                        JSON.stringify({ error: `User not found in Auth, and profile deletion failed: ${profileError.message}` }),
+                        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                    );
+                }
+
+                return new Response(
+                    JSON.stringify({ success: true, message: "Orphaned profile successfully removed" }),
+                    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+            }
+
             return new Response(
                 JSON.stringify({ error: deleteError.message }),
                 { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }

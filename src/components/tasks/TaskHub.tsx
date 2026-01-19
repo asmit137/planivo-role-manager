@@ -1,7 +1,8 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ListTodo, CheckSquare, Users, Search, PlusCircle, XCircle } from 'lucide-react';
+import { ListTodo, CheckSquare, Users, Search, PlusCircle, XCircle, MessageSquare } from 'lucide-react';
 import TaskManager from './TaskManager';
 import StaffTaskView from './StaffTaskView';
+import AllStaffTasksView from './AllStaffTasksView';
 import { useUserRole } from '@/hooks/useUserRole';
 import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorState } from '@/components/layout/ErrorState';
@@ -20,27 +21,29 @@ const TaskHub = () => {
   const { data: roles, isLoading: rolesLoading } = useUserRole();
   const { organization: currentOrganization } = useOrganization();
   const [activeTab, setActiveTab] = useState('manage');
+
   const [staffSearch, setStaffSearch] = useState('');
   const [preSelectedStaff, setPreSelectedStaff] = useState<string[]>([]);
+  const [viewingStaffId, setViewingStaffId] = useState<string | null>(null);
 
   // Determine user's scope for task management
   const managerRole = roles?.find(r =>
     ['super_admin', 'organization_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head'].includes(r.role)
   );
 
-  const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
+  const isSuperAdmin = roles?.some(r => r.role === 'super_admin' || r.role === 'general_admin');
   const canManageTasks = !!managerRole;
 
   const getScopeInfo = () => {
     if (!managerRole) return null;
 
-    if (managerRole.role === 'super_admin') {
-      // For Super Admin, use the currently selected organization from context
+    if (managerRole.role === 'super_admin' || managerRole.role === 'general_admin') {
+      // For Super Admin AND General Admin, use the currently selected organization from context
       if (!currentOrganization?.id || currentOrganization.id === 'all') return null;
       return { scopeType: 'organization' as const, scopeId: currentOrganization.id };
     }
 
-    if (['organization_admin', 'general_admin', 'workplace_supervisor'].includes(managerRole.role)) {
+    if (['organization_admin', 'workplace_supervisor'].includes(managerRole.role)) {
       return managerRole.workspace_id ? { scopeType: 'workspace' as const, scopeId: managerRole.workspace_id } : null;
     } else if (managerRole.role === 'facility_supervisor') {
       return { scopeType: 'facility' as const, scopeId: managerRole.facility_id! };
@@ -173,27 +176,57 @@ const TaskHub = () => {
 
                   {staffLoading ? (
                     <LoadingState message="Fetching staff members..." />
+                  ) : viewingStaffId && scopeInfo ? (
+                    <AllStaffTasksView
+                      scopeType={scopeInfo.scopeType}
+                      scopeId={scopeInfo.scopeId}
+                      assigneeId={viewingStaffId}
+                      onBack={() => setViewingStaffId(null)}
+                    />
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {filteredStaff.map((staff: any) => (
                         <Card key={staff.user_id} className="overflow-hidden hover:shadow-md transition-shadow">
-                          <CardContent className="p-4 flex items-center justify-between">
-                            <div className="space-y-1">
-                              <p className="font-semibold text-sm leading-none">{staff.profiles?.full_name || 'Unknown User'}</p>
-                              <p className="text-xs text-muted-foreground">{staff.profiles?.email}</p>
-                              <Badge variant="outline" className="text-[10px] uppercase font-bold px-1.5 py-0">
-                                {staff.role?.replace('_', ' ')}
-                              </Badge>
+                          <CardContent className="p-4 flex flex-col justify-between gap-4 h-full">
+                            <div className="flex items-start justify-between">
+                              <div className="space-y-1">
+                                <p className="font-semibold text-sm leading-none">{staff.profiles?.full_name || 'Unknown User'}</p>
+                                <p className="text-xs text-muted-foreground">{staff.profiles?.email}</p>
+                                <Badge variant="outline" className="text-[10px] uppercase font-bold px-1.5 py-0">
+                                  {staff.role?.replace('_', ' ')}
+                                </Badge>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                title="Message Staff"
+                                onClick={() => window.location.href = `/dashboard?tab=messaging`}
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                              </Button>
                             </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
-                              onClick={() => handleAssignTask(staff.user_id)}
-                            >
-                              <PlusCircle className="h-4 w-4" />
-                              Assign
-                            </Button>
+
+                            <div className="flex flex-col gap-2 mt-auto">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="w-full gap-1.5 text-xs h-8"
+                                onClick={() => setViewingStaffId(staff.user_id)}
+                              >
+                                <ListTodo className="h-3.5 w-3.5" />
+                                View Tasks
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="w-full gap-1.5 text-xs h-8"
+                                onClick={() => handleAssignTask(staff.user_id)}
+                              >
+                                <PlusCircle className="h-3.5 w-3.5" />
+                                Assign New Task
+                              </Button>
+                            </div>
                           </CardContent>
                         </Card>
                       ))}

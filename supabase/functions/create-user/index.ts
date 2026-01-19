@@ -97,7 +97,7 @@ serve(async (req: Request) => {
           },
           hint: "The request reached the function, but Supabase rejected the token. Ensure the Authorization header is correctly passed."
         }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -116,7 +116,7 @@ serve(async (req: Request) => {
     console.log(`Checking roles for user: ${requestingUser.email} (${requestingUser.id})`);
     const { data: requestingUserRoles, error: rolesError } = await adminClient
       .from("user_roles")
-      .select("role, workspace_id, facility_id, department_id")
+      .select("role, workspace_id, facility_id, department_id, organization_id")
       .eq("user_id", requestingUser.id);
 
     if (rolesError || !requestingUserRoles || requestingUserRoles.length === 0) {
@@ -132,7 +132,7 @@ serve(async (req: Request) => {
             hint: "If rolesError is 'column organization_id does not exist', I have now fixed this in the code. Please redeploy."
           }
         }),
-        { status: 403, headers: corsHeaders }
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -149,7 +149,7 @@ serve(async (req: Request) => {
       if (department_id && department_id !== deptRole?.department_id) {
         return new Response(
           JSON.stringify({ error: "Forbidden: Can only add users to your own department" }),
-          { status: 403, headers: corsHeaders }
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     }
@@ -159,7 +159,7 @@ serve(async (req: Request) => {
       if (facility_id && facility_id !== facilityRole?.facility_id) {
         return new Response(
           JSON.stringify({ error: "Forbidden: Can only add users to your own facility" }),
-          { status: 403, headers: corsHeaders }
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     }
@@ -167,7 +167,7 @@ serve(async (req: Request) => {
     if (!email || !password || !full_name || !role) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -195,7 +195,7 @@ serve(async (req: Request) => {
         if (!existingUser) {
           return new Response(
             JSON.stringify({ error: "User already exists but could not be retrieved" }),
-            { status: 400, headers: corsHeaders }
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
         newUserId = existingUser.id;
@@ -203,7 +203,7 @@ serve(async (req: Request) => {
       } else {
         return new Response(
           JSON.stringify({ error: createError.message }),
-          { status: 400, headers: corsHeaders }
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     } else {
@@ -229,7 +229,7 @@ serve(async (req: Request) => {
           details: profileError.message,
           diagnostic: { profileError }
         }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -243,39 +243,45 @@ serve(async (req: Request) => {
     // Resolve Hierarchy if needed
     if (department_id && (!resolvedFacilityId || !resolvedWorkspaceId || !resolvedOrganizationId)) {
       console.log("Resolving hierarchy from department_id:", department_id);
-      const { data: deptInfo } = await adminClient
+      const { data: deptInfo, error: dError } = await adminClient
         .from("departments")
         .select("facility_id, facilities(workspace_id, workspaces(organization_id))")
         .eq("id", department_id)
-        .single();
+        .maybeSingle();
 
       if (deptInfo) {
         resolvedFacilityId = resolvedFacilityId || deptInfo.facility_id;
         resolvedWorkspaceId = resolvedWorkspaceId || (deptInfo as any).facilities?.workspace_id;
         resolvedOrganizationId = resolvedOrganizationId || (deptInfo as any).facilities?.workspaces?.organization_id;
+      } else if (dError) {
+        console.error("Error resolving department info:", dError);
       }
     } else if (resolvedFacilityId && (!resolvedWorkspaceId || !resolvedOrganizationId)) {
       console.log("Resolving hierarchy from facility_id:", resolvedFacilityId);
-      const { data: facInfo } = await adminClient
+      const { data: facInfo, error: fError } = await adminClient
         .from("facilities")
         .select("workspace_id, workspaces(organization_id)")
         .eq("id", resolvedFacilityId)
-        .single();
+        .maybeSingle();
 
       if (facInfo) {
         resolvedWorkspaceId = resolvedWorkspaceId || facInfo.workspace_id;
         resolvedOrganizationId = resolvedOrganizationId || (facInfo as any).workspaces?.organization_id;
+      } else if (fError) {
+        console.error("Error resolving facility info:", fError);
       }
     } else if (resolvedWorkspaceId && !resolvedOrganizationId) {
       console.log("Resolving hierarchy from workspace_id:", resolvedWorkspaceId);
-      const { data: wsInfo } = await adminClient
+      const { data: wsInfo, error: wError } = await adminClient
         .from("workspaces")
         .select("organization_id")
         .eq("id", resolvedWorkspaceId)
-        .single();
+        .maybeSingle();
 
       if (wsInfo) {
         resolvedOrganizationId = resolvedOrganizationId || wsInfo.organization_id;
+      } else if (wError) {
+        console.error("Error resolving workspace info:", wError);
       }
     }
 
@@ -302,7 +308,7 @@ serve(async (req: Request) => {
           details: roleError.message,
           diagnostic: { roleError }
         }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -353,13 +359,18 @@ serve(async (req: Request) => {
           role,
         },
       }),
-      { status: 200, headers: corsHeaders }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (err) {
-    console.error("Unhandled error:", err);
+  } catch (err: any) {
+    console.error("Unhandled error in create-user:", err);
     return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: corsHeaders }
+      JSON.stringify({
+        error: "Internal server error",
+        message: err.message,
+        stack: err.stack,
+        diagnostic: "Caught in main try-catch"
+      }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

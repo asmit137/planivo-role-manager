@@ -22,7 +22,8 @@ interface VacationHubProps {
 
 const VacationHub = ({ departmentId }: VacationHubProps) => {
   const { data: roles, isLoading } = useUserRole();
-  const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
+  const isSuperAdmin = roles?.some(r => r.role === 'super_admin' || r.role === 'general_admin');
+  const isStrictSuperAdmin = roles?.some(r => r.role === 'super_admin');
   const isStaff = roles?.some(r => r.role === 'staff');
   const isDepartmentHead = roles?.some(r => r.role === 'department_head');
 
@@ -35,7 +36,7 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
     ['department_head', 'facility_supervisor', 'workplace_supervisor', 'workspace_supervisor'].includes(r.role)
   );
 
-  const isApprover = !!approverRole || isSuperAdmin;
+  const isApprover = !!approverRole || isStrictSuperAdmin;
 
   const getApprovalInfo = () => {
     if (isSuperAdmin) {
@@ -97,7 +98,7 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
               <List className="h-4 w-4 mr-1.5 sm:mr-2" />
               <span>My Plans</span>
             </TabsTrigger>
-            {isApprover && (
+            {(isApprover || isSuperAdmin) && (
               <TabsTrigger value="team-plans" className="min-h-[44px] px-3 text-sm">
                 <List className="h-4 w-4 mr-1.5 sm:mr-2" />
                 <span>Team Vacations</span>
@@ -115,7 +116,7 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
                 <span>Conflicts</span>
               </TabsTrigger>
             )}
-            {isSuperAdmin && (
+            {isStrictSuperAdmin && (
               <>
                 <TabsTrigger value="types" className="min-h-[44px] px-3 text-sm">
                   <Settings className="h-4 w-4 mr-1.5 sm:mr-2" />
@@ -159,7 +160,7 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
             </TabsContent>
           )}
 
-          {isApprover && approvalInfo && (
+          {(isApprover || isSuperAdmin) && approvalInfo && (
             <TabsContent value="team-plans">
               <VacationPlansList
                 scopeType={approvalInfo.scopeType}
@@ -176,7 +177,7 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
             </TabsContent>
           )}
 
-          {isSuperAdmin && (
+          {isStrictSuperAdmin && (
             <>
               <TabsContent value="types">
                 <VacationTypeManagement />

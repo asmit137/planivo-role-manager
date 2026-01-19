@@ -75,7 +75,7 @@ const moduleConfig = [
       { key: 'facilities', label: 'Facilities', path: '/dashboard?tab=facilities', icon: MapPin },
     ]
   },
-  { key: 'staff', label: 'Staff', icon: UserCheck, path: '/dashboard?tab=staff' },
+  { key: 'staff_management', label: 'Staff', icon: UserCheck, path: '/dashboard?tab=staff' },
   { key: 'vacation_planning', label: 'Vacation', icon: Calendar, path: '/dashboard?tab=vacation' },
   { key: 'scheduling', label: 'Scheduling', icon: CalendarClock, path: '/dashboard?tab=scheduling' },
   { key: 'task_management', label: 'Tasks', icon: CheckSquare, path: '/dashboard?tab=tasks' },
@@ -313,7 +313,7 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
   const searchParams = new URLSearchParams(location.search);
   const currentTab = searchParams.get('tab') || 'overview';
 
-  const isSuperAdmin = roles?.some(r => r.role === 'super_admin');
+  const isSuperAdmin = roles?.some(r => r.role === 'super_admin' || r.role === 'general_admin');
 
   const getPrimaryRole = () => {
     if (!roles || roles.length === 0) return null;
@@ -370,22 +370,26 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
         }
       }
 
-      // General Admin gets all modules except 'modules' (Module Access)
-      if (primaryRole === 'general_admin') {
-        if (module.key === 'modules') return false;
-        return true;
-      }
+      // (Block removed: general_admin is now handled via isSuperAdmin logic above)
 
       return module.alwaysShow || hasAccess(module.key);
     });
 
-  const visibleSystemModules = systemModuleConfig.filter(module =>
-    hasAccess(module.key)
-  );
+  const visibleSystemModules = systemModuleConfig.filter(module => {
+    // Hide Module Access for General Admin
+    if (primaryRole === 'general_admin' && module.key === 'modules') {
+      return false;
+    }
+    return hasAccess(module.key);
+  });
 
-  const visibleDeveloperModules = developerModuleConfig.filter(module =>
-    hasAccess(module.key)
-  );
+  const visibleDeveloperModules = developerModuleConfig.filter(module => {
+    // Hide Developer Tools for General Admin
+    if (primaryRole === 'general_admin') {
+      return false;
+    }
+    return hasAccess(module.key);
+  });
 
   const handleNavigation = (path: string) => {
     navigate(path);

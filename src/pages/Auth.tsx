@@ -170,7 +170,7 @@ const Auth = () => {
           <div className="mb-8 flex justify-center">
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-primary blur-2xl opacity-60 group-hover:opacity-80 transition-opacity" />
-              <h1 className="text-6xl font-display font-bold bg-gradient-primary bg-clip-text text-transparent relative tracking-tight">
+              <h1 className="text-4xl md:text-6xl font-display font-bold bg-gradient-primary bg-clip-text text-transparent relative tracking-tight">
                 Planivo
               </h1>
             </div>

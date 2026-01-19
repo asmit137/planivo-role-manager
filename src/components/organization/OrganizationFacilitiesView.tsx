@@ -14,6 +14,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { FolderTree } from 'lucide-react';
 
 interface OrganizationFacilitiesViewProps {
   organizationId: string;
@@ -24,7 +27,31 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
   const [editNameOpen, setEditNameOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [selectedFacility, setSelectedFacility] = useState<any>(null);
+  const [deptDialogOpen, setDeptDialogOpen] = useState(false);
+  const [selectedFacilityForDept, setSelectedFacilityForDept] = useState('');
+  const [selectedDeptTemplateId, setSelectedDeptTemplateId] = useState('');
   const queryClient = useQueryClient();
+
+  // Real-time subscriptions
+  useRealtimeSubscription({
+    table: 'facilities',
+    invalidateQueries: ['org-facilities-view'],
+  });
+
+  useRealtimeSubscription({
+    table: 'workspace_departments',
+    invalidateQueries: ['org-facilities-view', 'workspace-dept-templates'],
+  });
+
+  useRealtimeSubscription({
+    table: 'workspace_categories',
+    invalidateQueries: ['org-facilities-view', 'workspace-dept-templates'],
+  });
+
+  useRealtimeSubscription({
+    table: 'departments',
+    invalidateQueries: ['org-facilities-view'],
+  });
 
   const editMutation = useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
@@ -103,6 +130,126 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
     createMutation.mutate({ name: newFacilityName, workspaceId: selectedWorkspaceId });
   };
 
+  // Fetch available department templates
+  const { data: deptTemplates } = useQuery({
+    queryKey: ['workspace-dept-templates', selectedFacilityForDept],
+    enabled: !!selectedFacilityForDept,
+    queryFn: async () => {
+      const { data: facility } = await supabase
+        .from('facilities')
+        .select('workspace_id')
+        .eq('id', selectedFacilityForDept)
+        .single();
+
+      if (!facility) return [];
+
+      const { data: directDepts, error: directError } = await supabase
+        .from('workspace_departments')
+        .select(`
+          department_template_id,
+          departments!workspace_departments_department_template_id_fkey (*)
+        `)
+        .eq('workspace_id', facility.workspace_id);
+
+      if (directError) throw directError;
+
+      const { data: assignedCategories, error: catError } = await supabase
+        .from('workspace_categories')
+        .select(`
+          category_id,
+          categories (
+            name
+          )
+        `)
+        .eq('workspace_id', facility.workspace_id);
+
+      if (catError) throw catError;
+
+      const categoryNames = assignedCategories
+        .map((c: any) => c.categories?.name)
+        .filter(Boolean);
+
+      let categoryDepts: any[] = [];
+      if (categoryNames.length > 0) {
+        const { data: catDepts, error: catDeptsError } = await supabase
+          .from('departments')
+          .select('*')
+          .in('category', categoryNames)
+          .eq('is_template', true);
+
+        if (catDeptsError) throw catDeptsError;
+        categoryDepts = catDepts || [];
+      }
+
+      const direct = directDepts?.map(item => item.departments) || [];
+      const combined = [...direct, ...categoryDepts];
+      const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+
+      return unique;
+    },
+  });
+
+  const addDeptMutation = useMutation({
+    mutationFn: async ({ facilityId, templateId }: { facilityId: string; templateId: string }) => {
+      const { data: template, error: templateError } = await supabase
+        .from('departments')
+        .select('*')
+        .eq('id', templateId)
+        .single();
+
+      if (templateError) throw templateError;
+
+      const { data: existing } = await supabase
+        .from('departments')
+        .select('id')
+        .eq('facility_id', facilityId)
+        .eq('name', template.name)
+        .maybeSingle();
+
+      if (existing) {
+        throw new Error(`Department "${template.name}" already exists in this facility`);
+      }
+
+      const { error } = await supabase
+        .from('departments')
+        .insert({
+          name: template.name,
+          category: template.category,
+          min_staffing: template.min_staffing,
+          facility_id: facilityId,
+          is_template: false,
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['org-facilities-view'] });
+      toast.success('Department added to facility');
+      setDeptDialogOpen(false);
+      setSelectedDeptTemplateId('');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to add department');
+    },
+  });
+
+  const deleteDeptMutation = useMutation({
+    mutationFn: async (deptId: string) => {
+      const { error } = await supabase
+        .from('departments')
+        .delete()
+        .eq('id', deptId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['org-facilities-view'] });
+      toast.success('Department removed successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to remove department');
+    },
+  });
+
   const { data: workspacesWithFacilities, isLoading } = useQuery({
     queryKey: ['org-facilities-view', organizationId, facilityId],
     queryFn: async () => {
@@ -140,6 +287,7 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
 
         const facilityWithStats = {
           ...facility,
+          departments: [], // Will be fetched if needed, but for now exact count is enough for card
           departmentCount: deptCount || 0,
           userCount: userCount || 0,
         };
@@ -180,10 +328,11 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
 
           const facilitiesWithStats = await Promise.all(
             (facilities || []).map(async (fac) => {
-              const { count: deptCount } = await supabase
+              const { data: deptData } = await supabase
                 .from('departments')
-                .select('*', { count: 'exact', head: true })
-                .eq('facility_id', fac.id);
+                .select('*')
+                .eq('facility_id', fac.id)
+                .order('name');
 
               const { count: userCount } = await supabase
                 .from('user_roles')
@@ -192,7 +341,8 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
 
               return {
                 ...fac,
-                departmentCount: deptCount || 0,
+                departments: deptData || [],
+                departmentCount: deptData?.length || 0,
                 userCount: userCount || 0,
               };
             })
@@ -346,7 +496,7 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
                                 </Button>
                               )}
                             </div>
-                            <div className="flex flex-wrap gap-1.5">
+                            <div className="flex flex-wrap gap-1.5 mb-4">
                               <Badge variant="outline" className="text-[10px] px-1.5 h-5 flex items-center gap-1 bg-muted/30">
                                 {facility.departmentCount} Depts
                               </Badge>
@@ -354,6 +504,56 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
                                 <Users className="h-3 w-3 opacity-70" />
                                 {facility.userCount} Users
                               </Badge>
+                            </div>
+
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground border-b pb-1">
+                                <div className="flex items-center gap-1">
+                                  <FolderTree className="h-3 w-3" />
+                                  <span>Departments</span>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 px-1.5 text-[10px] hover:bg-primary/5 hover:text-primary"
+                                  onClick={() => {
+                                    setSelectedFacilityForDept(facility.id);
+                                    setDeptDialogOpen(true);
+                                  }}
+                                >
+                                  <Plus className="h-2.5 w-2.5 mr-1" />
+                                  Add
+                                </Button>
+                              </div>
+
+                              <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1 custom-scrollbar">
+                                {facility.departments?.length > 0 ? (
+                                  facility.departments.map((dept: any) => (
+                                    <div key={dept.id} className="flex items-center justify-between p-1.5 rounded bg-muted/20 border text-[11px] group">
+                                      <div className="flex flex-col min-w-0">
+                                        <span className="font-medium truncate">{dept.name}</span>
+                                        <span className="text-[9px] text-muted-foreground uppercase truncate">{dept.category}</span>
+                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive"
+                                        onClick={() => {
+                                          if (confirm(`Are you sure you want to remove ${dept.name}?`)) {
+                                            deleteDeptMutation.mutate(dept.id);
+                                          }
+                                        }}
+                                      >
+                                        <Trash2 className="h-2.5 w-2.5" />
+                                      </Button>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-[10px] text-muted-foreground text-center py-2 italic">
+                                    No departments assigned
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </CardContent>
                         </Card>
@@ -404,6 +604,41 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
                 Save Changes
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Department Dialog */}
+      <Dialog open={deptDialogOpen} onOpenChange={setDeptDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Department Template</DialogTitle>
+            <DialogDescription>Select a department template to add to this facility</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Available Templates</Label>
+              <SearchableSelect
+                options={deptTemplates?.map((template: any) => ({
+                  label: `${template.name} (${template.category || 'No Category'})`,
+                  value: template.id
+                })) || []}
+                value={selectedDeptTemplateId}
+                onChange={setSelectedDeptTemplateId}
+                placeholder="Select a template"
+                emptyMessage="No templates found for this workspace."
+              />
+            </div>
+            <Button
+              className="w-full"
+              disabled={!selectedDeptTemplateId || addDeptMutation.isPending}
+              onClick={() => addDeptMutation.mutate({
+                facilityId: selectedFacilityForDept,
+                templateId: selectedDeptTemplateId
+              })}
+            >
+              {addDeptMutation.isPending ? 'Adding...' : 'Add Department'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

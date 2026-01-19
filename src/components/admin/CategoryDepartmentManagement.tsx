@@ -236,18 +236,7 @@ const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryD
         throw new Error('Please enter at least one subdepartment name');
       }
 
-      // Check for duplicates within the parent department
-      const { data: existing } = await supabase
-        .from('departments')
-        .select('name')
-        .eq('parent_department_id', data.parentDeptId)
-        .in('name', validNames);
-
-      // Note: .in() is case-sensitive usually, but for batch check it's a start.
-      // Ideally we iteratively check or use a Postgres function, but client-side check is okay for now.
-      // For stricter case-insensitive list check, we might need a different approach or just accept case-sensitive for batch.
-      // Let's stick to strict check for batch or iterate. Iterating is safer for case-insensitive.
-
+      // Check for duplicates within the parent department (case-insensitive)
       for (const name of validNames) {
         const { data: dup } = await supabase
           .from('departments')
@@ -255,6 +244,7 @@ const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryD
           .eq('parent_department_id', data.parentDeptId)
           .ilike('name', name)
           .maybeSingle();
+
         if (dup) throw new Error(`Subdepartment '${name}' already exists`);
       }
 
@@ -269,7 +259,11 @@ const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryD
           }))
         );
 
-      toast.success('Subdepartments created');
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['departments-with-subs'] });
+      toast.success('Subdepartments created successfully');
       setSubdepartmentNames(['']);
       setAddSubdepartmentsOpen(false);
       setSelectedDepartmentForSubs(null);

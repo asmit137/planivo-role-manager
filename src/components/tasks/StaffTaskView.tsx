@@ -186,7 +186,6 @@ const StaffTaskView = () => {
           <div key={colKey} className="flex flex-col gap-3">
             <div className="flex items-center justify-between font-semibold p-2 bg-muted rounded-t-lg">
               <span>{kanbanColumns[colKey].title}</span>
-              <Badge variant="secondary">{kanbanColumns[colKey].items.length}</Badge>
             </div>
             <div className="flex flex-col gap-3 min-h-[200px] bg-muted/30 p-2 rounded-b-lg">
               {kanbanColumns[colKey].items.map((item) => (
