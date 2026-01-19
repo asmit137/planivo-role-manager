@@ -11,7 +11,7 @@ import TrainingEventList from './TrainingEventList';
 import TrainingEventForm from './TrainingEventForm';
 import TrainingRegistrations from './TrainingRegistrations';
 import TrainingCalendarView from './TrainingCalendarView';
-import AttendanceChecklist from './AttendanceChecklist';
+import AttendanceChecklistModal from './AttendanceChecklistModal';
 import AttendanceEventSelector from './AttendanceEventSelector';
 import GroupManagement from './GroupManagement';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -149,9 +149,11 @@ const TrainingHub = ({ departmentId }: TrainingHubProps) => {
                   selectedEventId={attendanceEventId}
                 />
                 {attendanceEventId && (
-                  <div className="mt-6">
-                    <AttendanceChecklist eventId={attendanceEventId} />
-                  </div>
+                  <AttendanceChecklistModal
+                    eventId={attendanceEventId}
+                    isOpen={!!attendanceEventId}
+                    onClose={() => setAttendanceEventId(null)}
+                  />
                 )}
               </TabsContent>
 

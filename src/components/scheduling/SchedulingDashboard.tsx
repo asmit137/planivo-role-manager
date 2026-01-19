@@ -173,7 +173,7 @@ export const SchedulingDashboard: React.FC<SchedulingDashboardProps> = ({ depart
               <Progress value={coverageRate} className="h-2" />
             </div>
 
-            <div className="grid grid-cols-3 gap-4 text-center pt-4">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center pt-4">
               <div className="space-y-1">
                 <div className="text-2xl font-bold text-emerald-500">{filledShifts}</div>
                 <div className="text-xs text-muted-foreground">Fully Staffed</div>

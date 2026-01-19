@@ -10,12 +10,15 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, Send, Clock, Users, Clipboard, Building2 } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Plus, Edit, Trash2, Send, Clock, Users, Clipboard, Building2, CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { LoadingState } from '@/components/layout/LoadingState';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 interface ScheduleManagerProps {
   departmentId: string;
@@ -40,8 +43,8 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
 
   // Form state
   const [name, setName] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState<Date>();
+  const [endDate, setEndDate] = useState<Date>();
   const [shiftCount, setShiftCount] = useState<number>(1);
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([departmentId]);
   const [shifts, setShifts] = useState<ShiftConfig[]>([
@@ -156,8 +159,8 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
           department_id: primaryDepartmentId,
           facility_id: facilityId,
           workspace_id: workspaceId,
-          start_date: startDate,
-          end_date: endDate,
+          start_date: startDate ? format(startDate, 'yyyy-MM-dd') : null,
+          end_date: endDate ? format(endDate, 'yyyy-MM-dd') : null,
           shift_count: shiftCount,
           created_by: user?.id,
         })
@@ -239,8 +242,8 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
 
   const resetForm = () => {
     setName('');
-    setStartDate('');
-    setEndDate('');
+    setStartDate(undefined);
+    setEndDate(undefined);
     setShiftCount(1);
     setSelectedDepartments([departmentId]);
     setShifts([{ name: 'Morning Shift', startTime: '06:00', endTime: '14:00', requiredStaff: 1, color: '#3b82f6' }]);
@@ -326,22 +329,55 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="startDate">Start Date</Label>
-                    <Input
-                      id="startDate"
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                    />
+                    <Label className="mb-2 block">Start Date</Label>
+                    <Popover modal={true}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            'w-full justify-start text-left font-normal',
+                            !startDate && 'text-muted-foreground'
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {startDate ? format(startDate, 'PPP') : 'Pick date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 z-[100]" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={startDate}
+                          onSelect={setStartDate}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div>
-                    <Label htmlFor="endDate">End Date</Label>
-                    <Input
-                      id="endDate"
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                    />
+                    <Label className="mb-2 block">End Date</Label>
+                    <Popover modal={true}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            'w-full justify-start text-left font-normal',
+                            !endDate && 'text-muted-foreground'
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {endDate ? format(endDate, 'PPP') : 'Pick date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 z-[100]" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={endDate}
+                          onSelect={setEndDate}
+                          disabled={(date) => startDate ? date < startDate : false}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
               </div>

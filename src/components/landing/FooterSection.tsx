@@ -19,16 +19,16 @@ export function FooterSection() {
               Empowering organizations with intelligent workforce management solutions. Streamline scheduling, enhance communication, and optimize productivity.
             </p>
             <div className="flex gap-4 pt-2">
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
+              <a href="https://www.facebook.com/" target="_blank" className="text-muted-foreground hover:text-primary transition-colors">
                 <Facebook className="h-5 w-5" />
               </a>
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
+              <a href="https://twitter.com/" target="_blank" className="text-muted-foreground hover:text-primary transition-colors">
                 <Twitter className="h-5 w-5" />
               </a>
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
+              <a href="https://www.linkedin.com/" target="_blank" className="text-muted-foreground hover:text-primary transition-colors">
                 <Linkedin className="h-5 w-5" />
               </a>
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
+              <a href="https://www.instagram.com/" target="_blank" className="text-muted-foreground hover:text-primary transition-colors">
                 <Instagram className="h-5 w-5" />
               </a>
             </div>

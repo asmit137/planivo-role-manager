@@ -11,7 +11,9 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Calendar, ClipboardList, LayoutDashboard, Clock, Send, Trash2, Filter, Monitor, Edit, ArrowLeft, Building2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Plus, ClipboardList, LayoutDashboard, Clock, Send, Trash2, Filter, Monitor, Edit, ArrowLeft, Building2, CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { LoadingState } from '@/components/layout/LoadingState';
@@ -21,6 +23,7 @@ import { ShiftCalendarView } from './ShiftCalendarView';
 import { SchedulingDashboard } from './SchedulingDashboard';
 import { ScheduleDisplaySettings } from './ScheduleDisplaySettings';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { cn } from '@/lib/utils';
 
 interface FacilitySchedulingHubProps {
   facilityId?: string;
@@ -521,23 +524,23 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
         )}
 
         {/* ... Tab Navigation ... */}
-        <div className="overflow-x-auto scrollbar-hide -mx-2 px-2 mb-6">
-          <TabsList className="grid w-max min-w-full grid-cols-4 gap-1">
-            <TabsTrigger value="schedules" className="flex items-center gap-2 min-h-[44px] px-3">
+        <div className="mb-6">
+          <TabsList>
+            <TabsTrigger value="schedules" className="flex items-center gap-2">
               <ClipboardList className="h-4 w-4" />
-              <span className="hidden sm:inline">Schedules</span>
+              <span>Schedules</span>
             </TabsTrigger>
-            <TabsTrigger value="calendar" className="flex items-center gap-2 min-h-[44px] px-3">
-              <Calendar className="h-4 w-4" />
-              <span className="hidden sm:inline">Calendar</span>
+            <TabsTrigger value="calendar" className="flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4" />
+              <span>Calendar</span>
             </TabsTrigger>
-            <TabsTrigger value="dashboard" className="flex items-center gap-2 min-h-[44px] px-3">
+            <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <LayoutDashboard className="h-4 w-4" />
-              <span className="hidden sm:inline">Dashboard</span>
+              <span>Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value="display" className="flex items-center gap-2 min-h-[44px] px-3">
+            <TabsTrigger value="display" className="flex items-center gap-2">
               <Monitor className="h-4 w-4" />
-              <span className="hidden sm:inline">Display</span>
+              <span>Display</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -617,30 +620,71 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label htmlFor="startDate">Start Date *</Label>
-                            <Input
-                              id="startDate"
-                              type="date"
-                              value={startDate}
-                              onChange={(e) => {
-                                setStartDate(e.target.value);
-                                // If end date is now before start date, update it
-                                if (endDate && e.target.value > endDate) {
-                                  setEndDate(e.target.value);
-                                }
-                              }}
-                              min={!editingSchedule ? new Date().toISOString().split('T')[0] : undefined}
-                            />
+                            <Label className="block">Start Date *</Label>
+                            <Popover modal={true}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !startDate && "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {startDate ? format(parseISO(startDate), "PPP") : "Pick date"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0 z-[100]" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={startDate ? parseISO(startDate) : undefined}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      const dateStr = format(date, "yyyy-MM-dd");
+                                      setStartDate(dateStr);
+                                      if (endDate && dateStr > endDate) {
+                                        setEndDate(dateStr);
+                                      }
+                                    } else {
+                                      setStartDate("");
+                                    }
+                                  }}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="endDate">End Date *</Label>
-                            <Input
-                              id="endDate"
-                              type="date"
-                              value={endDate}
-                              onChange={(e) => setEndDate(e.target.value)}
-                              min={startDate || new Date().toISOString().split('T')[0]}
-                            />
+                            <Label className="block">End Date *</Label>
+                            <Popover modal={true}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !endDate && "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {endDate ? format(parseISO(endDate), "PPP") : "Pick date"}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0 z-[100]" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={endDate ? parseISO(endDate) : undefined}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      setEndDate(format(date, "yyyy-MM-dd"));
+                                    } else {
+                                      setEndDate("");
+                                    }
+                                  }}
+                                  disabled={(date) => startDate ? date < parseISO(startDate) : false}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
                           </div>
                         </div>
                       </div>
@@ -851,7 +895,7 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
             </div>
           ) : (
             <EmptyState
-              icon={Calendar}
+              icon={CalendarIcon}
               title="No departments"
               description="Add departments to this facility first"
             />

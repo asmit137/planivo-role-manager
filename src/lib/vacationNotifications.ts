@@ -128,3 +128,110 @@ export const sendVacationStatusNotification = async (
     console.error('Error sending vacation notification:', error);
   }
 };
+
+/**
+ * Send a chat message to the staff memember when a vacation is created/approved by a manager.
+ */
+export const sendVacationMessage = async (
+  vacationPlanId: string,
+  staffId: string,
+  managerId: string,
+  managerName?: string
+) => {
+  try {
+    // 1. Get vacation plan details
+    const { data: plan } = await supabase
+      .from('vacation_plans')
+      .select('*, vacation_types(name), vacation_splits(*), profiles:staff_id(full_name)')
+      .eq('id', vacationPlanId)
+      .single();
+
+    if (!plan) return;
+
+    const vacationType = plan.vacation_types?.name || 'Vacation';
+    const totalDays = plan.total_days;
+    const staffName = (plan.profiles as any)?.full_name || 'Staff Member';
+
+    // Calculate date range
+    let dateRange = '';
+    if (plan.vacation_splits && plan.vacation_splits.length > 0) {
+      const sortedSplits = plan.vacation_splits.sort((a: any, b: any) =>
+        new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+      );
+
+      const startD = new Date(sortedSplits[0].start_date);
+      const endD = new Date(sortedSplits[sortedSplits.length - 1].end_date);
+
+      if (!isNaN(startD.getTime()) && !isNaN(endD.getTime())) {
+        const startDate = format(startD, 'MMM d, yyyy');
+        const endDate = format(endD, 'MMM d, yyyy');
+        dateRange = ` from ${startDate} to ${endDate}`;
+      }
+    }
+
+    // 2. Find or Create DM Conversation
+    let conversationId: string | null = null;
+
+    // Get manager's DM conversations
+    const { data: managerConvos } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id, conversations(type)')
+      .eq('user_id', managerId);
+
+    if (managerConvos) {
+      const dmIds = managerConvos
+        .filter((c: any) => c.conversations?.type === 'dm')
+        .map((c: any) => c.conversation_id);
+
+      if (dmIds.length > 0) {
+        // Check if staff is in any of these DMs
+        const { data: existing } = await supabase
+          .from('conversation_participants')
+          .select('conversation_id')
+          .eq('user_id', staffId)
+          .in('conversation_id', dmIds)
+          .maybeSingle();
+
+        if (existing) {
+          conversationId = existing.conversation_id;
+        }
+      }
+    }
+
+    // Create new DM if not found
+    if (!conversationId) {
+      const { data: newConvo, error: createError } = await supabase
+        .from('conversations')
+        .insert({ type: 'dm', created_by: managerId } as any)
+        .select()
+        .single();
+
+      if (createError) throw createError;
+      conversationId = newConvo.id;
+
+      // Add participants
+      await supabase.from('conversation_participants').insert([
+        { conversation_id: conversationId, user_id: managerId },
+        { conversation_id: conversationId, user_id: staffId }
+      ]);
+    }
+
+    // 3. Send Message
+    const messageContent = `Hello ${staffName.split(' ')[0]},
+
+I have created a ${vacationType} plan for you${dateRange} (${totalDays} days).
+It has been automatically approved.
+
+Best regards,
+${managerName || 'Manager'}`;
+
+    await supabase.from('messages').insert({
+      conversation_id: conversationId,
+      sender_id: managerId,
+      content: messageContent
+    });
+
+  } catch (error) {
+    console.error('Error sending vacation message:', error);
+  }
+};

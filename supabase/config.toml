@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.validate-module-system]
 verify_jwt = false
+
+[functions.send-password-otp]
+verify_jwt = false
+
+[functions.verify-and-update-password]
+verify_jwt = false

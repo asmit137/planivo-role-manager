@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { useMediaQuery } from '@/hooks/use-media-query';
 
 interface ChatAreaProps {
     channelId: string | null;
@@ -16,6 +17,7 @@ interface ChatAreaProps {
 }
 export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
     const { user } = useAuth();
+    const isDesktop = useMediaQuery('(min-width: 768px)');
     const queryClient = useQueryClient();
     const [messageInput, setMessageInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -299,6 +301,11 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
     if (!channelId) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground bg-background/50">
+                <div className="absolute top-4 left-4 md:hidden">
+                    <Button variant="ghost" size="icon" onClick={onMobileMenuToggle}>
+                        <Menu className="h-6 w-6" />
+                    </Button>
+                </div>
                 <div className="bg-primary/10 p-6 rounded-full mb-6 ring-1 ring-primary/20">
                     <MessageSquare className="h-10 w-10 text-primary" />
                 </div>
@@ -317,7 +324,7 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
             {/* Channel Header */}
             <div className="h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between px-4 shadow-sm flex-shrink-0">
                 <div className="flex items-center gap-2">
-                    <Button variant="ghost" className="lg:hidden mr-2 px-0" onClick={onMobileMenuToggle}>
+                    <Button variant="ghost" className="md:hidden mr-2 px-0" onClick={onMobileMenuToggle}>
                         <Menu className="h-6 w-6" />
                     </Button>
                     {conversation?.type === 'channel' ? (

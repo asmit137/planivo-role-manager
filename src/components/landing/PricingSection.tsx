@@ -141,12 +141,21 @@ export function PricingSection() {
         </div>
 
         {/* Pricing cards */}
-        <div className="flex justify-center mb-16">
-          {plans.filter(p => p.isEnterprise).map((plan) => (
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 lg:gap-6 mb-16 items-start">
+          {plans.map((plan) => (
             <Card
               key={plan.slug}
-              className="relative flex flex-col w-full max-w-md border-primary shadow-lg shadow-primary/10 ring-2 ring-primary"
+              className={`relative flex flex-col w-full ${plan.isPopular
+                  ? "border-primary shadow-lg shadow-primary/10 ring-2 ring-primary scale-105 z-10"
+                  : "border-border/50 bg-card/50 hover:border-primary/30 hover:shadow-lg transition-all"
+                }`}
             >
+              {plan.isPopular && (
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+                  Most Popular
+                </div>
+              )}
+
               <CardHeader className="pb-4">
                 <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
                 <p className="text-sm text-muted-foreground">{plan.description}</p>
@@ -155,6 +164,7 @@ export function PricingSection() {
               <CardContent className="flex-1 pb-6">
                 <div className="mb-6">
                   <span className="text-4xl font-bold text-foreground">{getPrice(plan)}</span>
+                  {getPeriod(plan) && <span className="text-muted-foreground">{getPeriod(plan)}</span>}
                 </div>
 
                 <ul className="space-y-3">
@@ -172,8 +182,11 @@ export function PricingSection() {
                   asChild
                   className="w-full"
                   size="lg"
+                  variant={plan.isPopular ? "default" : "outline"}
                 >
-                  <Link to="/contact-us">Contact Sales</Link>
+                  <Link to={plan.isEnterprise ? "/contact-us" : "/auth"}>
+                    {plan.isEnterprise ? "Contact Sales" : "Get Started"}
+                  </Link>
                 </Button>
               </CardFooter>
             </Card>

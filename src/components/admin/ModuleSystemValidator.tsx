@@ -33,7 +33,7 @@ const ModuleSystemValidator = () => {
   const runValidation = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('validate-module-system');
-      
+
       if (error) throw error;
       return data as ValidationResponse;
     },
@@ -45,8 +45,26 @@ const ModuleSystemValidator = () => {
         toast.error(`${data.summary.failed} test(s) failed`);
       }
     },
-    onError: (error) => {
-      toast.error('Validation failed: ' + error.message);
+    onError: async (error: any) => {
+      let message = error.message;
+
+      // Try to parse detailed error from Edge Function response
+      if (error.context && typeof error.context.json === 'function') {
+        try {
+          const body = await error.context.json();
+          if (body.error) {
+            message = body.error;
+            if (body.details) message += `: ${body.details}`;
+            if (body.diagnostic?.authErrorMessage) {
+              message += ` (Auth Error: ${body.diagnostic.authErrorMessage})`;
+            }
+          }
+        } catch (e) {
+          console.error("Failed to parse error body", e);
+        }
+      }
+
+      toast.error('Validation failed: ' + message);
       console.error(error);
     },
   });

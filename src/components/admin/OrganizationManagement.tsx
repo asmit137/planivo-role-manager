@@ -180,8 +180,21 @@ const OrganizationManagement = () => {
           },
         });
 
-        if (ownerError) throw new Error(ownerError.message || 'Failed to create owner');
-        if (ownerResult.error) throw new Error(ownerResult.error);
+        if (ownerError) {
+          // Robust error parsing from Edge Function
+          if (ownerError.context && typeof ownerError.context.json === 'function') {
+            try {
+              const body = await ownerError.context.json();
+              throw new Error(body.error || body.message || ownerError.message || 'Failed to create owner');
+            } catch (e) {
+              throw new Error(ownerError.message || 'Failed to create owner');
+            }
+          }
+          throw new Error(ownerError.message || 'Failed to create owner');
+        }
+
+        if (ownerResult?.error) throw new Error(ownerResult.error);
+        if (!ownerResult?.user?.id) throw new Error('User creation succeeded but no ID was returned');
 
         ownerId = ownerResult.user.id;
       }
@@ -259,8 +272,20 @@ const OrganizationManagement = () => {
           },
         });
 
-        if (ownerError) throw new Error(ownerError.message || 'Failed to create owner');
-        if (ownerResult.error) throw new Error(ownerResult.error);
+        if (ownerError) {
+          if (ownerError.context && typeof ownerError.context.json === 'function') {
+            try {
+              const body = await ownerError.context.json();
+              throw new Error(body.error || body.message || ownerError.message || 'Failed to create owner');
+            } catch (e) {
+              throw new Error(ownerError.message || 'Failed to create owner');
+            }
+          }
+          throw new Error(ownerError.message || 'Failed to create owner');
+        }
+
+        if (ownerResult?.error) throw new Error(ownerResult.error);
+        if (!ownerResult?.user?.id) throw new Error('User creation succeeded but no ID was returned');
 
         ownerId = ownerResult.user.id;
       }

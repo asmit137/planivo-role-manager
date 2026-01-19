@@ -30,6 +30,9 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
 
   useEffect(() => {
     if (open) {
@@ -52,7 +55,7 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
         .from('user_roles')
         .select(`
           *,
-          department:departments!user_roles_department_id_fkey(name),
+          department:departments!fk_user_roles_department(name),
           facility:facilities(name),
           workspace:workspaces(name),
           specialty:departments!user_roles_specialty_id_fkey(name)
@@ -95,14 +98,14 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
     }
   };
 
-  const handleChangePassword = async () => {
-    if (!newPassword || !confirmPassword) {
-      toast.error('Please fill in all password fields');
+  const handleSendOTP = async () => {
+    if (!profile?.email) {
+      toast.error('User email not found');
       return;
     }
 
-    if (newPassword.length < 6) {
-      toast.error('Password must be at least 6 characters long');
+    if (!newPassword || !confirmPassword) {
+      toast.error('Please fill in both password fields first');
       return;
     }
 
@@ -111,29 +114,116 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
       return;
     }
 
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return;
+    }
+
     if (newPassword === '123456') {
-      toast.error('Please choose a different password than the default');
+      toast.error('Please choose a more secure password than the default');
+      return;
+    }
+
+    setLoading(true);
+    console.log('[UserProfile] Initiating OTP request for:', profile.email);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-password-otp', {
+        body: { email: profile.email },
+      });
+
+      console.log('[UserProfile] OTP function response:', { data, error });
+
+      if (error) {
+        console.error('[UserProfile] Edge Function Error:', error);
+
+        // Attempt to parse the error message from the response body if possible
+        let errorMessage = error.message;
+        if (error instanceof Error && (error as any).context) {
+          try {
+            const body = await (error as any).context.json();
+            if (body && body.error) {
+              errorMessage = body.error;
+            }
+          } catch (e) {
+            console.error('[UserProfile] Failed to parse error body:', e);
+          }
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      setIsOtpSent(true);
+      setOtpCooldown(60);
+      toast.success('Verification code sent to your email');
+    } catch (error: any) {
+      console.error('[UserProfile] Error in handleSendOTP:', error);
+      toast.error(error.message || 'Failed to send verification code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!isOtpSent) {
+      toast.error('Please request a verification code first');
+      return;
+    }
+
+    if (!otp) {
+      toast.error('Please enter the verification code');
       return;
     }
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
+      const { data, error } = await supabase.functions.invoke('verify-and-update-password', {
+        body: {
+          email: profile.email,
+          otp,
+          newPassword
+        },
       });
 
-      if (error) throw error;
+      console.log('[UserProfile] Password change response:', { data, error });
+
+      if (error) {
+        console.error('[UserProfile] Edge Function Password Error:', error);
+
+        let errorMessage = error.message;
+        if (error instanceof Error && (error as any).context) {
+          try {
+            const body = await (error as any).context.json();
+            if (body && body.error) {
+              errorMessage = body.error;
+            }
+          } catch (e) {
+            console.error('[UserProfile] Failed to parse password error body:', e);
+          }
+        }
+
+        throw new Error(errorMessage);
+      }
 
       toast.success('Password changed successfully');
-      setCurrentPassword('');
+      setIsOtpSent(false);
+      setOtp('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: any) {
+      console.error('[UserProfile] Error in handleChangePassword:', error);
       toast.error(error.message || 'Failed to change password');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let timer: any;
+    if (otpCooldown > 0) {
+      timer = setTimeout(() => setOtpCooldown(prev => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [otpCooldown]);
 
   const getRoleLabel = (role: string) => {
     const labels: Record<string, string> = {
@@ -170,7 +260,7 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
           {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-foreground">Basic Information</h3>
-            
+
             <div className="space-y-2">
               <Label htmlFor="email" className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
@@ -233,7 +323,7 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
             <p className="text-xs text-muted-foreground">
               Assigned by your department head or administrator
             </p>
-            
+
             {roles.length > 0 ? (
               <div className="space-y-3">
                 {roles.map((role, index) => (
@@ -274,7 +364,7 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
           {/* Change Password */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-foreground">Change Password</h3>
-            
+
             <div className="space-y-2">
               <Label htmlFor="newPassword">New Password</Label>
               <Input
@@ -295,18 +385,58 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm new password"
-                disabled={loading}
+                disabled={loading || isOtpSent}
               />
             </div>
 
-            <Button
-              onClick={handleChangePassword}
-              disabled={loading || !newPassword || !confirmPassword}
-              className="w-full"
-            >
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Change Password
-            </Button>
+            {isOtpSent && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                <Label htmlFor="otp">Verification Code</Label>
+                <Input
+                  id="otp"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  placeholder="Enter 6-digit code"
+                  className="text-center tracking-widest font-mono text-lg"
+                  maxLength={6}
+                  disabled={loading}
+                />
+                <p className="text-xs text-muted-foreground text-center">
+                  Sent to {profile?.email}
+                </p>
+                <div className="flex justify-center">
+                  <Button
+                    variant="link"
+                    size="sm"
+                    onClick={handleSendOTP}
+                    disabled={loading || otpCooldown > 0}
+                    className="text-xs"
+                  >
+                    {otpCooldown > 0 ? `Resend in ${otpCooldown}s` : "Resend code"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {!isOtpSent ? (
+              <Button
+                onClick={handleSendOTP}
+                disabled={loading}
+                className="w-full"
+              >
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Send Verification Code
+              </Button>
+            ) : (
+              <Button
+                onClick={handleChangePassword}
+                disabled={loading || !otp}
+                className="w-full"
+              >
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Verify & Change Password
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>

@@ -348,11 +348,12 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
             }
           }
 
-          if ((conflicts && Array.isArray(conflicts) && conflicts.length > 0) || schedulingConflicts.length > 0) {
-            // STRICT REJECTION: If conflicts found, force action to 'reject'
-            effectiveAction = 'reject';
-            rejectionReason = comments || 'Auto-rejected due to scheduling/vacation conflicts.';
-          }
+          // Instead of auto-rejecting, throw error to show conflict dialog
+          const allConflicts = {
+            vacationConflicts: conflicts || [],
+            schedulingConflicts: schedulingConflicts || []
+          };
+          throw new Error('CONFLICTS_DETECTED:' + JSON.stringify(allConflicts));
         }
       }
 
