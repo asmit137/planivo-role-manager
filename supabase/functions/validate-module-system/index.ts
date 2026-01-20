@@ -1,5 +1,5 @@
 // @ts-ignore
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.84.0';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 declare const Deno: any;
 
@@ -27,20 +27,14 @@ Deno.serve(async (req: Request) => {
 
     // 1. Verify the requesting user using the token from the Authorization header
     const authHeader = req.headers.get('Authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Missing authorization header' }), { status: 401, headers: corsHeaders });
     }
 
+    const token = authHeader.replace('Bearer ', '');
+
     const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
+      auth: { persistSession: false },
     });
 
     const { data: { user: requestingUser }, error: authError } = await authClient.auth.getUser(token);

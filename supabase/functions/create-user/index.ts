@@ -1,6 +1,4 @@
 // @ts-ignore
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-// @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 declare const Deno: any;
@@ -11,44 +9,81 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req: Request) => {
-  console.log("--- REQUEST RECEIVED ---");
-  console.log("Method:", req.method);
-  console.log("Auth Header present:", !!req.headers.get("Authorization"));
+Deno.serve(async (req: Request) => {
+  console.log("--- CREATE-USER REQUEST RECEIVED ---");
 
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { status: 200, headers: corsHeaders });
   }
 
-  // Use standard environment variables (Supabase provides these automatically)
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-  console.log("ENV CHECK - URL:", !!SUPABASE_URL, "Anon:", !!SUPABASE_ANON_KEY, "Service:", !!SUPABASE_SERVICE_ROLE_KEY);
-  console.log("Auth Header:", req.headers.get("Authorization")?.substring(0, 20) + "...");
-
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("Missing Authorization header");
+      throw new Error("Missing Authorization header");
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+
+    // 1. Authenticate the requesting user (Robust Pattern)
+    const authClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+      auth: { persistSession: false },
+    });
+
+    const {
+      data: { user: requestingUser },
+      error: authError,
+    } = await authClient.auth.getUser(token);
+
+    if (authError || !requestingUser) {
+      console.error("AUTH ERROR:", authError?.message || "User not found");
+
+      let jwtClaims: any = {};
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = parts[1];
+          const padded = payload.padEnd(payload.length + (4 - payload.length % 4) % 4, '=');
+          const decoded = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+          jwtClaims = JSON.parse(decoded);
+        }
+      } catch (e) { jwtClaims = { error: "Parse failed" }; }
+
+      return new Response(
+        JSON.stringify({
+          error: "Unauthorized_from_code",
+          details: authError?.message || "Invalid session",
+          diagnostic: {
+            authErrorMessage: authError?.message,
+            jwtClaims,
+            tokenLength: token.length,
+            urlPresent: !!SUPABASE_URL,
+            anonPresent: !!SUPABASE_ANON_KEY
+          }
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Authenticated as: ${requestingUser.email}`);
+
+    // 2. Admin client for operations
+    const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
     /* =====================================================
-       1️⃣ REQUEST BODY & HEALTH CHECK
+       3️⃣ REQUEST BODY
     ===================================================== */
     const body = await req.json();
 
+    // Health check support
     if (body.type === "health") {
-      return new Response(
-        JSON.stringify({
-          status: "ok",
-          message: "Function reached successfully",
-          config: {
-            supabaseUrl: SUPABASE_URL,
-            hasAnonKey: !!SUPABASE_ANON_KEY,
-            hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY,
-            authHeaderPresent: !!req.headers.get("Authorization"),
-          }
-        }),
-        { status: 200, headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ status: "ok" }), { status: 200, headers: corsHeaders });
     }
 
     const {
@@ -64,42 +99,6 @@ serve(async (req: Request) => {
       custom_role_id,
       force_password_change,
     } = body;
-
-    /* =====================================================
-       2️⃣ AUTH CLIENT (VALIDATES USER JWT)
-    ===================================================== */
-    const authHeader = req.headers.get("Authorization");
-    const token = authHeader?.replace("Bearer ", "");
-
-    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
-
-    const {
-      data: { user: requestingUser },
-      error: authError,
-    } = await authClient.auth.getUser(token);
-
-    if (authError || !requestingUser) {
-      console.error("AUTH ERROR:", authError);
-      return new Response(
-        JSON.stringify({
-          error: "Unauthorized_from_code",
-          details: authError?.message || "User not found",
-          diagnostic: {
-            authErrorMessage: authError?.message,
-            authErrorStatus: authError?.status,
-            headerPrefix: authHeader?.substring(0, 25) + "...",
-            tokenLength: token?.length,
-          },
-          hint: "The request reached the function, but Supabase rejected the token. Ensure the Authorization header is correctly passed."
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     /* =====================================================
        3️⃣ ADMIN CLIENT & ROLE VALIDATION
@@ -347,6 +346,57 @@ serve(async (req: Request) => {
           console.log(`Initialized ${vTypes.length} leave balances`);
         }
       }
+    }
+
+    /* =====================================================
+       8️⃣ SEND WELCOME EMAIL
+    ===================================================== */
+    /* =====================================================
+       8️⃣ SEND WELCOME EMAIL (SENDGRID)
+    ===================================================== */
+    /* =====================================================
+       8️⃣ SEND WELCOME EMAIL (RESEND)
+    ===================================================== */
+    const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
+    const SENDGRID_SENDER_EMAIL = Deno.env.get("SENDGRID_SENDER_EMAIL") || "no-reply@planivo.com";
+    if (SENDGRID_API_KEY) {
+      console.log(`Sending welcome email to ${email} via SendGrid...`);
+      try {
+        const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SENDGRID_API_KEY}`,
+          },
+          body: JSON.stringify({
+            personalizations: [{ to: [{ email: email }] }],
+            from: { email: SENDGRID_SENDER_EMAIL, name: "Planivo" },
+            subject: "Welcome to Planivo - Your Account Credentials",
+            content: [{
+              type: "text/html",
+              value: `
+                <h1>Welcome to Planivo!</h1>
+                <p>Your account has been successfully created.</p>
+                <p><strong>Username:</strong> ${email}</p>
+                <p><strong>Password:</strong> ${password}</p>
+                <p>Click here to login: <a href="${Deno.env.get("PUBLIC_APP_URL") || 'http://localhost:8080'}">Planivo Login</a></p>
+                <p>Please log in and change your password immediately for security.</p>
+              `
+            }],
+          }),
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("SendGrid API error:", errorText);
+        } else {
+          console.log("Welcome email sent successfully via SendGrid.");
+        }
+      } catch (emailErr: any) {
+        console.error("Failed to send welcome email:", emailErr);
+      }
+    } else {
+      console.warn("SENDGRID_API_KEY not set. Welcome email skipped.");
     }
 
     return new Response(
