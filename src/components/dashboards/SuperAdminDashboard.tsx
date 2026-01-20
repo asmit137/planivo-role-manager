@@ -205,17 +205,17 @@ const SuperAdminDashboard = () => {
 
   const getStatusBadge = (status: string) => {
     const configs: Record<string, { label: string; className: string }> = {
-      draft: { label: 'Draft', className: 'bg-warning text-warning-foreground' },
-      department_pending: { label: 'Dept Pending', className: 'bg-primary text-primary-foreground' },
-      facility_pending: { label: 'Facility Pending', className: 'bg-primary text-primary-foreground' },
-      workspace_pending: { label: 'Final Pending', className: 'bg-primary text-primary-foreground' },
-      approved: { label: 'Approved', className: 'bg-success text-success-foreground' },
-      rejected: { label: 'Rejected', className: 'bg-destructive' },
-      active: { label: 'Active', className: 'bg-primary' },
-      pending_approval: { label: 'Pending', className: 'bg-primary' },
-      completed: { label: 'Completed', className: 'bg-success' },
+      draft: { label: 'Draft', className: 'bg-warning text-warning-foreground hover:bg-warning' },
+      department_pending: { label: 'Dept Pending', className: 'bg-primary text-primary-foreground hover:bg-primary' },
+      facility_pending: { label: 'Facility Pending', className: 'bg-primary text-primary-foreground hover:bg-primary' },
+      workspace_pending: { label: 'Final Pending', className: 'bg-primary text-primary-foreground hover:bg-primary' },
+      approved: { label: 'Approved', className: 'bg-success text-success-foreground hover:bg-success' },
+      rejected: { label: 'Rejected', className: 'bg-destructive hover:bg-destructive' },
+      active: { label: 'Active', className: 'bg-primary hover:bg-primary' },
+      pending_approval: { label: 'Pending', className: 'bg-primary hover:bg-primary' },
+      completed: { label: 'Completed', className: 'bg-success hover:bg-success' },
     };
-    const config = configs[status] || { label: status, className: 'bg-secondary' };
+    const config = configs[status] || { label: status, className: 'bg-secondary hover:bg-secondary' };
     return <Badge className={config.className}>{config.label}</Badge>;
   };
 

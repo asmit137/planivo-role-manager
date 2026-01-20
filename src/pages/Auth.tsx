@@ -296,7 +296,7 @@ const Auth = () => {
                     fill="#EA4335"
                   />
                 </svg>
-                Sign in with Google
+                {mode === 'login' ? 'Sign in with Google' : 'Sign up with Google'}
               </Button>
 
               <div className="text-center text-sm text-muted-foreground">
