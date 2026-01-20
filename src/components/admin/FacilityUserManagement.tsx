@@ -31,11 +31,11 @@ interface FacilityUserManagementProps {
 const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: FacilityUserManagementProps) => {
   const facilityAtLimit = maxFacilities !== null && maxFacilities !== undefined && (currentFacilityCount || 0) >= maxFacilities;
   const [facilityDialogOpen, setFacilityDialogOpen] = useState(false);
-  const [selectedWorkspace, setSelectedWorkspace] = useState('');
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string | undefined>(undefined);
   const [facilityName, setFacilityName] = useState('');
   const [deptDialogOpen, setDeptDialogOpen] = useState(false);
-  const [selectedFacilityId, setSelectedFacilityId] = useState('');
-  const [selectedDeptTemplateId, setSelectedDeptTemplateId] = useState('');
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string | undefined>(undefined);
+  const [selectedDeptTemplateId, setSelectedDeptTemplateId] = useState<string | undefined>(undefined);
   const queryClient = useQueryClient();
   const { selectedOrganizationId } = useOrganization();
 
@@ -237,7 +237,8 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
           .from('departments')
           .select('*')
           .in('category', categoryNames)
-          .eq('is_template', true);
+          .eq('is_template', true)
+          .is('parent_department_id', null);
 
         if (catDeptsError) throw catDeptsError;
         categoryDepts = catDepts || [];
@@ -368,11 +369,17 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
                           <SelectValue placeholder="Select workspace" />
                         </SelectTrigger>
                         <SelectContent>
-                          {workspaces?.map((workspace) => (
-                            <SelectItem key={workspace.id} value={workspace.id}>
-                              {workspace.name}
-                            </SelectItem>
-                          ))}
+                          {workspaces && workspaces.length > 0 ? (
+                            workspaces.map((workspace) => (
+                              <SelectItem key={workspace.id} value={workspace.id}>
+                                {workspace.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="p-2 text-xs text-muted-foreground text-center">
+                              No workspaces available
+                            </div>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -404,7 +411,8 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
                       <Label>Available Templates</Label>
                       <SearchableSelect
                         options={deptTemplates?.map((template: any) => ({
-                          label: `${template.name} (${template.category || 'No Category'})`,
+                          label: template.name,
+                          group: template.category || 'No Category',
                           value: template.id
                         })) || []}
                         value={selectedDeptTemplateId}

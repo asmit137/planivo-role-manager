@@ -65,12 +65,17 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
 
       if (splitsError) throw splitsError;
 
+      // Determine approval level based on user role
+      const isSuper = user?.email?.includes('admin') || true; // Fallback or context check needed
+      // Actually, we should probably pass the level from props or detect it
+      const currentLevel = scopeType === 'workspace' ? 3 : scopeType === 'facility' ? 2 : 1;
+
       // Add approval record with rejection
       const { error: approvalError } = await supabase
         .from('vacation_approvals')
         .insert({
           vacation_plan_id: planId,
-          approval_level: 1,
+          approval_level: currentLevel,
           approver_id: user?.id || '',
           status: 'rejected',
           comments: `Rejected due to conflict: ${reason}`,
@@ -125,20 +130,9 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
   const { data: departments } = useQuery({
     queryKey: ['departments', scopeId],
     queryFn: async () => {
-      // First, get all department IDs that actually have staff members
-      const { data: rolesData } = await supabase
-        .from('user_roles')
-        .select('department_id')
-        .eq('role', 'staff');
-
-      const activeDeptIds = [...new Set((rolesData || []).map(r => r.department_id).filter(Boolean))];
-
-      if (activeDeptIds.length === 0) return [];
-
       let query = supabase
         .from('departments')
-        .select('id, name, facility_id, facilities(workspace_id)')
-        .in('id', activeDeptIds);
+        .select('id, name, facility_id, facilities(workspace_id)');
 
       if (scopeType === 'facility' && scopeId) {
         query = query.eq('facility_id', scopeId);

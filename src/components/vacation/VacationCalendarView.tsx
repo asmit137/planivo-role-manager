@@ -13,6 +13,7 @@ import { ErrorState } from '@/components/layout/ErrorState';
 import { format, addDays, isWithinInterval, isSameDay, parseISO, isToday } from 'date-fns';
 import { CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface VacationCalendarViewProps {
   departmentId?: string;
@@ -23,6 +24,7 @@ type TimeFilter = '30' | '60' | '90' | 'all';
 export default function VacationCalendarView({ departmentId }: VacationCalendarViewProps) {
   const { user } = useAuth();
   const { data: roles } = useUserRole();
+  const { organization } = useOrganization();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('30');
   const [statusFilter, setStatusFilter] = useState<'approved' | 'pending' | 'all'>('all');
@@ -36,9 +38,9 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
   const userFacilityId = roles?.find(r => r.facility_id)?.facility_id;
   const userWorkspaceId = roles?.find(r => r.workspace_id)?.workspace_id;
 
-  // Fetch vacations based on role and status filter
+  // Fetch vacations based on organization, role and status filter
   const { data: vacations, isLoading, error, refetch } = useQuery({
-    queryKey: ['vacations', user?.id, userDepartmentId, userFacilityId, userWorkspaceId, roles, timeFilter, statusFilter],
+    queryKey: ['vacations', user?.id, userDepartmentId, userFacilityId, userWorkspaceId, roles, timeFilter, statusFilter, organization?.id],
     queryFn: async () => {
       // Find the specific role records for scope detection
       const workplaceRole = roles?.find(r => r.role === 'workplace_supervisor');
@@ -79,9 +81,26 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
         query = query.in('status', ['draft', 'pending_approval', 'approved', 'department_pending', 'facility_pending', 'workspace_pending']);
       }
 
-      // Apply role-based filtering
+      // Apply organization/role-based filtering
       if (isSuperAdmin) {
-        // Super admin sees all, no additional filters
+        // For super admin, filter by selected organization if not 'all'
+        if (organization?.id && organization.id !== 'all') {
+          // Get all workspace IDs for this organization
+          const { data: workspaceData } = await supabase
+            .from('workspaces')
+            .select('id')
+            .eq('organization_id', organization.id);
+
+          const workspaceIds = workspaceData?.map(w => w.id) || [];
+
+          if (workspaceIds.length > 0) {
+            query = query.in('workspace_id', workspaceIds);
+          } else {
+            // No workspaces = no data for this org
+            return [];
+          }
+        }
+        // If 'all', no additional filters for super admin
       } else if (isWorkplaceSupervisor && effectiveWorkspaceId) {
         // Workplace supervisor sees all in the workspace
         query = query.eq('workspace_id', effectiveWorkspaceId);

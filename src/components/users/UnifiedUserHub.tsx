@@ -784,11 +784,17 @@ const UnifiedUserHub = ({
                           </SelectTrigger>
                           <SelectContent className="bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139]">
                             <SelectItem value="all">All Workspaces</SelectItem>
-                            {workspaces?.map((workspace) => (
-                              <SelectItem key={workspace.id} value={workspace.id}>
-                                {workspace.name}
-                              </SelectItem>
-                            ))}
+                            {workspaces && workspaces.length > 0 ? (
+                              workspaces.map((workspace) => (
+                                <SelectItem key={workspace.id} value={workspace.id}>
+                                  {workspace.name}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <div className="p-2 text-xs text-muted-foreground text-center">
+                                No workspaces found
+                              </div>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -802,11 +808,17 @@ const UnifiedUserHub = ({
                             </SelectTrigger>
                             <SelectContent className="bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139]">
                               <SelectItem value="all">All Departments</SelectItem>
-                              {allDepartments?.map((department) => (
-                                <SelectItem key={department.id} value={department.id}>
-                                  {department.name}
-                                </SelectItem>
-                              ))}
+                              {allDepartments && allDepartments.length > 0 ? (
+                                allDepartments.map((department) => (
+                                  <SelectItem key={department.id} value={department.id}>
+                                    {department.name}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <div className="p-2 text-xs text-muted-foreground text-center">
+                                  No departments found
+                                </div>
+                              )}
                             </SelectContent>
                           </Select>
                         </div>

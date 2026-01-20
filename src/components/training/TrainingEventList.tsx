@@ -91,8 +91,8 @@ const TrainingEventList = ({
         .select('*')
         .order('start_datetime', { ascending: true });
 
-      // Filter by organization if we have one
-      if (effectiveOrgId) {
+      // Filter by organization if we have one and it's not 'all'
+      if (effectiveOrgId && effectiveOrgId !== 'all') {
         query = query.eq('organization_id', effectiveOrgId);
       }
 

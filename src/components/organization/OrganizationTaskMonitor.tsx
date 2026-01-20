@@ -46,10 +46,15 @@ const OrganizationTaskMonitor = ({ organizationId }: OrganizationTaskMonitorProp
   const { data: workspaceIds } = useQuery({
     queryKey: ['org-workspace-ids', organizationId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('workspaces')
-        .select('id')
-        .eq('organization_id', organizationId);
+        .select('id');
+
+      if (organizationId && organizationId !== 'all') {
+        query = query.eq('organization_id', organizationId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data?.map(w => w.id) || [];
     },

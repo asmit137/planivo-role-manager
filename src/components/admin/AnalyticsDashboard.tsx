@@ -82,8 +82,7 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
     queryFn: async () => {
       let query = supabase.from('facilities').select('id, name');
 
-      if (organizationId) {
-        // Facilities don't have organization_id directly, need to join with workspaces
+      if (organizationId && organizationId !== 'all') {
         const { data: workspaces } = await supabase
           .from('workspaces')
           .select('id')
@@ -110,7 +109,7 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
 
       if (selectedFacilityId !== 'all') {
         query = supabase.from('user_roles').select('created_at').eq('facility_id', selectedFacilityId);
-      } else if (organizationId) {
+      } else if (organizationId && organizationId !== 'all') {
         query = (supabase.from('user_roles') as any).select('created_at').eq('organization_id', organizationId);
       } else {
         query = supabase.from('profiles').select('created_at');
@@ -164,7 +163,7 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
 
       if (selectedFacilityId !== 'all') {
         query = (query as any).eq('facility_id', selectedFacilityId);
-      } else if (organizationId) {
+      } else if (organizationId && organizationId !== 'all') {
         query = (query as any).eq('organization_id', organizationId);
       }
 
@@ -223,7 +222,7 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
     queryKey: ['entity-counts'],
     queryFn: async () => {
       let workspaceIds: string[] = [];
-      if (organizationId) {
+      if (organizationId && organizationId !== 'all') {
         const { data: ws } = await supabase.from('workspaces').select('id').eq('organization_id', organizationId);
         workspaceIds = ws?.map(w => w.id) || [];
       }
@@ -232,7 +231,7 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
         organizationId
           ? Promise.resolve({ count: 1, error: null })
           : supabase.from('organizations').select('id', { count: 'exact', head: true }),
-        organizationId
+        organizationId && organizationId !== 'all'
           ? (supabase.from('workspaces') as any).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)
           : supabase.from('workspaces').select('id', { count: 'exact', head: true }),
         organizationId
@@ -298,14 +297,7 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
       // Supabase join syntax: select('performed_at, profiles!inner(organization_id)') ...
       // But query is on audit_logs.
 
-      if (organizationId) {
-        // This assumes audit_logs has organization_id or using performed_by lookup which is expensive here. 
-        // Let's skip deep filtering here to avoid breaking it without schema knowledge, 
-        // but we can limit to current user's actions if we wanted, but Org Admin wants to see org actions.
-        // Let's try adding an empty check if we can't filter, or just proceed.
-        // Better to leave it as "Global" for this specific chart if schema is unknown, 
-        // OR query users first.
-
+      if (organizationId && organizationId !== 'all') {
         // Let's fetching org users first
         const { data: orgUsers } = await (supabase.from('user_roles') as any).select('user_id').eq('organization_id', organizationId);
         const userIds = orgUsers?.map(u => u.user_id) || [];

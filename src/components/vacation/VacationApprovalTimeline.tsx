@@ -111,7 +111,9 @@ const VacationApprovalTimeline = ({
   ];
 
   // Find the final approver (the one who actually approved or rejected)
-  const finalApproval = approvals?.find(a => a.status === 'approved' || a.status === 'rejected');
+  // Find the final status (Rejected takes precedence over Approved)
+  const finalApproval = approvals?.find(a => a.status === 'rejected') ||
+    approvals?.find(a => a.status === 'approved');
   const hasAnyConflicts = approvals?.some(a => a.has_conflict);
 
   // Get role name from approval level
@@ -145,7 +147,12 @@ const VacationApprovalTimeline = ({
   }
 
   return (
-    <div className="p-4 rounded-lg border-2 border-success bg-success/5">
+    <div className={cn(
+      "p-4 rounded-lg border-2",
+      finalApproval?.status === 'approved' && "border-success bg-success/5",
+      finalApproval?.status === 'rejected' && "border-destructive bg-destructive/5",
+      !finalApproval && "border-warning bg-warning/5"
+    )}>
       {/* Conflict Alert if any */}
       {hasAnyConflicts && (
         <div className="flex items-center gap-2 mb-3 pb-3 border-b border-warning/30">
@@ -158,10 +165,12 @@ const VacationApprovalTimeline = ({
         <div className={cn(
           "w-10 h-10 rounded-full flex items-center justify-center",
           finalApproval?.status === 'approved' && "bg-success/20",
-          finalApproval?.status === 'rejected' && "bg-destructive/20"
+          finalApproval?.status === 'rejected' && "bg-destructive/20",
+          !finalApproval && "bg-warning/20"
         )}>
           {finalApproval?.status === 'approved' && <CheckCircle2 className="h-5 w-5 text-success" />}
           {finalApproval?.status === 'rejected' && <XCircle className="h-5 w-5 text-destructive" />}
+          {!finalApproval && <Clock className="h-5 w-5 text-warning" />}
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">

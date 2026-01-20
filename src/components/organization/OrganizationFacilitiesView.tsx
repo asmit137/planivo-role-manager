@@ -28,8 +28,8 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
   const [newName, setNewName] = useState('');
   const [selectedFacility, setSelectedFacility] = useState<any>(null);
   const [deptDialogOpen, setDeptDialogOpen] = useState(false);
-  const [selectedFacilityForDept, setSelectedFacilityForDept] = useState('');
-  const [selectedDeptTemplateId, setSelectedDeptTemplateId] = useState('');
+  const [selectedFacilityForDept, setSelectedFacilityForDept] = useState<string | undefined>(undefined);
+  const [selectedDeptTemplateId, setSelectedDeptTemplateId] = useState<string | undefined>(undefined);
   const queryClient = useQueryClient();
 
   // Real-time subscriptions
@@ -92,7 +92,7 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newFacilityName, setNewFacilityName] = useState('');
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState('');
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | undefined>(undefined);
 
   const createMutation = useMutation({
     mutationFn: async ({ name, workspaceId }: { name: string; workspaceId: string }) => {
@@ -175,7 +175,8 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
           .from('departments')
           .select('*')
           .in('category', categoryNames)
-          .eq('is_template', true);
+          .eq('is_template', true)
+          .is('parent_department_id', null);
 
         if (catDeptsError) throw catDeptsError;
         categoryDepts = catDepts || [];
@@ -306,8 +307,11 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
       let workspacesQuery = supabase
         .from('workspaces')
         .select('id, name')
-        .eq('organization_id', organizationId)
         .order('name');
+
+      if (organizationId && organizationId !== 'all') {
+        workspacesQuery = workspacesQuery.eq('organization_id', organizationId);
+      }
 
       const { data: workspaces, error: wsError } = await workspacesQuery;
 
@@ -620,7 +624,8 @@ const OrganizationFacilitiesView = ({ organizationId, facilityId }: Organization
               <Label>Available Templates</Label>
               <SearchableSelect
                 options={deptTemplates?.map((template: any) => ({
-                  label: `${template.name} (${template.category || 'No Category'})`,
+                  label: template.name,
+                  group: template.category || 'No Category',
                   value: template.id
                 })) || []}
                 value={selectedDeptTemplateId}

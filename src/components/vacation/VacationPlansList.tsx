@@ -53,8 +53,9 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
     queryKey: ['vacation-plans-list', departmentId, scopeType, scopeId, staffView, user?.id, organization?.id, isSuperAdmin],
     queryFn: async () => {
       const isOrgFilter = isSuperAdmin && organization?.id && organization.id !== 'all';
+      const isSuperAdminAll = isSuperAdmin && (!organization || organization.id === 'all');
 
-      const departmentsSelect = isOrgFilter
+      const departmentsSelect = (isOrgFilter || isSuperAdminAll)
         ? 'departments!inner(name, facility_id, facilities!inner(name, workspace_id, workspaces!inner(organization_id)))'
         : 'departments(name, facility_id, facilities!facility_id(name, workspace_id))';
 
@@ -87,6 +88,9 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
 
       if (isOrgFilter) {
         query = query.eq('departments.facilities.workspaces.organization_id', organization.id).eq('status', 'approved');
+      } else if (isSuperAdminAll && !staffView && scopeType === 'department' && !departmentId && !scopeId) {
+        // If super admin and all orgs selected, and no specific filters, show all approved
+        query = query.eq('status', 'approved');
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -167,16 +171,7 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
     );
   }
 
-  if (isSuperAdmin && (!organization || organization.id === 'all')) {
-    return (
-      <Card>
-        <CardContent className="p-12 text-center text-muted-foreground flex flex-col items-center justify-center min-h-[200px]">
-          <p className="text-lg font-medium mb-2">Organization Selection Required</p>
-          <p>Please select a specific organization from the sidebar to view vacation plans.</p>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Removed the blocking UI for 'All Organizations' to allow viewing all approved plans
 
   return (
     <>
