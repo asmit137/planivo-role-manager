@@ -43,35 +43,61 @@ export function LeaveBalanceView() {
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-primary" />
+        <Card className="overflow-hidden">
+            <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-primary shrink-0" />
                     My Leave Balances ({currentYear})
                 </CardTitle>
-                <CardDescription>View your available and used vacation days.</CardDescription>
+                <CardDescription className="text-xs sm:text-sm">View your available and used vacation days.</CardDescription>
             </CardHeader>
-            <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Vacation Type</TableHead>
-                            <TableHead className="text-center">Total Allocated</TableHead>
-                            <TableHead className="text-center">Used</TableHead>
-                            <TableHead className="text-right">Remaining</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {balances.map((item: any) => (
-                            <TableRow key={item.id}>
-                                <TableCell className="font-medium">{item.vacation_types?.name}</TableCell>
-                                <TableCell className="text-center">{item.accrued}</TableCell>
-                                <TableCell className="text-center">{item.used}</TableCell>
-                                <TableCell className="text-right font-bold text-primary">{item.balance}</TableCell>
+            <CardContent className="p-0 sm:p-6 pt-0 sm:pt-0">
+                <div className="hidden sm:block">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Vacation Type</TableHead>
+                                <TableHead className="text-center">Total Allocated</TableHead>
+                                <TableHead className="text-center">Used</TableHead>
+                                <TableHead className="text-right">Remaining</TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                        </TableHeader>
+                        <TableBody>
+                            {balances.map((item: any) => (
+                                <TableRow key={item.id}>
+                                    <TableCell className="font-medium">{item.vacation_types?.name}</TableCell>
+                                    <TableCell className="text-center">{item.accrued}</TableCell>
+                                    <TableCell className="text-center">{item.used}</TableCell>
+                                    <TableCell className="text-right font-bold text-primary">{item.balance}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+                <div className="sm:hidden space-y-2 p-2">
+                    {balances.map((item: any) => (
+                        <div key={item.id} className="p-3 border rounded-lg space-y-2 bg-muted/30">
+                            <div className="flex justify-between items-center">
+                                <span className="font-semibold text-sm">{item.vacation_types?.name}</span>
+                                <span className="text-xs text-muted-foreground">{currentYear}</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                                <div className="flex flex-col">
+                                    <span className="text-muted-foreground">Total</span>
+                                    <span className="font-medium">{item.accrued}</span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-muted-foreground">Used</span>
+                                    <span className="font-medium">{item.used}</span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-muted-foreground">Remaining</span>
+                                    <span className="font-bold text-primary">{item.balance}</span>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </CardContent>
         </Card>
     );

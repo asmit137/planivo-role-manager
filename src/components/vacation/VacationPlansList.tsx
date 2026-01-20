@@ -190,7 +190,7 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
                 <Card key={plan.id} className="border-2">
                   {/* Conflict Alert Banner at Top */}
                   {hasConflicts && (
-                    <div className="bg-warning/10 border-b-2 border-warning p-4">
+                    <div className="bg-warning/10 border-b-2 border-warning p-3 sm:p-4">
                       <div className="flex items-start gap-3">
                         <AlertCircle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
                         <div className="flex-1 space-y-2">
@@ -231,22 +231,24 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
                     </div>
                   )}
 
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-2">
-                        <div>
+                  <CardHeader className="p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="min-w-0 w-full">
                           {!staffView && (
-                            <div className="flex items-center gap-2 mb-2">
-                              <User className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-semibold">
-                                {plan.profiles?.full_name}
-                              </span>
-                              <span className="text-sm text-muted-foreground">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2 min-w-0">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                                <span className="font-semibold truncate">
+                                  {plan.profiles?.full_name}
+                                </span>
+                              </div>
+                              <span className="text-xs sm:text-sm text-muted-foreground truncate">
                                 ({plan.profiles?.email})
                               </span>
                             </div>
                           )}
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-sm text-muted-foreground truncate">
                             {plan.departments?.name}
                           </div>
                         </div>
@@ -254,7 +256,7 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="flex items-center gap-1 cursor-help text-warning">
+                                <div className="flex items-center gap-1 cursor-help text-warning shrink-0">
                                   <AlertCircle className="h-4 w-4" />
                                 </div>
                               </TooltipTrigger>
@@ -275,10 +277,12 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
                           </TooltipProvider>
                         )}
                       </div>
-                      {getStatusBadge(plan.status)}
+                      <div className="shrink-0 self-start sm:self-center">
+                        {getStatusBadge(plan.status)}
+                      </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="p-4 sm:p-6 space-y-4 pt-0 sm:pt-0">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm font-medium">Vacation Type</p>
@@ -307,9 +311,9 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
                     </div>
 
                     {plan.notes && (
-                      <div className="bg-accent p-3 rounded-lg">
-                        <p className="text-sm font-medium mb-1">Notes:</p>
-                        <p className="text-sm text-muted-foreground">{plan.notes}</p>
+                      <div className="bg-cyan-500/5 p-4 rounded-xl border border-cyan-500/10 shadow-sm">
+                        <p className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2">Notes</p>
+                        <p className="text-sm leading-relaxed opacity-90">{plan.notes}</p>
                       </div>
                     )}
 
@@ -345,7 +349,7 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
                               </div>
 
                               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-                                <span className="text-sm font-medium">
+                                <span className="text-[13px] sm:text-sm font-semibold text-foreground/90">
                                   {format(new Date(split.start_date), 'MMM d, yyyy')} →{' '}
                                   {format(new Date(split.end_date), 'MMM d, yyyy')}
                                 </span>

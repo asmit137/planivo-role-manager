@@ -107,12 +107,6 @@ const StaffDashboard = () => {
             description="Plan and manage your vacation requests"
           />
         )}
-        {activeTab === 'messaging' && (
-          <PageHeader
-            title="Messaging"
-            description="Chat with your colleagues"
-          />
-        )}
         {activeTab === 'notifications' && (
           <PageHeader
             title="Notifications"

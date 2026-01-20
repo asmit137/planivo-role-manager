@@ -155,8 +155,8 @@ const TrainingCalendarView = () => {
 
       {/* Calendar Grid */}
       <Card className="border-2">
-        <CardContent className="p-0 sm:p-6 overflow-hidden">
-          <div className="w-full">
+        <CardContent className="p-2 sm:p-6 overflow-hidden">
+          <div className="w-full overflow-x-auto">
             <Calendar
               mode="single"
               selected={currentMonth}
@@ -167,7 +167,7 @@ const TrainingCalendarView = () => {
               classNames={{
                 months: "flex flex-col gap-2 sm:gap-8 w-full justify-center",
                 month: "space-y-2 sm:space-y-4 flex-1",
-                caption: "flex justify-center pt-1 relative items-center mb-1 sm:mb-8 h-8 sm:h-12",
+                caption: "flex justify-center pt-1 relative items-center mb-1 sm:mb-8 h-7 sm:h-12",
                 caption_label: "text-xs sm:text-2xl font-bold tracking-tight",
                 nav: "flex items-center",
                 nav_button: "h-6 w-6 sm:h-10 sm:w-10 bg-transparent p-0 opacity-60 hover:opacity-100 hover:bg-accent rounded-md sm:rounded-xl transition-all flex items-center justify-center z-20",
@@ -177,7 +177,7 @@ const TrainingCalendarView = () => {
                 head_row: "flex w-full mb-1 sm:mb-4",
                 head_cell: "text-muted-foreground/60 rounded-md font-bold text-[0.45rem] sm:text-xs uppercase tracking-widest flex-1 min-w-0 text-center",
                 row: "flex w-full mt-0.5 sm:mt-2",
-                cell: "relative p-0.5 text-center focus-within:relative focus-within:z-20 flex-1 min-w-0 min-h-[40px] sm:min-h-[64px]",
+                cell: "relative p-0.5 text-center focus-within:relative focus-within:z-20 flex-1 min-w-0 min-h-[34px] sm:min-h-[64px]",
                 day: "h-full w-full p-0 font-normal hover:bg-accent/50 rounded-lg sm:rounded-xl transition-all touch-manipulation",
                 day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground shadow-lg shadow-primary/20",
                 day_today: "bg-accent/30 text-accent-foreground font-bold ring-2 ring-primary/20 ring-offset-2",
@@ -236,24 +236,24 @@ const TrainingCalendarView = () => {
                         </button>
                       </PopoverTrigger>
                       {hasEvents && (
-                        <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80 p-3 sm:p-4 max-h-[60vh] overflow-y-auto" side="bottom" align="center">
-                          <div className="space-y-3">
-                            <h4 className="font-semibold text-lg border-b pb-2">
+                        <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80 p-0 overflow-hidden border-border" align="center">
+                          <div className="p-4 border-b bg-muted/10">
+                            <h4 className="font-bold text-lg">
                               {format(date, "MMMM d, yyyy")}
                             </h4>
-                            <p className="text-sm text-muted-foreground">
-                              {dayEvents.length} event{dayEvents.length > 1 ? 's' : ''} scheduled
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {dayEvents.length} event{dayEvents.length !== 1 ? 's' : ''} scheduled
                             </p>
-                            <div className="space-y-2 max-h-96 overflow-y-auto">
-                              {dayEvents.map((event: any) => (
-                                <EventPopover
-                                  key={event.id}
-                                  event={event}
-                                  isRegistered={registrations?.includes(event.id) || false}
-                                  onJoin={() => navigate(`/meeting?eventId=${event.id}`)}
-                                />
-                              ))}
-                            </div>
+                          </div>
+                          <div className="p-3 space-y-3 max-h-[60vh] overflow-y-auto">
+                            {dayEvents.map((event: any) => (
+                              <EventPopover
+                                key={event.id}
+                                event={event}
+                                isRegistered={registrations?.includes(event.id) || false}
+                                onJoin={() => navigate(`/meeting?eventId=${event.id}`)}
+                              />
+                            ))}
                           </div>
                         </PopoverContent>
                       )}
@@ -363,34 +363,55 @@ const EventPopover = ({
   const isOngoing = new Date() >= startTime && new Date() <= endTime;
 
   return (
-    <div className="flex items-start gap-3 rounded-lg border bg-card p-3 hover:bg-accent/50 transition-colors">
+    <div className={cn(
+      "relative flex gap-3 rounded-xl border p-3 transition-colors",
+      event.event_type === 'training'
+        ? "bg-teal-950/30 border-teal-900/50 hover:bg-teal-950/50"
+        : "bg-card hover:bg-accent/50"
+    )}>
+      {/* Indicator Bar */}
       <div
-        className="w-3 h-10 rounded"
+        className="w-1.5 shrink-0 rounded-full"
         style={{ backgroundColor: eventTypeColors[event.event_type] }}
       />
-      <div className="flex-1 min-w-0 space-y-1">
-        <p className="font-medium truncate">{event.title}</p>
-        <Badge variant="outline" className="text-xs">
-          {eventTypeLabels[event.event_type]}
-        </Badge>
-        {event.registration_type === 'mandatory' && (
-          <Badge className="ml-1 bg-red-500 text-white text-xs">Mandatory</Badge>
-        )}
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Clock className="h-3 w-3" />
+
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="space-y-1">
+          <p className="font-bold text-base leading-none">{event.title}</p>
+          <div className="flex flex-wrap gap-1.5">
+            <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px] font-medium h-5">
+              {eventTypeLabels[event.event_type]}
+            </Badge>
+            {event.registration_type === 'mandatory' && (
+              <Badge className="rounded-full px-2 py-0 text-[10px] bg-red-500 hover:bg-red-600 h-5 border-none">
+                Mandatory
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Clock className="h-3.5 w-3.5" />
           <span>{format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')}</span>
         </div>
-        <div className="flex gap-2 pt-1">
-          {isRegistered && event.enable_video_conference && isOngoing && (
-            <Button size="sm" onClick={onJoin} className="h-7 text-xs">
-              <Video className="h-3 w-3 mr-1" />
-              Join
-            </Button>
-          )}
+
+        <div className="pt-1">
           {isRegistered ? (
-            <Badge className="bg-emerald-500 text-white text-xs">✓ Registered</Badge>
+            <div className="flex gap-2">
+              {event.enable_video_conference && isOngoing && (
+                <Button size="sm" onClick={onJoin} className="h-7 text-xs rounded-full bg-emerald-600 hover:bg-emerald-700">
+                  <Video className="h-3 w-3 mr-1" />
+                  Join
+                </Button>
+              )}
+              <Badge variant="outline" className="rounded-full px-3 py-0.5 text-xs border-emerald-500/50 text-emerald-500 bg-emerald-500/10">
+                Registered
+              </Badge>
+            </div>
           ) : (
-            <Badge variant="outline" className="text-xs">Not Registered</Badge>
+            <Badge variant="outline" className="rounded-full px-3 py-0.5 text-xs text-muted-foreground font-normal">
+              Not Registered
+            </Badge>
           )}
         </div>
       </div>

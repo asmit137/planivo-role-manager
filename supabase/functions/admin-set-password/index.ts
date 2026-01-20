@@ -166,41 +166,41 @@ Deno.serve(async (req: Request) => {
 
     console.log(`Password updated successfully for user: ${email}`);
 
-    // Send Password Change Notification (SendGrid)
-    const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
-    const SENDGRID_SENDER_EMAIL = Deno.env.get("SENDGRID_SENDER_EMAIL") || "no-reply@planivo.com";
-    if (SENDGRID_API_KEY) {
+    // Send Password Change Notification (RESEND)
+    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+    if (RESEND_API_KEY) {
       try {
-        console.log(`Sending password change notification to ${email} via SendGrid...`);
-        const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        console.log(`Sending password change notification to ${email} via Resend...`);
+        const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${SENDGRID_API_KEY}`,
+            Authorization: `Bearer ${RESEND_API_KEY}`,
           },
           body: JSON.stringify({
-            personalizations: [{ to: [{ email: email }] }],
-            from: { email: SENDGRID_SENDER_EMAIL, name: "Planivo" },
+            from: "Planivo <onboarding@resend.dev>",
+            to: [email],
             subject: "Planivo - Password Changed",
-            content: [{
-              type: "text/html",
-              value: `
-                <h1>Password Changed</h1>
-                <p>Your password for Planivo has been changed by an administrator.</p>
-                <p><strong>New Password:</strong> ${password}</p>
-                <p>If you did not request this, please contact support immediately.</p>
+            html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h1 style="color: #0ea5e9;">Password Changed</h1>
+                  <p>Your password for Planivo has been changed by an administrator.</p>
+                  <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 0;"><strong>New Password:</strong> ${password}</p>
+                  </div>
+                  <p>If you did not request this, please contact support immediately.</p>
+                </div>
               `
-            }],
           }),
         });
 
         if (!res.ok) {
-          console.error("SendGrid API error:", await res.text());
+          console.error("Resend API error:", await res.text());
         } else {
-          console.log("Password change notification sent successfully via SendGrid.");
+          console.log("Password change notification sent successfully via Resend.");
         }
       } catch (emailErr) {
-        console.error("Failed to send notification email:", emailErr);
+        console.error("Failed to send notification email via Resend:", emailErr);
       }
     }
 

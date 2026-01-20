@@ -21,7 +21,7 @@ import { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
-type DateFilterType = '1day' | '1week' | '1month' | 'custom';
+type DateFilterType = '1day' | '1week' | '1month' | '60day' | '90day' | 'custom';
 
 // Animation Variants
 const containerVariants = {
@@ -61,7 +61,9 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
     from: subDays(new Date(), 30),
     to: new Date(),
   });
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>(organizationId || 'all');
   const [selectedFacilityId, setSelectedFacilityId] = useState<string>('all');
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('all');
 
   // Handle Date Filter Change
   const handleDateFilterChange = (val: DateFilterType) => {
@@ -73,20 +75,40 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
       setDateRange({ from: subDays(today, 7), to: today });
     } else if (val === '1month') {
       setDateRange({ from: subDays(today, 30), to: today });
+    } else if (val === '60day') {
+      setDateRange({ from: subDays(today, 60), to: today });
+    } else if (val === '90day') {
+      setDateRange({ from: subDays(today, 90), to: today });
     }
   };
 
+  // Fetch Organizations (Super Admin only)
+  const { data: organizations } = useQuery({
+    queryKey: ['admin-organizations-list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data;
+    },
+    enabled: isSuperAdmin,
+  });
+
   // Fetch Facilities (Super Admin or Org Admin)
   const { data: facilities } = useQuery({
-    queryKey: ['admin-facilities-list', organizationId],
+    queryKey: ['admin-facilities-list', selectedOrganizationId, organizationId],
     queryFn: async () => {
-      let query = supabase.from('facilities').select('id, name');
+      let query = supabase.from('facilities').select('id, name, workspaces(organization_id, organizations(name))');
 
-      if (organizationId && organizationId !== 'all') {
+      const targetOrgId = selectedOrganizationId !== 'all' ? selectedOrganizationId : organizationId;
+
+      if (targetOrgId && targetOrgId !== 'all') {
         const { data: workspaces } = await supabase
           .from('workspaces')
           .select('id')
-          .eq('organization_id', organizationId);
+          .eq('organization_id', targetOrgId);
 
         const workspaceIds = workspaces?.map(w => w.id) || [];
         if (workspaceIds.length === 0) return [];
@@ -98,21 +120,64 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
       if (error) throw error;
       return data;
     },
-    enabled: isSuperAdmin || !!organizationId,
+    enabled: isSuperAdmin || !!organizationId || !!selectedOrganizationId,
+  });
+
+  // Fetch Departments
+  const { data: departments } = useQuery({
+    queryKey: ['admin-departments-list', selectedFacilityId, selectedOrganizationId, organizationId],
+    queryFn: async () => {
+      let query = supabase.from('departments').select('id, name, facility_id, facilities(name, workspaces(organizations(name)))');
+
+      if (selectedFacilityId !== 'all') {
+        query = query.eq('facility_id', selectedFacilityId);
+      } else {
+        const targetOrgId = selectedOrganizationId !== 'all' ? selectedOrganizationId : organizationId;
+        if (targetOrgId && targetOrgId !== 'all') {
+          const { data: workspaces } = await supabase
+            .from('workspaces')
+            .select('id')
+            .eq('organization_id', targetOrgId);
+          const workspaceIds = workspaces?.map(w => w.id) || [];
+
+          if (workspaceIds.length > 0) {
+            const { data: facs } = await supabase.from('facilities').select('id').in('workspace_id', workspaceIds);
+            const facIds = facs?.map(f => f.id) || [];
+            if (facIds.length > 0) {
+              query = query.in('facility_id', facIds);
+            } else {
+              return [];
+            }
+          } else {
+            return [];
+          }
+        }
+      }
+
+      const { data, error } = await query.order('name');
+      if (error) throw error;
+      return data;
+    },
+    enabled: isSuperAdmin || !!organizationId || !!selectedOrganizationId,
   });
 
   // User growth data
   const { data: userGrowth } = useQuery({
-    queryKey: ['user-growth', dateRange?.from, dateRange?.to, selectedFacilityId, organizationId],
+    queryKey: ['user-growth', dateRange?.from, dateRange?.to, selectedOrganizationId, selectedFacilityId, selectedDepartmentId, organizationId],
     queryFn: async () => {
       let query: any;
 
-      if (selectedFacilityId !== 'all') {
+      if (selectedDepartmentId !== 'all') {
+        query = supabase.from('user_roles').select('created_at').eq('department_id', selectedDepartmentId);
+      } else if (selectedFacilityId !== 'all') {
         query = supabase.from('user_roles').select('created_at').eq('facility_id', selectedFacilityId);
-      } else if (organizationId && organizationId !== 'all') {
-        query = (supabase.from('user_roles') as any).select('created_at').eq('organization_id', organizationId);
       } else {
-        query = supabase.from('profiles').select('created_at');
+        const targetOrgId = selectedOrganizationId !== 'all' ? selectedOrganizationId : organizationId;
+        if (targetOrgId && targetOrgId !== 'all') {
+          query = (supabase.from('user_roles') as any).select('created_at').eq('organization_id', targetOrgId);
+        } else {
+          query = supabase.from('profiles').select('created_at');
+        }
       }
 
       query = (query as any).order('created_at', { ascending: true });
@@ -155,16 +220,21 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
 
   // Role distribution
   const { data: roleDistribution } = useQuery({
-    queryKey: ['role-distribution-chart', selectedFacilityId],
+    queryKey: ['role-distribution-chart', selectedOrganizationId, selectedFacilityId, selectedDepartmentId, organizationId],
     queryFn: async () => {
       let query: any = supabase
         .from('user_roles')
         .select('role');
 
-      if (selectedFacilityId !== 'all') {
+      if (selectedDepartmentId !== 'all') {
+        query = (query as any).eq('department_id', selectedDepartmentId);
+      } else if (selectedFacilityId !== 'all') {
         query = (query as any).eq('facility_id', selectedFacilityId);
-      } else if (organizationId && organizationId !== 'all') {
-        query = (query as any).eq('organization_id', organizationId);
+      } else {
+        const targetOrgId = selectedOrganizationId !== 'all' ? selectedOrganizationId : organizationId;
+        if (targetOrgId && targetOrgId !== 'all') {
+          query = (query as any).eq('organization_id', targetOrgId);
+        }
       }
 
       const { data, error } = await query;
@@ -219,39 +289,75 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
 
   // Entity counts
   const { data: entityCounts } = useQuery({
-    queryKey: ['entity-counts'],
+    queryKey: ['entity-counts', selectedOrganizationId, selectedFacilityId, selectedDepartmentId, organizationId],
     queryFn: async () => {
+      const targetOrgId = selectedOrganizationId !== 'all' ? selectedOrganizationId : organizationId;
+
       let workspaceIds: string[] = [];
-      if (organizationId && organizationId !== 'all') {
-        const { data: ws } = await supabase.from('workspaces').select('id').eq('organization_id', organizationId);
+      if (targetOrgId && targetOrgId !== 'all') {
+        const { data: ws } = await supabase.from('workspaces').select('id').eq('organization_id', targetOrgId);
         workspaceIds = ws?.map(w => w.id) || [];
       }
 
       const counts = await Promise.all([
-        organizationId
+        targetOrgId && targetOrgId !== 'all'
           ? Promise.resolve({ count: 1, error: null })
           : supabase.from('organizations').select('id', { count: 'exact', head: true }),
-        organizationId && organizationId !== 'all'
-          ? (supabase.from('workspaces') as any).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)
+        targetOrgId && targetOrgId !== 'all'
+          ? (supabase.from('workspaces') as any).select('id', { count: 'exact', head: true }).eq('organization_id', targetOrgId)
           : supabase.from('workspaces').select('id', { count: 'exact', head: true }),
-        organizationId
-          ? (supabase.from('facilities') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
-          : supabase.from('facilities').select('id', { count: 'exact', head: true }),
-        organizationId
-          ? (supabase.from('departments') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
-          : supabase.from('departments').select('id', { count: 'exact', head: true }),
-        organizationId
-          ? (supabase.from('tasks') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
-          : supabase.from('tasks').select('id', { count: 'exact', head: true }),
-        organizationId
-          ? (supabase.from('schedules') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
-          : supabase.from('schedules').select('id', { count: 'exact', head: true }),
-        organizationId
-          ? (supabase.from('vacation_plans') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
-          : supabase.from('vacation_plans').select('id', { count: 'exact', head: true }),
-        organizationId
-          ? (supabase.from('training_events') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
-          : supabase.from('training_events').select('id', { count: 'exact', head: true }),
+        selectedFacilityId !== 'all'
+          ? (supabase.from('facilities') as any).select('id', { count: 'exact', head: true }).eq('id', selectedFacilityId)
+          : workspaceIds.length > 0
+            ? (supabase.from('facilities') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
+            : targetOrgId && targetOrgId !== 'all'
+              ? Promise.resolve({ count: 0, error: null })
+              : supabase.from('facilities').select('id', { count: 'exact', head: true }),
+        selectedDepartmentId !== 'all'
+          ? (supabase.from('departments') as any).select('id', { count: 'exact', head: true }).eq('id', selectedDepartmentId)
+          : selectedFacilityId !== 'all'
+            ? (supabase.from('departments') as any).select('id', { count: 'exact', head: true }).eq('facility_id', selectedFacilityId)
+            : workspaceIds.length > 0
+              ? (supabase.from('departments') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
+              : targetOrgId && targetOrgId !== 'all'
+                ? Promise.resolve({ count: 0, error: null })
+                : supabase.from('departments').select('id', { count: 'exact', head: true }),
+        selectedDepartmentId !== 'all'
+          ? (supabase.from('tasks') as any).select('id', { count: 'exact', head: true }).eq('department_id', selectedDepartmentId)
+          : selectedFacilityId !== 'all'
+            ? (supabase.from('tasks') as any).select('id', { count: 'exact', head: true }).eq('facility_id', selectedFacilityId)
+            : workspaceIds.length > 0
+              ? (supabase.from('tasks') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
+              : targetOrgId && targetOrgId !== 'all'
+                ? Promise.resolve({ count: 0, error: null })
+                : supabase.from('tasks').select('id', { count: 'exact', head: true }),
+        selectedDepartmentId !== 'all'
+          ? (supabase.from('schedules') as any).select('id', { count: 'exact', head: true }).eq('department_id', selectedDepartmentId)
+          : selectedFacilityId !== 'all'
+            ? (supabase.from('schedules') as any).select('id', { count: 'exact', head: true }).eq('facility_id', selectedFacilityId)
+            : workspaceIds.length > 0
+              ? (supabase.from('schedules') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
+              : targetOrgId && targetOrgId !== 'all'
+                ? Promise.resolve({ count: 0, error: null })
+                : supabase.from('schedules').select('id', { count: 'exact', head: true }),
+        selectedDepartmentId !== 'all'
+          ? (supabase.from('vacation_plans') as any).select('id', { count: 'exact', head: true }).eq('department_id', selectedDepartmentId)
+          : selectedFacilityId !== 'all'
+            ? (supabase.from('vacation_plans') as any).select('id', { count: 'exact', head: true }).eq('facility_id', selectedFacilityId)
+            : workspaceIds.length > 0
+              ? (supabase.from('vacation_plans') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
+              : targetOrgId && targetOrgId !== 'all'
+                ? Promise.resolve({ count: 0, error: null })
+                : supabase.from('vacation_plans').select('id', { count: 'exact', head: true }),
+        selectedDepartmentId !== 'all'
+          ? (supabase.from('training_events') as any).select('id', { count: 'exact', head: true }).eq('department_id', selectedDepartmentId)
+          : selectedFacilityId !== 'all'
+            ? (supabase.from('training_events') as any).select('id', { count: 'exact', head: true }).eq('facility_id', selectedFacilityId)
+            : workspaceIds.length > 0
+              ? (supabase.from('training_events') as any).select('id', { count: 'exact', head: true }).in('workspace_id', workspaceIds)
+              : targetOrgId && targetOrgId !== 'all'
+                ? Promise.resolve({ count: 0, error: null })
+                : supabase.from('training_events').select('id', { count: 'exact', head: true }),
       ]) as any[];
 
       const [orgs, workspaces, facilities, departments, tasks, schedules, vacations, trainings] = counts;
@@ -271,7 +377,7 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
 
   // Activity by day of week
   const { data: activityByDay } = useQuery({
-    queryKey: ['activity-by-day', dateRange?.from, dateRange?.to, organizationId],
+    queryKey: ['activity-by-day', dateRange?.from, dateRange?.to, selectedOrganizationId, selectedFacilityId, selectedDepartmentId, organizationId],
     queryFn: async () => {
       let query = supabase
         .from('audit_logs')
@@ -346,32 +452,75 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Facility Filter - Super Admin Only */}
+          {/* Organization Filter - Super Admin Only */}
           {isSuperAdmin && (
             <div className="min-w-[200px]">
-              <Select value={selectedFacilityId} onValueChange={setSelectedFacilityId}>
+              <Select value={selectedOrganizationId} onValueChange={(val) => {
+                setSelectedOrganizationId(val);
+                setSelectedFacilityId('all');
+                setSelectedDepartmentId('all');
+              }}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Facility" />
+                  <SelectValue placeholder="Select Organization" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Facilities</SelectItem>
-                  {facilities?.map((f: any) => (
-                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  <SelectItem value="all">All Organizations</SelectItem>
+                  {organizations?.map((org: any) => (
+                    <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           )}
 
+          {/* Facility Filter */}
+          <div className="min-w-[200px]">
+            <Select value={selectedFacilityId} onValueChange={(val) => {
+              setSelectedFacilityId(val);
+              setSelectedDepartmentId('all');
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select Facility" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Facilities</SelectItem>
+                {facilities?.map((f: any) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.name} {isSuperAdmin && f.workspaces?.organizations?.name && `(${f.workspaces.organizations.name})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Department Filter */}
+          <div className="min-w-[200px]">
+            <Select value={selectedDepartmentId} onValueChange={setSelectedDepartmentId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select Department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments?.map((d: any) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name} {d.facilities?.name && `(${d.facilities.name})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="flex items-center gap-2">
             <Select value={dateFilter} onValueChange={handleDateFilterChange}>
-              <SelectTrigger className="w-[120px]">
+              <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Period" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="1day">Last 24 Hours</SelectItem>
                 <SelectItem value="1week">Last 7 Days</SelectItem>
                 <SelectItem value="1month">Last 30 Days</SelectItem>
+                <SelectItem value="60day">Last 60 Days</SelectItem>
+                <SelectItem value="90day">Last 90 Days</SelectItem>
                 <SelectItem value="custom">Custom Range</SelectItem>
               </SelectContent>
             </Select>
@@ -505,6 +654,8 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
                       }}
+                      itemStyle={{ color: 'hsl(var(--foreground))' }}
+                      labelStyle={{ color: 'hsl(var(--foreground))' }}
                     />
                     <Area
                       type="monotone"
@@ -560,6 +711,8 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
                       }}
+                      itemStyle={{ color: 'hsl(var(--foreground))' }}
+                      labelStyle={{ color: 'hsl(var(--foreground))' }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -593,6 +746,8 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
                       }}
+                      itemStyle={{ color: 'hsl(var(--foreground))' }}
+                      labelStyle={{ color: 'hsl(var(--foreground))' }}
                     />
                     <Bar
                       dataKey="roles"
@@ -632,6 +787,8 @@ export function AnalyticsDashboard({ organizationId }: AnalyticsDashboardProps =
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
                       }}
+                      itemStyle={{ color: 'hsl(var(--foreground))' }}
+                      labelStyle={{ color: 'hsl(var(--foreground))' }}
                     />
                     <Bar
                       dataKey="events"

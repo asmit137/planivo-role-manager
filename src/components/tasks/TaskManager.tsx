@@ -203,6 +203,7 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
           title: taskData.title,
           description: taskData.description,
           scope_type: scopeType,
+          organization_id: scopeType === 'organization' ? scopeId : null,
           ...(scopeField ? { [scopeField]: scopeId } : {}),
           due_date: taskData.due_date,
           priority: taskData.priority,
@@ -229,6 +230,8 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['my-task-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['all-staff-tasks'] });
       toast.success('Task created successfully');
       resetForm();
       if (onSuccess) {
@@ -240,6 +243,8 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
       toast.error(`Failed to create task: ${error.message || 'Unknown error'}`);
     },
   });
+
+
 
   const resetForm = () => {
     setTitle('');
@@ -622,20 +627,10 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
                       <p className="text-sm font-medium">Assigned to:</p>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {task.task_assignments.map((assignment: any) => (
-                          <div key={assignment.id} className="flex items-center gap-1.5 bg-accent/50 p-1 rounded-md border border-accent">
-                            <span className="text-xs px-1 font-medium">
+                          <div key={assignment.id} className="flex items-center gap-1.5 bg-accent/50 px-2 py-1 rounded-md border border-accent">
+                            <span className="text-xs font-medium">
                               {assignment.profiles?.full_name || 'User'} ({assignment.status})
                             </span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-5 w-5 text-primary hover:text-primary hover:bg-primary/20"
-                              onClick={() => handleMessageUser(assignment.assigned_to)}
-                              disabled={isMessaging}
-                              title="Message Staff"
-                            >
-                              <MessageSquare className="h-3 w-3" />
-                            </Button>
                           </div>
                         ))}
                       </div>

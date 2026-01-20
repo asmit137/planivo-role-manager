@@ -635,24 +635,28 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
           <div className="space-y-4">
             {(pendingPlans as any[])?.map((plan) => (
               <Card key={plan.id} className="border-2">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-semibold">
-                          {plan.staff_profile?.full_name || 'Unknown'}
-                        </span>
-                        <span className="text-sm text-muted-foreground">
+                <CardHeader className="p-3 sm:p-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="font-semibold truncate">
+                            {plan.staff_profile?.full_name || 'Unknown'}
+                          </span>
+                        </div>
+                        <span className="text-xs sm:text-sm text-muted-foreground truncate">
                           ({plan.staff_profile?.email})
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <FileText className="h-4 w-4" />
-                        <span>Planned by: {plan.creator_profile?.full_name || 'Unknown'}</span>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground truncate">
+                        <FileText className="h-4 w-4 shrink-0" />
+                        <span className="truncate">Planned by: {plan.creator_profile?.full_name || 'Unknown'}</span>
                       </div>
                     </div>
-                    {getStatusBadge(plan.status)}
+                    <div className="shrink-0 self-start sm:self-center">
+                      {getStatusBadge(plan.status)}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -684,9 +688,9 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                   </div>
 
                   {plan.notes && (
-                    <div className="bg-accent p-3 rounded-lg">
-                      <p className="text-sm font-medium mb-1">Notes:</p>
-                      <p className="text-sm text-muted-foreground">{plan.notes}</p>
+                    <div className="bg-cyan-500/5 p-4 rounded-xl border border-cyan-500/10 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2">Notes</p>
+                      <p className="text-sm leading-relaxed opacity-90">{plan.notes}</p>
                     </div>
                   )}
 

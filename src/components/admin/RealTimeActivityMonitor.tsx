@@ -83,22 +83,22 @@ export function RealTimeActivityMonitor() {
         },
         (payload) => {
           if (isPaused) return;
-          
+
           const newEvent = payload.new as ActivityEvent;
           newEvent.isNew = true;
           newEvent.performer_name = profiles?.[newEvent.performed_by || ''] || 'System';
-          
+
           setEvents(prev => [newEvent, ...prev.slice(0, 99)]);
-          
+
           // Play sound if enabled
           if (soundEnabled && audioRef.current) {
             audioRef.current.currentTime = 0;
-            audioRef.current.play().catch(() => {});
+            audioRef.current.play().catch(() => { });
           }
 
           // Remove "new" highlight after animation
           setTimeout(() => {
-            setEvents(prev => 
+            setEvents(prev =>
               prev.map(e => e.id === newEvent.id ? { ...e, isNew: false } : e)
             );
           }, 2000);
@@ -106,7 +106,7 @@ export function RealTimeActivityMonitor() {
       )
       .subscribe((status) => {
         setIsConnected(status === 'SUBSCRIBED');
-        console.log('Real-time subscription status:', status);
+        // console.log('Real-time subscription status:', status);
       });
 
     return () => {
@@ -302,8 +302,8 @@ export function RealTimeActivityMonitor() {
                     key={event.id}
                     className={cn(
                       "flex items-start gap-3 p-3 rounded-lg transition-all duration-500",
-                      event.isNew 
-                        ? "bg-primary/20 border border-primary/30 animate-pulse" 
+                      event.isNew
+                        ? "bg-primary/20 border border-primary/30 animate-pulse"
                         : "bg-muted/30 hover:bg-muted/50"
                     )}
                   >
@@ -330,8 +330,8 @@ export function RealTimeActivityMonitor() {
                         </span>
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          {event.performed_at 
-                            ? format(new Date(event.performed_at), 'HH:mm:ss') 
+                          {event.performed_at
+                            ? format(new Date(event.performed_at), 'HH:mm:ss')
                             : 'Now'}
                         </span>
                         <span className="font-mono opacity-50">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -316,7 +316,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0 sm:p-6 overflow-hidden">
+        <CardContent className="px-3 py-6 sm:p-8 overflow-hidden">
           <div className="w-full">
             <Calendar
               mode="single"
@@ -325,19 +325,19 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
               numberOfMonths={1}
               className="p-0 pointer-events-auto w-full"
               classNames={{
-                months: "flex flex-col gap-2 sm:gap-8 w-full justify-center",
-                month: "space-y-2 sm:space-y-4 flex-1",
-                caption: "flex justify-center pt-1 relative items-center mb-1 sm:mb-8 h-8 sm:h-12",
-                caption_label: "text-sm sm:text-2xl font-bold tracking-tight",
+                months: "flex flex-col gap-4 sm:gap-8 w-full justify-center",
+                month: "space-y-4 flex-1",
+                caption: "flex justify-center pt-2 relative items-center mb-4 sm:mb-8 h-10 sm:h-12",
+                caption_label: "text-base sm:text-2xl font-bold tracking-tight",
                 nav: "flex items-center",
-                nav_button: "h-7 w-7 sm:h-10 sm:w-10 bg-transparent p-0 opacity-60 hover:opacity-100 hover:bg-accent rounded-lg sm:rounded-xl transition-all flex items-center justify-center z-20",
+                nav_button: "h-8 w-8 sm:h-10 sm:w-10 bg-transparent p-0 opacity-60 hover:opacity-100 hover:bg-accent rounded-lg sm:rounded-xl transition-all flex items-center justify-center z-20",
                 nav_button_previous: "absolute left-0 top-1/2 -translate-y-1/2",
                 nav_button_next: "absolute right-0 top-1/2 -translate-y-1/2",
                 table: "w-full border-collapse",
-                head_row: "flex w-full mb-1 sm:mb-4",
-                head_cell: "text-muted-foreground/60 rounded-md font-bold text-[0.45rem] sm:text-xs uppercase tracking-widest flex-1 min-w-0 text-center",
-                row: "flex w-full mt-0.5 sm:mt-2",
-                cell: "relative p-0.5 text-center focus-within:relative focus-within:z-20 flex-1 min-w-0 min-h-[40px] sm:min-h-[64px]",
+                head_row: "flex w-full mb-2 sm:mb-4",
+                head_cell: "text-muted-foreground/60 rounded-md font-bold text-[0.6rem] sm:text-xs uppercase tracking-widest flex-1 min-w-0 text-center",
+                row: "flex w-full mt-1 sm:mt-2",
+                cell: "relative p-0.5 sm:p-1 text-center focus-within:relative focus-within:z-20 flex-1 min-w-0 min-h-[44px] sm:min-h-[64px]",
                 day: "h-full w-full p-0 font-normal hover:bg-accent/50 rounded-lg sm:rounded-xl transition-all touch-manipulation",
                 day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground shadow-lg shadow-primary/20",
                 day_today: "bg-accent/30 text-accent-foreground font-bold ring-2 ring-primary/20 ring-offset-2",
@@ -356,7 +356,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                         <button
                           {...props}
                           className={cn(
-                            "h-full w-full p-0.5 sm:p-2 font-normal hover:bg-accent/50 rounded-lg sm:rounded-xl transition-all relative group touch-manipulation flex flex-col items-center justify-center gap-0.5 sm:gap-1 overflow-hidden",
+                            "h-full w-full p-1 sm:p-2 font-normal hover:bg-accent/50 rounded-lg sm:rounded-xl transition-all relative group touch-manipulation flex flex-col items-center justify-center gap-0.5 sm:gap-1 overflow-hidden",
                             hasVacations && `font-bold border-2 ${getVacationStatusColor(vacationsOnDay)}`,
                             !hasVacations && "border border-transparent"
                           )}
@@ -364,7 +364,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                           <time
                             dateTime={format(date, "yyyy-MM-dd")}
                             className={cn(
-                              "text-[10px] sm:text-lg font-medium transition-colors w-full text-center",
+                              "text-xs sm:text-lg font-medium transition-colors w-full text-center",
                               isToday(date) ? "text-primary font-bold" : "text-foreground/70"
                             )}
                           >
@@ -454,22 +454,40 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
           </div>
 
           {/* Legend */}
-          <div className="mt-4 sm:mt-8 pt-4 sm:pt-6 border-t">
-            <h4 className="text-[10px] sm:text-sm font-semibold mb-2 sm:mb-4 uppercase tracking-wider text-muted-foreground">Legend</h4>
-            <div className="flex flex-wrap gap-x-3 gap-y-2">
-              <div className="flex items-center gap-1.5 sm:gap-3">
+          <div className="mt-6 sm:mt-10 pt-6 sm:pt-8 border-t">
+            <h4 className="text-xs sm:text-sm font-bold mb-3 sm:mb-4 uppercase tracking-widest text-muted-foreground/80">Legend</h4>
+            <div className="flex flex-wrap gap-x-4 gap-y-3">
+              <div
+                className={cn(
+                  "flex items-center gap-1.5 sm:gap-3 cursor-pointer p-2 rounded-lg transition-all",
+                  statusFilter === 'approved' ? "bg-accent shadow-sm ring-1 ring-border" : "hover:bg-accent/50 opacity-60 hover:opacity-100"
+                )}
+                onClick={() => setStatusFilter('approved')}
+              >
                 <div className="h-4 w-4 sm:h-8 sm:w-8 rounded-md border-2 border-emerald-500 bg-emerald-500/10 flex-shrink-0" />
                 <span className="text-[10px] sm:text-sm font-medium">Approved</span>
               </div>
-              <div className="flex items-center gap-1.5 sm:gap-3">
+              <div
+                className={cn(
+                  "flex items-center gap-1.5 sm:gap-3 cursor-pointer p-2 rounded-lg transition-all",
+                  statusFilter === 'pending' ? "bg-accent shadow-sm ring-1 ring-border" : "hover:bg-accent/50 opacity-60 hover:opacity-100"
+                )}
+                onClick={() => setStatusFilter('pending')}
+              >
                 <div className="h-4 w-4 sm:h-8 sm:w-8 rounded-md border-2 border-amber-500 bg-amber-500/10 flex-shrink-0" />
                 <span className="text-[10px] sm:text-sm font-medium">Pending</span>
               </div>
-              <div className="flex items-center gap-1.5 sm:gap-3">
+              <div
+                className={cn(
+                  "flex items-center gap-1.5 sm:gap-3 cursor-pointer p-2 rounded-lg transition-all",
+                  statusFilter === 'all' ? "bg-accent shadow-sm ring-1 ring-border" : "hover:bg-accent/50 opacity-60 hover:opacity-100"
+                )}
+                onClick={() => setStatusFilter('all')}
+              >
                 <div className="h-4 w-4 sm:h-8 sm:w-8 rounded-md border-2 border-purple-500 bg-purple-500/10 flex-shrink-0" />
-                <span className="text-[10px] sm:text-sm font-medium">Mixed</span>
+                <span className="text-[10px] sm:text-sm font-medium">Mixed / All</span>
               </div>
-              <div className="flex items-center gap-1.5 sm:gap-3">
+              <div className="flex items-center gap-1.5 sm:gap-3 p-2 opacity-80">
                 <div className="h-4 w-4 sm:h-8 sm:w-8 rounded-full bg-emerald-500 text-white text-[8px] sm:text-[11px] font-bold flex items-center justify-center shadow-md flex-shrink-0">
                   3
                 </div>
@@ -541,11 +559,11 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                         item.status === 'facility_pending' && "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
                         item.status === 'workspace_pending' && "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800"
                       )}>
-                        {isApproved ? '✓ Approved' :
-                          item.status === 'pending_approval' ? '⏳ Request Sent' :
-                            item.status === 'department_pending' ? '⏳ Dept. Pending' :
-                              item.status === 'facility_pending' ? '⏳ Facility Pending' :
-                                item.status === 'workspace_pending' ? '⏳ Workspace Pending' :
+                        {isApproved ? 'Γ£ô Approved' :
+                          item.status === 'pending_approval' ? 'ΓÅ│ Request Sent' :
+                            item.status === 'department_pending' ? 'ΓÅ│ Dept. Pending' :
+                              item.status === 'facility_pending' ? 'ΓÅ│ Facility Pending' :
+                                item.status === 'workspace_pending' ? 'ΓÅ│ Workspace Pending' :
                                   item.status}
                       </Badge>
                       <div className="flex items-center gap-2 text-sm">

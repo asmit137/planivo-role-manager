@@ -6,14 +6,20 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, CheckCircle2, Clock, AlertCircle, PlayCircle, XCircle, CheckSquare, Eye, MessageSquare, ArrowLeft } from 'lucide-react';
-import { format } from 'date-fns';
+import { Search, CheckCircle2, Clock, AlertCircle, PlayCircle, XCircle, CheckSquare, Eye, MessageSquare, ArrowLeft, Trash2 } from 'lucide-react';
+import { format, isToday, isThisWeek, addDays, addMonths, subMonths, startOfMonth, endOfMonth, parseISO, isWithinInterval, startOfToday, endOfDay } from 'date-fns';
 import { LoadingState } from '@/components/layout/LoadingState';
 import { safeProfileName, cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { useAuth } from '@/lib/auth';
 
 interface AllStaffTasksViewProps {
     scopeType: 'organization' | 'workspace' | 'facility' | 'department';
@@ -23,11 +29,47 @@ interface AllStaffTasksViewProps {
 }
 
 const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffTasksViewProps) => {
+    const { user } = useAuth();
+    const queryClient = useQueryClient();
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [priorityFilter, setPriorityFilter] = useState<string>('all');
+    const [dateFilter, setDateFilter] = useState<string>('all');
     const [selectedAssignment, setSelectedAssignment] = useState<any | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+    const { data: userRoles } = useQuery({
+        queryKey: ['user-roles-all-staff', user?.id],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', user?.id);
+            return data || [];
+        },
+        enabled: !!user,
+    });
+
+    const isSuperAdmin = userRoles?.some(r => r.role === 'super_admin');
+
+
+
+    const deleteTaskMutation = useMutation({
+        mutationFn: async (taskId: string) => {
+            const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['all-staff-tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['my-task-assignments'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            toast.success('Task deleted successfully');
+            setIsDetailsOpen(false);
+        },
+        onError: (error: any) => toast.error(`Failed to delete task: ${error.message}`),
+    });
+
+
 
     const { data: assignments, isLoading } = useQuery({
         queryKey: ['all-staff-tasks', scopeType, scopeId, assigneeId],
@@ -36,13 +78,7 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
             let query = supabase.from('tasks').select('id, title, description, priority, due_date, status, created_by');
 
             if (scopeType === 'organization') {
-                const { data: workspaces } = await supabase.from('workspaces').select('id').eq('organization_id', scopeId);
-                const wsIds = workspaces?.map(w => w.id) || [];
-                if (wsIds.length > 0) {
-                    query = query.or(`scope_type.eq.organization,workspace_id.in.(${wsIds.join(',')})`);
-                } else {
-                    query = query.eq('scope_type', 'organization');
-                }
+                query = query.eq('organization_id', scopeId);
             } else if (scopeType === 'workspace') {
                 query = query.eq('workspace_id', scopeId);
             } else if (scopeType === 'facility') {
@@ -111,6 +147,8 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
     if (isLoading) return <LoadingState message="Loading staff tasks..." />;
 
     // Filtering
+    const today = startOfToday();
+
     const filteredAssignments = (assignments || []).filter((item: any) => {
         const matchesSearch =
             item.task_title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -118,7 +156,42 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
 
         const matchesPriority = priorityFilter === 'all' || item.task_priority === priorityFilter;
 
-        return matchesSearch && matchesPriority;
+        let matchesDate = true;
+        if (dateFilter !== 'all') {
+            if (!item.task_due_date) {
+                matchesDate = false;
+            } else {
+                const dueDate = parseISO(item.task_due_date);
+                switch (dateFilter) {
+                    case 'today':
+                        matchesDate = isToday(dueDate);
+                        break;
+                    case 'week':
+                        matchesDate = isThisWeek(dueDate, { weekStartsOn: 1 });
+                        break;
+                    case '15days':
+                        matchesDate = isWithinInterval(dueDate, {
+                            start: today,
+                            end: endOfDay(addDays(today, 15))
+                        });
+                        break;
+                    case 'month':
+                        matchesDate = isWithinInterval(dueDate, {
+                            start: today,
+                            end: endOfDay(addMonths(today, 1))
+                        });
+                        break;
+                    case 'last_month':
+                        matchesDate = isWithinInterval(dueDate, {
+                            start: startOfMonth(subMonths(today, 1)),
+                            end: endOfMonth(subMonths(today, 1))
+                        });
+                        break;
+                }
+            }
+        }
+
+        return matchesSearch && matchesPriority && matchesDate;
     });
 
     // Group into Kanban columns
@@ -191,10 +264,24 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
                             <SelectItem value="low">Low</SelectItem>
                         </SelectContent>
                     </Select>
-                    {(searchQuery || priorityFilter !== 'all') && (
+                    <Select value={dateFilter} onValueChange={setDateFilter}>
+                        <SelectTrigger className="w-[150px] h-9 bg-card border-border/50">
+                            <SelectValue placeholder="Due Date" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Date: All</SelectItem>
+                            <SelectItem value="today">Today</SelectItem>
+                            <SelectItem value="week">This Week</SelectItem>
+                            <SelectItem value="15days">Next 15 Days</SelectItem>
+                            <SelectItem value="month">Next 1 Month</SelectItem>
+                            <SelectItem value="last_month">Last Month</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    {(searchQuery || priorityFilter !== 'all' || dateFilter !== 'all') && (
                         <Button variant="ghost" size="sm" onClick={() => {
                             setSearchQuery('');
                             setPriorityFilter('all');
+                            setDateFilter('all');
                         }} className="h-9 px-2">
                             <XCircle className="h-4 w-4" />
                         </Button>
@@ -249,6 +336,41 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
                                                     <span>{item.task_due_date ? format(new Date(item.task_due_date), 'MMM d') : '-'}</span>
                                                 </div>
                                                 <div className="flex gap-1">
+                                                    {(item.created_by === user?.id || isSuperAdmin) && (
+                                                        <>
+                                                            <AlertDialog>
+                                                                <AlertDialogTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                                        title="Delete Task"
+                                                                    >
+                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                    </Button>
+                                                                </AlertDialogTrigger>
+                                                                <AlertDialogContent>
+                                                                    <AlertDialogHeader>
+                                                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                                        <AlertDialogDescription>
+                                                                            This will permanently delete the task "{item.task_title}" and all its assignments.
+                                                                        </AlertDialogDescription>
+                                                                    </AlertDialogHeader>
+                                                                    <AlertDialogFooter>
+                                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                        <AlertDialogAction
+                                                                            onClick={() => deleteTaskMutation.mutate(item.task_id)}
+                                                                            className="bg-destructive hover:bg-destructive/90"
+                                                                        >
+                                                                            Delete
+                                                                        </AlertDialogAction>
+                                                                    </AlertDialogFooter>
+                                                                </AlertDialogContent>
+                                                            </AlertDialog>
+
+
+                                                        </>
+                                                    )}
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
@@ -351,15 +473,48 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
                             )}
                         </div>
 
-                        {selectedAssignment?.notes && (
-                            <div className="space-y-1 bg-muted/50 p-3 rounded-lg border border-border/50">
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Status Notes</p>
-                                <p className="text-sm italic">"{selectedAssignment.notes}"</p>
+                        <div className="space-y-2 border-t pt-4">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status Notes</p>
+                            <div className="bg-muted/50 p-3 rounded-lg border border-border/50 text-sm italic whitespace-pre-wrap leading-relaxed shadow-inner">
+                                {selectedAssignment?.notes || 'No notes added yet.'}
                             </div>
-                        )}
+                        </div>
                     </div>
 
-                    <DialogFooter>
+                    <DialogFooter className="flex justify-between items-center sm:justify-between w-full">
+                        <div className="flex gap-2">
+                            {(selectedAssignment?.created_by === user?.id || isSuperAdmin) && (
+                                <>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="destructive" className="gap-2">
+                                                <Trash2 className="h-4 w-4" />
+                                                Delete Task
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    This will permanently delete the task "{selectedAssignment?.task_title}" and all its assignments.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction
+                                                    onClick={() => deleteTaskMutation.mutate(selectedAssignment?.task_id)}
+                                                    className="bg-destructive hover:bg-destructive/90"
+                                                >
+                                                    Delete
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+
+
+                                </>
+                            )}
+                        </div>
                         <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>Close</Button>
                     </DialogFooter>
                 </DialogContent>

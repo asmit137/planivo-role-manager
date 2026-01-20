@@ -65,7 +65,7 @@ const UserSelectionDialog = ({
   const [activeTab, setActiveTab] = useState<'groups' | 'departments' | 'users'>('users');
 
   // Force re-render check
-  console.log('Rendering UserSelectionDialog with updated UI fixes');
+  // console.log('Rendering UserSelectionDialog with updated UI fixes');
 
   // Determine user's scope
   const userScope = useMemo(() => {
@@ -394,8 +394,8 @@ const UserSelectionDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] !flex !flex-col bg-background border shadow-2xl z-50 p-0 gap-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-2">
+      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] sm:max-h-[85vh] !flex !flex-col bg-background border shadow-2xl z-50 p-0 gap-0 overflow-hidden outline-none">
+        <DialogHeader className="p-4 sm:p-6 pb-2 shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
             {title}
@@ -405,12 +405,12 @@ const UserSelectionDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col px-6 gap-4 overflow-hidden">
+        <div className="flex-1 flex flex-col px-4 sm:px-6 gap-3 sm:gap-4 overflow-hidden min-h-0">
 
           {/* Selected users preview */}
           {(selectedUserIds.length > 0 || selectedDepartmentIds.length > 0) && (
-            <div className="flex flex-wrap gap-1 p-2 bg-muted/50 rounded-lg max-h-24 overflow-y-auto">
-              <span className="text-[10px] w-full text-muted-foreground mb-1 font-semibold uppercase px-1">Selected Directly:</span>
+            <div className="shrink-0 flex flex-wrap gap-1 p-2 bg-muted/50 rounded-lg max-h-[120px] overflow-y-auto border border-border/50">
+              <span className="text-[10px] w-full text-muted-foreground mb-1 font-bold uppercase tracking-wider px-1">Selected Directly:</span>
               {selectedUsers.map(user => (
                 <Badge key={user.id} variant="secondary" className="gap-1 h-5 text-[10px]">
                   {user.full_name}
@@ -475,8 +475,8 @@ const UserSelectionDialog = ({
             )}
           </div>
 
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
-            <TabsList className="grid w-full grid-cols-3">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col min-h-0">
+            <TabsList className="grid w-full grid-cols-3 shrink-0">
               <TabsTrigger value="users" className="gap-2">
                 <Users className="h-4 w-4" />
                 All Users
@@ -497,11 +497,11 @@ const UserSelectionDialog = ({
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="users" className="flex-1 mt-4 flex flex-col min-h-0">
+            <TabsContent value="users" className="flex-1 mt-2 sm:mt-4 flex flex-col min-h-0 data-[state=active]:flex">
               {usersLoading ? (
                 <LoadingState message="Loading users..." />
               ) : (
-                <ScrollArea className="h-[400px] border rounded-md">
+                <ScrollArea className="h-[300px] sm:h-[400px] border rounded-md bg-card/50">
                   <div className="p-2 space-y-1">
                     {filteredUsers.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
@@ -558,11 +558,11 @@ const UserSelectionDialog = ({
               )}
             </TabsContent>
 
-            <TabsContent value="groups" className="flex-1 mt-4 flex flex-col min-h-0">
+            <TabsContent value="groups" className="flex-1 mt-2 sm:mt-4 flex flex-col min-h-0 data-[state=active]:flex">
               {groupsLoading ? (
                 <LoadingState message="Loading groups..." />
               ) : (
-                <ScrollArea className="h-[400px] border rounded-md">
+                <ScrollArea className="h-[300px] sm:h-[400px] border rounded-md bg-card/50">
                   <div className="p-2 space-y-1">
                     {!groups?.length ? (
                       <div className="text-center py-8">
@@ -604,8 +604,8 @@ const UserSelectionDialog = ({
               )}
             </TabsContent>
 
-            <TabsContent value="departments" className="flex-1 mt-4 flex flex-col min-h-0">
-              <ScrollArea className="h-[400px] border rounded-md">
+            <TabsContent value="departments" className="flex-1 mt-2 sm:mt-4 flex flex-col min-h-0 data-[state=active]:flex">
+              <ScrollArea className="h-[300px] sm:h-[400px] border rounded-md bg-card/50">
                 <div className="p-2 space-y-1">
                   {!departments?.length ? (
                     <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">

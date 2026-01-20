@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { sendVacationStatusNotification, sendVacationMessage } from '@/lib/vacationNotifications';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Badge } from '@/components/ui/badge';
 
 interface VacationSplit {
@@ -57,28 +58,19 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   ]);
 
   // Fetch current user's role to auto-detect behavior
-  const { data: currentUserRole } = useQuery({
-    queryKey: ['current-user-role', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data } = await supabase
-        .from('user_roles')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: userRoles, isLoading: rolesLoading } = useUserRole();
 
   // Determine effective department ID and mode
-  const isStaff = (currentUserRole?.role as any) === 'staff' || (currentUserRole?.role as any) === 'intern';
-  const isDepartmentHead = (currentUserRole?.role as any) === 'department_head';
-  const isSupervisor = ['facility_supervisor', 'workplace_supervisor', 'workspace_supervisor'].includes(currentUserRole?.role as any);
-  const isSuperAdmin = (currentUserRole?.role as any) === 'super_admin' || (currentUserRole?.role as any) === 'organization_admin' || (currentUserRole?.role as any) === 'general_admin';
-  const effectiveDepartmentId = departmentId || selectedDepartment || currentUserRole?.department_id;
-  const effectiveStaffOnly = staffOnly || isStaff;
+  const isStaff = useMemo(() => userRoles?.some(r => r.role === 'staff' || r.role === 'intern') ?? false, [userRoles]);
+  const isDepartmentHead = useMemo(() => userRoles?.some(r => r.role === 'department_head') ?? false, [userRoles]);
+  const isSupervisor = useMemo(() => userRoles?.some(r => ['facility_supervisor', 'workplace_supervisor', 'workspace_supervisor'].includes(r.role)) ?? false, [userRoles]);
+  const isSuperAdmin = useMemo(() => userRoles?.some(r => ['super_admin', 'organization_admin', 'general_admin'].includes(r.role)) ?? false, [userRoles]);
+
+  // Find first role with a department_id for fallback
+  const homeDepartmentId = useMemo(() => userRoles?.find(r => r.department_id)?.department_id, [userRoles]);
+
+  const effectiveDepartmentId = departmentId || selectedDepartment || homeDepartmentId;
+  const effectiveStaffOnly = staffOnly || (isStaff && !isSupervisor && !isSuperAdmin);
 
   // Auto-select staff member if in staff-only mode
   useEffect(() => {
@@ -205,6 +197,14 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     );
   }
 
+  if (rolesLoading) {
+    return (
+      <Card className="p-8 text-center text-muted-foreground border-2 border-dashed">
+        Detecting roles and permissions...
+      </Card>
+    );
+  }
+
   const { data: userProfile } = useQuery({
     queryKey: ['user-profile', user?.id],
     queryFn: async () => {
@@ -218,9 +218,10 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   // Merge current user into departmentStaff if missing (for Supervisors planning for themselves)
   const effectiveStaffList = [...(departmentStaff || [])];
   if (isSupervisor && userProfile && !effectiveStaffList.find(s => s.user_id === user?.id)) {
+    const primaryRole = userRoles?.find(r => r.user_id === user?.id)?.role || 'supervisor';
     effectiveStaffList.push({
       user_id: user!.id,
-      role: currentUserRole?.role,
+      role: primaryRole,
       profiles: userProfile
     });
   }
@@ -531,17 +532,13 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
     if (field === 'start_date') {
       const start = new Date(value);
-      if (start && !isNaN(start.getTime()) && maxDays) {
-        // Automatically set end_date based on max_days
-        const autoEndDate = addDays(start, maxDays - 1);
-        newSplits[index].end_date = autoEndDate;
-        newSplits[index].days = maxDays;
-      } else if (start && !isNaN(start.getTime())) {
-        // If no maxDays, ensure end_date is at least start_date
-        if (newSplits[index].end_date < start) {
+      if (start && !isNaN(start.getTime())) {
+        // If end_date is before new start_date, or not set, set it to start_date (1 day)
+        if (!newSplits[index].end_date || newSplits[index].end_date < start) {
           newSplits[index].end_date = start;
           newSplits[index].days = 1;
         } else {
+          // Recalculate days based on existing end_date
           const end = new Date(newSplits[index].end_date);
           const diffTime = Math.abs(end.getTime() - start.getTime());
           newSplits[index].days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
@@ -608,6 +605,12 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     }
 
     const totalDays = splits.reduce((sum, split) => sum + split.days, 0);
+    const vacationType = vacationTypes?.find(t => t.id === selectedVacationType);
+
+    if (vacationType?.max_days && totalDays > vacationType.max_days) {
+      toast.error(`Total vacation days (${totalDays}) exceeds the maximum limit for ${vacationType.name} (${vacationType.max_days} days).`);
+      return;
+    }
 
     const commonData = {
       vacation_type_id: selectedVacationType,
@@ -687,7 +690,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   };
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader>
         <CardTitle>Create Vacation Plan</CardTitle>
         {currentOrganization?.vacation_mode === 'planning' && (
@@ -702,7 +705,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {(isSuperAdmin || (isSupervisor && !effectiveDepartmentId)) && (
+          {(isSuperAdmin || isSupervisor) && !departmentId && (
             <div>
               <Label>Select Department *</Label>
               <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
@@ -859,7 +862,12 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                             </span>
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 z-50 pointer-events-auto max-w-[calc(100vw-2rem)]" align="start" side="bottom">
+                        <PopoverContent
+                          className="w-auto p-0 pointer-events-auto"
+                          align="center"
+                          side="bottom"
+                          sideOffset={4}
+                        >
                           <div className="p-2 pb-0">
                             <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                               <div className="w-3 h-3 bg-warning/30 rounded" />
@@ -901,7 +909,12 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                             </span>
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 z-50 pointer-events-auto max-w-[calc(100vw-2rem)]" align="start" side="bottom">
+                        <PopoverContent
+                          className="w-auto p-0 pointer-events-auto"
+                          align="center"
+                          side="bottom"
+                          sideOffset={4}
+                        >
                           <div className="p-2 pb-0">
                             <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                               <div className="w-3 h-3 bg-warning/30 rounded" />
@@ -944,11 +957,11 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
             />
           </div>
 
-          <div className="flex gap-2">
-            <Button type="submit" disabled={createPlanMutation.isPending}>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button type="submit" disabled={createPlanMutation.isPending} className="w-full sm:w-auto">
               Create Plan
             </Button>
-            <Button type="button" variant="outline" onClick={resetForm}>
+            <Button type="button" variant="outline" onClick={resetForm} className="w-full sm:w-auto">
               Reset
             </Button>
           </div>

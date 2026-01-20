@@ -231,61 +231,6 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
     );
   }, [selectedUserProfiles, usersInDepartments, inviteeSearch]);
 
-  // Fetch potential coordinators (admins in org)
-  const { data: potentialCoordinators } = useQuery({
-    queryKey: ['potential-coordinators', organizationId || userOrganization?.id, organizations],
-    queryFn: async () => {
-      const orgId = organizationId || userOrganization?.id || organizations?.[0]?.id;
-      if (!orgId) return [];
-
-      // Get workspaces for this org
-      const { data: workspaces } = await supabase
-        .from('workspaces')
-        .select('id')
-        .eq('organization_id', orgId);
-
-      if (!workspaces?.length) return [];
-      const workspaceIds = workspaces.map(w => w.id);
-
-      // Get admin roles in those workspaces
-      const { data: adminRoles } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .in('workspace_id', workspaceIds)
-        .in('role', ['general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head']);
-
-      if (!adminRoles?.length) return [];
-      const userIds = [...new Set(adminRoles.map(r => r.user_id))];
-
-      // Get roles
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select(`
-          user_id, 
-          role, 
-          custom_role:custom_roles(name)
-        `)
-        .in('user_id', userIds)
-        .in('role', ['general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head']) as any;
-
-      // Get profiles
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .in('id', userIds)
-        .eq('is_active', true);
-
-      return profiles?.map(p => {
-        const roleData = userRoles?.find(r => r.user_id === p.id);
-        return {
-          ...p,
-          role: roleData?.role,
-          custom_role_name: roleData?.custom_role?.name
-        };
-      }) || [];
-    },
-    enabled: !!userOrganization?.id || !!organizations?.length,
-  });
 
   const form = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
@@ -312,6 +257,31 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
     },
   });
 
+  // Reset form when existing event data loads
+  useEffect(() => {
+    if (existingEvent) {
+      form.reset({
+        title: existingEvent.title,
+        description: existingEvent.description || '',
+        event_type: (existingEvent.event_type as EventFormData['event_type']),
+        location_type: (existingEvent.location_type as EventFormData['location_type']),
+        location_address: existingEvent.location_address || '',
+        online_link: existingEvent.online_link || '',
+        start_datetime: new Date(existingEvent.start_datetime).toISOString().slice(0, 16),
+        end_datetime: new Date(existingEvent.end_datetime).toISOString().slice(0, 16),
+        organization_id: existingEvent.organization_id || organizationId || userOrganization?.id || '',
+        max_participants: existingEvent.max_participants || null,
+        status: (existingEvent.status as EventFormData['status']),
+        registration_type: (existingEvent.registration_type as EventFormData['registration_type']) || 'open',
+        responsible_user_id: existingEvent.responsible_user_id || null,
+        enable_video_conference: existingEvent.enable_video_conference || false,
+        allow_recording: existingEvent.allow_recording || false,
+        require_lobby: existingEvent.require_lobby ?? true,
+        max_video_participants: existingEvent.max_video_participants || 100,
+      });
+    }
+  }, [existingEvent, form, organizationId, userOrganization]);
+
   // Pre-select department for new events if departmentId is provided
   useEffect(() => {
     if (!eventId && departmentId && !selectedDepartments.includes(departmentId)) {
@@ -336,6 +306,58 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
   const enableVideoConference = form.watch('enable_video_conference');
   const registrationType = form.watch('registration_type');
   const currentOrgId = form.watch('organization_id');
+
+  // Fetch potential coordinators (admins in org)
+  const { data: potentialCoordinators } = useQuery({
+    queryKey: ['potential-coordinators', currentOrgId],
+    queryFn: async () => {
+      if (!currentOrgId) return [];
+      // console.log('Fetching coordinators for org:', currentOrgId);
+
+
+      const { data: adminRoles, error: rolesError } = await (supabase as any)
+        .from('user_roles')
+        .select('user_id, role, custom_role:custom_roles(name), profiles:user_id(id, full_name, email, is_active)')
+        .eq('organization_id', currentOrgId)
+        .in('role', ['organization_admin', 'general_admin', 'workplace_supervisor', 'facility_supervisor', 'department_head']);
+
+      if (rolesError) {
+        console.error('Error fetching admin roles:', rolesError);
+        return [];
+      }
+
+      // Also fetch Super Admins (they might not have an organization_id assigned directly in user_roles)
+      const { data: superAdmins } = await supabase
+        .from('user_roles')
+        .select(`
+          user_id,
+          role,
+          profiles:user_id(id, full_name, email, is_active)
+        `)
+        .eq('role', 'super_admin');
+
+      // Combine and filter unique active profiles
+      const allAdmins = [...(adminRoles || []), ...(superAdmins || [])];
+
+      const uniqueCoordinators = allAdmins.reduce((acc: any[], current: any) => {
+        const profile = current.profiles;
+        if (!profile || !profile.is_active) return acc;
+
+        if (!acc.find(c => c.id === profile.id)) {
+          acc.push({
+            ...profile,
+            role: current.role,
+            custom_role_name: current.custom_role?.name
+          });
+        }
+        return acc;
+      }, []);
+
+      return uniqueCoordinators;
+    },
+    enabled: !!currentOrgId,
+  });
+
 
   const isEventPast = existingEvent?.end_datetime ? new Date(existingEvent.end_datetime) < new Date() : false;
 

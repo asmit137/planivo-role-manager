@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Search, Calendar, Filter, XCircle } from 'lucide-react';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { parseISO, isAfter } from 'date-fns';
 
 interface TrainingEventListProps {
   showOnlyPublished?: boolean;
@@ -53,7 +54,6 @@ const TrainingEventList = ({
     queryKey: ['user-org-id', user?.id],
     queryFn: async () => {
       if (!user) return null;
-      // Try direct role first (Org Admin)
       const { data: directOrg } = await (supabase
         .from('user_roles')
         .select('organization_id')
@@ -77,29 +77,28 @@ const TrainingEventList = ({
       if (error) throw error;
       return (workspaceOrg?.workspaces as any)?.organization_id || null;
     },
-    enabled: !!user && !isSuperAdmin, // Only fetch if not super admin
+    enabled: !!user && !isSuperAdmin,
   });
 
-  // Determine effective organization ID: use context for super admin, fallback for others
   const effectiveOrgId = isSuperAdmin ? selectedOrganizationId : userOrgId;
 
+  // Cache busting query key that updates every 5 minutes
+  const now = new Date();
+  const currentInterval = new Date(Math.floor(now.getTime() / (5 * 60 * 1000)) * (5 * 60 * 1000)).toISOString();
+
   const { data: events, isLoading, error } = useQuery({
-    queryKey: ['training-events', showOnlyPublished, showOnlyRegistered, showAll, showOnlyUpcoming, effectiveOrgId, isSuperAdmin, departmentId],
+    queryKey: ['training-events', showOnlyPublished, showOnlyRegistered, showAll, showOnlyUpcoming, effectiveOrgId, isSuperAdmin, departmentId, currentInterval],
     queryFn: async () => {
       let query = supabase
         .from('training_events')
         .select('*')
         .order('start_datetime', { ascending: true });
 
-      // Filter by organization if we have one and it's not 'all'
       if (effectiveOrgId && effectiveOrgId !== 'all') {
         query = query.eq('organization_id', effectiveOrgId);
       }
 
-      // Filter by department if provided (e.g. for department heads)
       if (departmentId) {
-        // Since training_events doesn't have a direct department_id, 
-        // we filter by events that have this department in training_event_targets
         const { data: targetEvents } = await supabase
           .from('training_event_targets')
           .select('event_id')
@@ -107,26 +106,23 @@ const TrainingEventList = ({
           .eq('target_type', 'department');
 
         const eventIds = targetEvents?.map(te => te.event_id) || [];
-
-        // Also include events created by this user (Department Head)
-        // or where they are the responsible user
         query = query.or(`id.in.(${eventIds.length > 0 ? eventIds.join(',') : '00000000-0000-0000-0000-000000000000'}),created_by.eq.${user?.id},responsible_user_id.eq.${user?.id}`);
       }
 
-      // Filter by status
       if (showOnlyPublished) {
         query = query.eq('status', 'published');
       }
 
-      // Filter by upcoming (end date >= now)
+      // Server-side filter for upcoming
+      // To fulfill the user's request of removing past-date events (like Jan 19 when today is Jan 20),
+      // we filter by events where the START time is in the future.
       if (showOnlyUpcoming) {
-        query = query.gte('end_datetime', new Date().toISOString());
+        query = query.gt('start_datetime', new Date().toISOString());
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const { data, error: queryError } = await query;
+      if (queryError) throw queryError;
 
-      // If showing only registered events, filter by user's registrations
       if (showOnlyRegistered && user) {
         const { data: registrations } = await supabase
           .from('training_registrations')
@@ -140,7 +136,7 @@ const TrainingEventList = ({
 
       return data;
     },
-    enabled: (isSuperAdmin || !!userOrgId) && !!user,
+    enabled: (isSuperAdmin || !!userOrgId) || !!user,
   });
 
   if (isLoading) {
@@ -157,14 +153,25 @@ const TrainingEventList = ({
     );
   }
 
-  // Apply filters
-  const filteredEvents = events?.filter(event => {
+  const filteredEvents = (events || []).filter(event => {
+    // 1. Search Query Filter
     const matchesSearch =
       event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      (event.description?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+
+    // 2. Type Filter
     const matchesType = eventTypeFilter === 'all' || event.event_type === eventTypeFilter;
-    return matchesSearch && matchesType;
-  }) || [];
+
+    // 3. Upcoming Filter (Client-side strict check)
+    let matchesUpcoming = true;
+    if (showOnlyUpcoming) {
+      // Strictly hide anything that has already started to match user expectation
+      const eventStartDate = parseISO(event.start_datetime);
+      matchesUpcoming = isAfter(eventStartDate, new Date());
+    }
+
+    return matchesSearch && matchesType && matchesUpcoming;
+  });
 
   const handleEditEvent = (eventId: string) => {
     setEditingEventId(eventId);
@@ -176,7 +183,6 @@ const TrainingEventList = ({
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
@@ -228,7 +234,6 @@ const TrainingEventList = ({
         </CardContent>
       </Card>
 
-      {/* Events Grid */}
       {filteredEvents.length === 0 ? (
         <EmptyState
           icon={Calendar}
@@ -255,7 +260,6 @@ const TrainingEventList = ({
         </div>
       )}
 
-      {/* Edit Event Dialog */}
       <Dialog open={!!editingEventId} onOpenChange={(open) => !open && setEditingEventId(null)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

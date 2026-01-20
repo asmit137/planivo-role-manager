@@ -47,35 +47,42 @@ Deno.serve(async (req: Request) => {
 
         if (dbError) throw dbError;
 
-        const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
-        const SENDGRID_SENDER_EMAIL = Deno.env.get("SENDGRID_SENDER_EMAIL") || "no-reply@planivo.com";
-        if (SENDGRID_API_KEY) {
-            console.log(`Attempting to send OTP email to ${email} via SendGrid...`);
-            const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+        if (RESEND_API_KEY) {
+            console.log(`Attempting to send OTP email to ${email} via Resend...`);
+            const res = await fetch("https://api.resend.com/emails", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${SENDGRID_API_KEY}`,
+                    Authorization: `Bearer ${RESEND_API_KEY}`,
                 },
                 body: JSON.stringify({
-                    personalizations: [{ to: [{ email: email }] }],
-                    from: { email: SENDGRID_SENDER_EMAIL, name: "Planivo" },
+                    from: "Planivo <onboarding@resend.dev>",
+                    to: [email],
                     subject: "Your Password Change Verification Code",
-                    content: [{
-                        type: "text/html",
-                        value: `<p>Your verification code for changing your password is: <strong>${otp}</strong></p><p>This code expires in 10 minutes.</p>`,
-                    }],
+                    html: `
+                        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                            <h2 style="color: #0ea5e9;">Password Change Verification</h2>
+                            <p>You have requested to change your password.</p>
+                            <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                                <p style="margin: 0; font-size: 14px; color: #6b7280;">Your verification code is:</p>
+                                <h1 style="margin: 10px 0; color: #0f172a; letter-spacing: 4px;">${otp}</h1>
+                                <p style="margin: 0; font-size: 12px; color: #9ca3af;">This code expires in 10 minutes.</p>
+                            </div>
+                            <p style="color: #6b7280; font-size: 14px;">If you did not request this change, please ignore this email.</p>
+                        </div>
+                    `,
                 }),
             });
 
             if (!res.ok) {
                 const error = await res.text();
-                console.error("SendGrid API error:", error);
+                console.error("Resend API error:", error);
             } else {
-                console.log("OTP email sent successfully via SendGrid");
+                console.log("OTP email sent successfully via Resend");
             }
         } else {
-            console.warn("SENDGRID_API_KEY not set. OTP will only be logged to console.");
+            console.warn("RESEND_API_KEY not set. OTP will only be logged to console.");
         }
 
         // For development: log the OTP to Supabase logs

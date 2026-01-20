@@ -263,14 +263,19 @@ const TrainingEventCard = ({
 
           <div className="flex items-center gap-2 text-muted-foreground">
             <Clock className="h-4 w-4 shrink-0" />
-            <span>
-              {format(startDate, 'h:mm a')} - {format(endDate, 'h:mm a')}
-              {isEventUpcoming && (
-                <span className="ml-2 text-primary font-medium">
-                  ({formatDistanceToNow(startDate, { addSuffix: true })})
+            <div className="flex flex-col">
+              <span>{format(startDate, 'h:mm a')} - {format(endDate, 'h:mm a')}</span>
+              {format(startDate, 'yyyy-MM-dd') !== format(endDate, 'yyyy-MM-dd') && (
+                <span className="text-[10px] text-amber-600 font-medium">
+                  Ends on {format(endDate, 'EEEE, MMM d')}
                 </span>
               )}
-            </span>
+            </div>
+            {isEventUpcoming && (
+              <span className="ml-auto text-primary font-medium text-xs">
+                ({formatDistanceToNow(startDate, { addSuffix: true })})
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -302,7 +307,7 @@ const TrainingEventCard = ({
 
       <CardFooter className="flex flex-wrap gap-2 pt-4 border-t">
         {/* Video Conference Join Button */}
-        {event.enable_video_conference && isRegistered && !isEventPast && (
+        {event.enable_video_conference && (isRegistered || isAdminView) && !isEventPast && (
           <Button
             size="sm"
             className="bg-emerald-600 hover:bg-emerald-700"

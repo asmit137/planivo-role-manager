@@ -57,33 +57,33 @@ const TrainingHub = ({ departmentId }: TrainingHubProps) => {
           <ResponsiveTabsList>
             <TabsTrigger value="calendar" className="min-h-[44px] px-3 text-sm">
               <CalendarDays className="h-4 w-4 mr-1.5 sm:mr-2" />
-              <span>Calendar</span>
+              <span className="hidden sm:inline">Calendar</span>
             </TabsTrigger>
             <TabsTrigger value="events" className="min-h-[44px] px-3 text-sm">
               <Calendar className="h-4 w-4 mr-1.5 sm:mr-2" />
-              <span>Upcoming</span>
+              <span className="hidden sm:inline">Upcoming</span>
             </TabsTrigger>
             <TabsTrigger value="my-registrations" className="min-h-[44px] px-3 text-sm">
               <List className="h-4 w-4 mr-1.5 sm:mr-2" />
-              <span>My Registrations</span>
+              <span className="hidden sm:inline">My Registrations</span>
             </TabsTrigger>
             {isAdmin && (
               <>
                 <TabsTrigger value="create" className="min-h-[44px] px-3 text-sm">
                   <Plus className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  <span>Create</span>
+                  <span className="hidden sm:inline">Create</span>
                 </TabsTrigger>
                 <TabsTrigger value="manage" className="min-h-[44px] px-3 text-sm">
                   <Users className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  <span>Manage</span>
+                  <span className="hidden sm:inline">Manage</span>
                 </TabsTrigger>
                 <TabsTrigger value="attendance" onClick={() => setAttendanceEventId(null)} className="min-h-[44px] px-3 text-sm">
                   <UserCheck className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  <span>Attendance</span>
+                  <span className="hidden sm:inline">Attendance</span>
                 </TabsTrigger>
                 <TabsTrigger value="groups" className="min-h-[44px] px-3 text-sm">
                   <UsersRound className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  <span>Groups</span>
+                  <span className="hidden sm:inline">Groups</span>
                 </TabsTrigger>
               </>
             )}
@@ -105,6 +105,7 @@ const TrainingHub = ({ departmentId }: TrainingHubProps) => {
           <TabsContent value="my-registrations">
             <TrainingEventList
               showOnlyRegistered={true}
+              showOnlyUpcoming={true}
               onSelectEvent={setSelectedEventId}
             />
           </TabsContent>
