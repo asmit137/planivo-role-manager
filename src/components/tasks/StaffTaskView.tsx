@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
-import { CheckCircle2, Clock, PlayCircle, Eye, MessageSquare } from 'lucide-react';
+import { format, isToday, isThisWeek, addDays, addMonths, subMonths, startOfMonth, endOfMonth, parseISO, isWithinInterval, startOfToday, endOfDay } from 'date-fns';
+import { CheckCircle2, Clock, PlayCircle, Eye, MessageSquare, Trash2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -19,8 +20,16 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { LoadingState } from '@/components/layout/LoadingState';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
-const StaffTaskView = () => {
+interface StaffTaskViewProps {
+  scopeType?: 'organization' | 'workspace' | 'facility' | 'department';
+  scopeId?: string;
+}
+
+const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -28,6 +37,21 @@ const StaffTaskView = () => {
   const [notes, setNotes] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMessaging, setIsMessaging] = useState(false);
+  const [dateFilter, setDateFilter] = useState('all');
+
+  const { data: userRoles } = useQuery({
+    queryKey: ['user-roles-global', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user?.id);
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  const isSuperAdmin = userRoles?.some(r => r.role === 'super_admin');
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -56,24 +80,27 @@ const StaffTaskView = () => {
   };
 
   const { data: assignments, isLoading } = useQuery({
-    queryKey: ['my-task-assignments', user?.id],
+    queryKey: ['my-task-assignments', user?.id, scopeType, scopeId],
     queryFn: async () => {
-      const { data: roles } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user?.id)
-        .eq('role', 'super_admin')
-        .maybeSingle();
-
-      const isSuperAdmin = !!roles;
+      // Re-fetch roles if not yet available to avoid race condition
+      let currentIsSuperAdmin = isSuperAdmin;
+      if (user && userRoles === undefined) {
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id);
+        currentIsSuperAdmin = roles?.some(r => r.role === 'super_admin') || false;
+      }
 
       let query = supabase
         .from('task_assignments')
-        .select('*, tasks(*)')
+        .select('*, tasks!inner(*), assigned_to_profile:assigned_to(full_name)')
         .order('created_at', { ascending: false });
 
-      if (!isSuperAdmin) {
+      if (!currentIsSuperAdmin) {
         query = query.eq('assigned_to', user?.id);
+      } else if (scopeType === 'organization' && scopeId) {
+        query = query.eq('tasks.organization_id', scopeId);
       }
 
       const { data, error } = await query;
@@ -119,7 +146,45 @@ const StaffTaskView = () => {
       completed: { title: 'Completed', items: [] as any[] },
     };
 
+    const today = startOfToday();
+
     assignments?.forEach(assignment => {
+      if (!assignment.tasks.due_date && dateFilter !== 'all') return;
+
+      if (dateFilter !== 'all' && assignment.tasks.due_date) {
+        const dueDate = parseISO(assignment.tasks.due_date);
+        let matches = false;
+
+        switch (dateFilter) {
+          case 'today':
+            matches = isToday(dueDate);
+            break;
+          case 'week':
+            matches = isThisWeek(dueDate, { weekStartsOn: 1 });
+            break;
+          case '15days':
+            matches = isWithinInterval(dueDate, {
+              start: today,
+              end: endOfDay(addDays(today, 15))
+            });
+            break;
+          case 'month':
+            matches = isWithinInterval(dueDate, {
+              start: today,
+              end: endOfDay(addMonths(today, 1))
+            });
+            break;
+          case 'last_month':
+            matches = isWithinInterval(dueDate, {
+              start: startOfMonth(subMonths(today, 1)),
+              end: endOfMonth(subMonths(today, 1))
+            });
+            break;
+        }
+
+        if (!matches) return;
+      }
+
       const colKey = assignment.status as keyof typeof cols;
       if (cols[colKey]) {
         cols[colKey].items.push(assignment);
@@ -163,6 +228,45 @@ const StaffTaskView = () => {
       setNotes('');
     },
     onError: () => toast.error('Failed to update task status'),
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', taskId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-task-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['all-staff-tasks'] });
+      toast.success('Task deleted successfully');
+      setIsModalOpen(false);
+    },
+    onError: (error: any) => toast.error(`Failed to delete task: ${error.message}`),
+  });
+
+
+
+  const { data: availableStaff } = useQuery({
+    queryKey: ['available-staff-global'],
+    queryFn: async () => {
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select(`
+          user_id,
+          role,
+          profiles:user_id (id, full_name, email)
+        `);
+
+      if (rolesError) throw rolesError;
+
+      // Unique by user_id
+      const unique = Array.from(new Map(roles.map((r: any) => [r.user_id, r])).values());
+      return unique;
+    },
   });
 
   const handleMessageUser = async (targetUserId: string) => {
@@ -272,6 +376,23 @@ const StaffTaskView = () => {
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end items-center gap-2 mb-2">
+        <span className="text-sm font-medium text-muted-foreground italic">Filter tasks by due date:</span>
+        <Select value={dateFilter} onValueChange={setDateFilter}>
+          <SelectTrigger className="w-[180px] h-9">
+            <SelectValue placeholder="Filter by date" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Tasks</SelectItem>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="week">This Week</SelectItem>
+            <SelectItem value="15days">Next 15 Days</SelectItem>
+            <SelectItem value="month">Next 1 Month</SelectItem>
+            <SelectItem value="last_month">Last Month</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {(Object.keys(kanbanColumns) as Array<keyof typeof kanbanColumns>).map((colKey) => (
           <div key={colKey} className="flex flex-col gap-3">
@@ -319,7 +440,42 @@ const StaffTaskView = () => {
                       Due: {format(new Date(item.tasks.due_date), 'MMM dd')}
                     </p>
                   )}
-                  <div className="flex justify-end pt-1">
+                  <div className="flex justify-end pt-1 gap-1">
+                    {(item.tasks.created_by === user?.id || isSuperAdmin) && (
+                      <>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                              title="Delete Task"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete the task "{item.tasks.title}" and all its assignments.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteTaskMutation.mutate(item.tasks.id)}
+                                className="bg-destructive hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+
+
+                      </>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -420,16 +576,20 @@ const StaffTaskView = () => {
                   <p className="text-sm text-primary">
                     {selectedAssignment.assigned_to_profile.full_name}
                   </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 gap-2 text-primary hover:text-primary hover:bg-primary/10 border-primary/20"
-                    onClick={() => handleMessageUser(selectedAssignment.assigned_to)}
-                    disabled={isMessaging}
-                  >
-                    <MessageSquare className="h-3.5 w-3.5" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider">Message</span>
-                  </Button>
+                  <div className="flex items-center gap-1">
+
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-2 text-primary hover:text-primary hover:bg-primary/10 border-primary/20"
+                      onClick={() => handleMessageUser(selectedAssignment.assigned_to)}
+                      disabled={isMessaging}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Message</span>
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
@@ -459,37 +619,69 @@ const StaffTaskView = () => {
               )}
             </div>
 
-            {/* Action Buttons - Only for Assigned User */}
-            {selectedAssignment?.assigned_to === user?.id && selectedAssignment?.status !== 'completed' && (
-              <div className="flex gap-2 justify-end pt-4">
-                {selectedAssignment.status === 'pending' && (
-                  <Button
-                    onClick={() => updateStatusMutation.mutate({
-                      id: selectedAssignment.id,
-                      status: 'in_progress',
-                      notes
-                    })}
-                    className="gap-2"
-                  >
-                    <PlayCircle className="h-4 w-4" />
-                    Start Working
-                  </Button>
-                )}
-                {selectedAssignment.status === 'in_progress' && (
-                  <Button
-                    onClick={() => updateStatusMutation.mutate({
-                      id: selectedAssignment.id,
-                      status: 'completed',
-                      notes
-                    })}
-                    className="gap-2"
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    Mark as Completed
-                  </Button>
-                )}
-              </div>
-            )}
+            {/* Action Buttons */}
+            <div className="flex gap-2 justify-end pt-4">
+              {/* Only for Assigned User */}
+              {selectedAssignment?.assigned_to === user?.id && selectedAssignment?.status !== 'completed' && (
+                <>
+                  {selectedAssignment.status === 'pending' && (
+                    <Button
+                      onClick={() => updateStatusMutation.mutate({
+                        id: selectedAssignment.id,
+                        status: 'in_progress',
+                        notes
+                      })}
+                      className="gap-2"
+                    >
+                      <PlayCircle className="h-4 w-4" />
+                      Start Working
+                    </Button>
+                  )}
+                  {selectedAssignment.status === 'in_progress' && (
+                    <Button
+                      onClick={() => updateStatusMutation.mutate({
+                        id: selectedAssignment.id,
+                        status: 'completed',
+                        notes
+                      })}
+                      className="gap-2"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      Mark as Completed
+                    </Button>
+                  )}
+                </>
+              )}
+
+              {/* Creator or Super Admin can Delete */}
+              {(selectedAssignment?.tasks.created_by === user?.id || isSuperAdmin) && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="gap-2">
+                      <Trash2 className="h-4 w-4" />
+                      Delete Task
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete the task "{selectedAssignment?.tasks.title}" and all its assignments.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => deleteTaskMutation.mutate(selectedAssignment?.tasks.id)}
+                        className="bg-destructive hover:bg-destructive/90"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

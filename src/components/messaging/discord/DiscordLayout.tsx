@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { ChatArea } from './ChatArea';
 import { useMediaQuery } from '@/hooks/use-media-query';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useSearchParams } from 'react-router-dom';
+import { cn } from "@/lib/utils";
 
 export const DiscordLayout = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -30,31 +30,26 @@ export const DiscordLayout = () => {
     };
 
     return (
-        <div className="flex h-[calc(100vh-6rem)] w-full overflow-hidden bg-background text-foreground rounded-xl shadow-2xl border border-border/50 ring-1 ring-border/10">
-            {/* Sidebar - Desktop persistent / Mobile drawer */}
-            {isDesktop ? (
-                <div className="w-72 flex-shrink-0 border-r border-border bg-muted/10">
+        <div className="flex h-[calc(100vh-4rem)] md:h-[calc(100vh-8rem)] w-full overflow-hidden bg-background text-foreground relative -m-4 md:-m-6 lg:-m-8">
+            {/* Sidebar - Persistent on all screens, but can be hidden/shown */}
+            <div className={cn(
+                "w-72 flex-shrink-0 border-r border-border bg-muted/10 transition-all duration-300 ease-in-out h-full overflow-hidden",
+                !isDesktop && !mobileMenuOpen && "w-0 border-none"
+            )}>
+                <div className="w-72 h-full">
                     <Sidebar
                         selectedChannelId={selectedChannelId}
                         onSelectChannel={handleSelectChannel}
                     />
                 </div>
-            ) : (
-                <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-                    <SheetContent side="left" className="p-0 w-72 bg-background border-r border-border">
-                        <Sidebar
-                            selectedChannelId={selectedChannelId}
-                            onSelectChannel={handleSelectChannel}
-                        />
-                    </SheetContent>
-                </Sheet>
-            )}
+            </div>
 
             {/* Main Chat Area */}
-            <div className="flex flex-1 flex-col min-w-0 bg-background">
+            <div className="flex-1 h-full min-w-0">
                 <ChatArea
                     channelId={selectedChannelId}
-                    onMobileMenuToggle={() => setMobileMenuOpen(true)}
+                    onMobileMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+                    sidebarOpen={mobileMenuOpen}
                 />
             </div>
         </div>

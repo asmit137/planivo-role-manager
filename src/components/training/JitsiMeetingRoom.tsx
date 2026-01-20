@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { LoadingState } from '@/components/layout/LoadingState';
-import { 
-  Video, 
-  VideoOff, 
-  Mic, 
-  MicOff, 
-  PhoneOff, 
+import {
+  Video,
+  VideoOff,
+  Mic,
+  MicOff,
+  PhoneOff,
   Users,
   MessageSquare,
   Settings,
@@ -69,7 +69,7 @@ const JitsiMeetingRoom = ({ eventId, onLeave }: JitsiMeetingRoomProps) => {
         .eq('is_active', true)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data || { server_url: 'https://meet.jit.si' };
     },
   });
 
@@ -194,7 +194,7 @@ const JitsiMeetingRoom = ({ eventId, onLeave }: JitsiMeetingRoomProps) => {
 
     try {
       jitsiApiRef.current = new window.JitsiMeetExternalAPI(domain, options);
-      
+
       // Event listeners
       jitsiApiRef.current.addListener('videoConferenceJoined', () => {
         setIsLoading(false);
@@ -224,9 +224,12 @@ const JitsiMeetingRoom = ({ eventId, onLeave }: JitsiMeetingRoomProps) => {
       });
 
       // Get initial participant count
-      jitsiApiRef.current.getNumberOfParticipants().then((count: number) => {
+      try {
+        const count = jitsiApiRef.current.getNumberOfParticipants();
         setParticipantCount(count);
-      });
+      } catch (e) {
+        console.warn('Could not get initial participant count:', e);
+      }
 
     } catch (error) {
       console.error('Jitsi initialization error:', error);
@@ -308,7 +311,7 @@ const JitsiMeetingRoom = ({ eventId, onLeave }: JitsiMeetingRoomProps) => {
             </div>
           )}
           <div ref={jitsiContainerRef} className="w-full h-full" />
-          
+
           {/* Custom controls overlay */}
           <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
             <div className="flex items-center justify-center gap-3">

@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -39,6 +40,7 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [selectedPlanToReject, setSelectedPlanToReject] = useState<any>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [checkCrossDept, setCheckCrossDept] = useState(false);
 
   const clearFilters = () => {
     setStartDate('');
@@ -153,7 +155,7 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
 
   // Fetch all vacation plans with conflicts
   const { data: conflictData, isLoading } = useQuery({
-    queryKey: ['vacation-conflicts', scopeType, scopeId, selectedDepartment, startDate, endDate],
+    queryKey: ['vacation-conflicts', scopeType, scopeId, selectedDepartment, startDate, endDate, checkCrossDept],
     queryFn: async () => {
       // Get department IDs based on scope
       let allowedDepartmentIds: string[] = [];
@@ -212,8 +214,10 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
 
       if (!plans) return [];
 
-      // Group plans by department to find conflicts
-      const departmentGroups = plans.reduce((acc: any, plan: any) => {
+      // Group plans for conflict detection
+      // If checkCrossDept is true, we put ALL plans in a single group 'all' to check everyone against everyone.
+      // If false, we group by department_id to only check within departments.
+      const conflictGroups = checkCrossDept ? { 'all': plans } : plans.reduce((acc: any, plan: any) => {
         const deptId = plan.department_id;
         if (!acc[deptId]) {
           acc[deptId] = [];
@@ -225,14 +229,14 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
       // Find conflicts within each department
       const conflicts: any[] = [];
 
-      Object.entries(departmentGroups).forEach(([deptId, deptPlans]: [string, any]) => {
-        if (deptPlans.length < 2) return;
+      Object.entries(conflictGroups).forEach(([groupId, projectPlans]: [string, any]) => {
+        if (projectPlans.length < 2) return;
 
         // Check each plan against others
-        deptPlans.forEach((plan: any, i: number) => {
+        projectPlans.forEach((plan: any, i: number) => {
           const planSplits = plan.vacation_splits || [];
 
-          deptPlans.slice(i + 1).forEach((otherPlan: any) => {
+          projectPlans.slice(i + 1).forEach((otherPlan: any) => {
             const otherSplits = otherPlan.vacation_splits || [];
 
             // Check for date overlaps
@@ -319,20 +323,20 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
       <CardContent>
         {/* Filters */}
         <Card className="mb-6 bg-muted/50">
-          <CardHeader>
-            <div className="flex items-center justify-between">
+          <CardHeader className="py-3 sm:py-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                <CardTitle>Filters</CardTitle>
+                <Filter className="h-4 w-4 sm:h-5 sm:w-5" />
+                <CardTitle className="text-sm sm:text-base font-semibold">Filters</CardTitle>
               </div>
               {(startDate || endDate || selectedDepartment !== 'all') && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={clearFilters}
-                  className="h-8 text-muted-foreground hover:bg-secondary transition-colors"
+                  className="h-8 text-xs sm:text-sm text-muted-foreground hover:bg-secondary transition-colors"
                 >
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                   Clear Filters
                 </Button>
               )}
@@ -375,37 +379,51 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
                 </Select>
               </div>
             </div>
+
+            <div className="flex items-center space-x-2 mt-4 pt-4 border-t">
+              <Switch
+                id="cross-department-mode"
+                checked={checkCrossDept}
+                onCheckedChange={setCheckCrossDept}
+              />
+              <Label htmlFor="cross-department-mode" className="flex flex-col gap-1">
+                <span>Check Cross-Department Conflicts</span>
+                <span className="font-normal text-xs text-muted-foreground">
+                  Enable to spot overlapping vacations between staff in different specialties
+                </span>
+              </Label>
+            </div>
           </CardContent>
         </Card>
 
         {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">Total Conflicts</CardTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
+          <Card className="bg-destructive/5 border-destructive/10">
+            <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6">
+              <CardTitle className="text-[10px] sm:text-xs uppercase tracking-wider text-muted-foreground font-semibold">Total Conflicts</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-destructive">
+            <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+              <div className="text-2xl sm:text-3xl font-bold text-destructive">
                 {conflictData?.length || 0}
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">Acknowledged</CardTitle>
+          <Card className="bg-amber-500/5 border-amber-500/10">
+            <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6">
+              <CardTitle className="text-[10px] sm:text-xs uppercase tracking-wider text-muted-foreground font-semibold">Acknowledged</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-warning">
+            <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+              <div className="text-2xl sm:text-3xl font-bold text-amber-500">
                 {conflictData?.filter(c => c.hasAcknowledgment).length || 0}
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">Unacknowledged</CardTitle>
+          <Card className="bg-destructive/5 border-destructive/10 sm:col-span-2 lg:col-span-1">
+            <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6">
+              <CardTitle className="text-[10px] sm:text-xs uppercase tracking-wider text-muted-foreground font-semibold">Unacknowledged</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-destructive">
+            <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+              <div className="text-2xl sm:text-3xl font-bold text-destructive">
                 {conflictData?.filter(c => !c.hasAcknowledgment).length || 0}
               </div>
             </CardContent>
@@ -425,47 +443,48 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
                   "border-2",
                   conflict.hasAcknowledgment ? "border-warning" : "border-destructive"
                 )}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <AlertCircle className="h-4 w-4" />
-                          {conflict.department.name}
+                  <CardHeader className="p-3 sm:p-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <CardTitle className="text-sm sm:text-base flex items-center gap-2 truncate">
+                          <AlertCircle className="h-4 w-4 shrink-0 text-destructive" />
+                          <span className="truncate">{conflict.department.name}</span>
                         </CardTitle>
-                        <CardDescription>Overlapping vacation schedules detected</CardDescription>
+                        <CardDescription className="text-xs sm:text-sm truncate">Overlapping vacation schedules detected</CardDescription>
                       </div>
-                      <Badge variant={conflict.hasAcknowledgment ? "secondary" : "destructive"}>
-                        {conflict.hasAcknowledgment ? 'Acknowledged' : 'Unacknowledged'}
-                      </Badge>
+                      <div className="shrink-0 self-start sm:self-center">
+                        <Badge variant={conflict.hasAcknowledgment ? "secondary" : "destructive"}>
+                          {conflict.hasAcknowledgment ? 'Acknowledged' : 'Unacknowledged'}
+                        </Badge>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {conflict.plans.map((plan: any, idx: number) => (
                       <div key={plan.id}>
-                        <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+                        <div className="flex flex-col items-start gap-2">
                           <div className="flex-1 w-full min-w-0">
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <Users className="h-4 w-4 text-muted-foreground shrink-0" />
-                              <span className="font-semibold truncate">
+                            <div className="flex flex-wrap items-center gap-2 mb-1 sm:mb-2 text-sm sm:text-base">
+                              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
+                              <span className="font-semibold truncate max-w-[150px] sm:max-w-none">
                                 {plan.profiles?.full_name || 'Unknown'}
                               </span>
-                              <Badge variant="outline" className="whitespace-nowrap">{plan.vacation_types?.name}</Badge>
+                              <Badge variant="outline" className="text-[10px] sm:text-xs h-5 whitespace-nowrap">{plan.vacation_types?.name}</Badge>
                             </div>
-                            <div className="space-y-2 ml-0 sm:ml-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 ml-0 sm:ml-6">
                               {plan.vacation_splits?.map((split: any) => (
-                                <div key={split.id} className="flex flex-wrap items-center gap-2 text-sm bg-muted/30 p-1.5 rounded">
+                                <div key={split.id} className="flex items-center gap-2 text-[11px] sm:text-sm bg-muted/30 p-1.5 rounded border border-border/10">
                                   <Calendar className="h-3 w-3 text-muted-foreground shrink-0" />
-                                  <span className="font-medium">
-                                    {format(parseISO(split.start_date), 'MMM dd, yyyy')} -{' '}
-                                    {format(parseISO(split.end_date), 'MMM dd, yyyy')}
+                                  <span className="font-medium truncate">
+                                    {format(parseISO(split.start_date), 'MMM dd')} - {format(parseISO(split.end_date), 'MMM dd')}
                                   </span>
-                                  <span className="text-muted-foreground text-xs">({split.days} days)</span>
+                                  <span className="text-muted-foreground text-[10px] ml-auto shrink-0">({split.days}d)</span>
                                 </div>
                               ))}
                             </div>
                           </div>
                         </div>
-                        {idx === 0 && <Separator className="my-4" />}
+                        {idx === 0 && <Separator className="my-3 sm:my-4" />}
                       </div>
                     ))}
 
@@ -479,16 +498,16 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
                     )}
 
                     {/* Quick Actions */}
-                    <div className="flex flex-wrap gap-2 pt-2">
+                    <div className="flex flex-col gap-3 pt-2">
                       {conflict.plans.map((plan: any) => (
-                        <div key={plan.id} className="flex gap-2">
+                        <div key={plan.id} className="flex flex-col sm:flex-row gap-2 border-t sm:border-t-0 pt-3 sm:pt-0">
                           {plan.profiles?.email && (
                             <a
                               href={`mailto:${plan.profiles.email}?subject=Vacation Conflict - Schedule Adjustment Needed&body=Hi ${plan.profiles.full_name},%0D%0A%0D%0AYour vacation request has a scheduling conflict with another team member. Please review and coordinate your dates.%0D%0A%0D%0AThank you.`}
-                              className="inline-flex"
+                              className="flex-1"
                             >
-                              <Button variant="outline" size="sm" className="gap-1">
-                                <Mail className="h-3 w-3" />
+                              <Button variant="outline" size="sm" className="w-full gap-1.5 h-9 text-[11px] sm:text-xs">
+                                <Mail className="h-3.5 w-3.5" />
                                 Contact {plan.profiles.full_name?.split(' ')[0]}
                               </Button>
                             </a>
@@ -496,11 +515,11 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
                           <Button
                             variant="destructive"
                             size="sm"
-                            className="gap-1"
+                            className="flex-1 gap-1.5 h-9 text-[11px] sm:text-xs"
                             onClick={() => handleRejectClick(plan)}
                             disabled={rejectMutation.isPending}
                           >
-                            <XCircle className="h-3 w-3" />
+                            <XCircle className="h-3.5 w-3.5" />
                             Reject {plan.profiles?.full_name?.split(' ')[0]}'s Leave
                           </Button>
                         </div>
@@ -586,7 +605,7 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </Card >
   );
 };
 

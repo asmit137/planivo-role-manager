@@ -224,11 +224,11 @@ export function AdminBalanceManager() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Leave Management</h2>
-                    <p className="text-muted-foreground">Manage role-based defaults and individual staff leave allocations.</p>
-                </div>
+            <div className="flex flex-col gap-2">
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Leave Management</h2>
+                <p className="text-sm text-muted-foreground max-w-2xl">
+                    Manage role-based defaults and individual staff leave allocations.
+                </p>
             </div>
 
             <Tabs defaultValue="staff" className="space-y-6">
@@ -245,14 +245,14 @@ export function AdminBalanceManager() {
 
                 <TabsContent value="roles" className="space-y-4">
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Role-Based Default Allowances</CardTitle>
-                            <CardDescription>
+                        <CardHeader className="p-5 sm:p-6 pb-2 sm:pb-4">
+                            <CardTitle className="text-lg sm:text-xl">Role-Based Default Allowances</CardTitle>
+                            <CardDescription className="text-sm">
                                 Set standard leave days for each role. These will apply to all staff in that role unless an individual override is set.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="rounded-md border overflow-x-auto">
+                            <div className="rounded-md border overflow-x-auto hidden lg:block">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -323,27 +323,99 @@ export function AdminBalanceManager() {
                                     </TableBody>
                                 </Table>
                             </div>
+
+                            {/* Mobile/Tablet Role Cards */}
+                            <div className="lg:hidden space-y-4">
+                                {appRoles.map((role: string) => (
+                                    <div key={role} className="border rounded-xl p-4 bg-muted/20 space-y-3">
+                                        <div className="flex items-center justify-between border-b pb-2">
+                                            <h3 className="font-bold capitalize text-primary">
+                                                {role.replace('_', ' ')}
+                                            </h3>
+                                            <Badge variant="outline" className="text-[10px]">Role Default</Badge>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {staffWithBalances?.types.map(type => {
+                                                const roleDefault = staffWithBalances.defaults.find(
+                                                    (d: any) => d.role === role && d.vacation_type_id === type.id
+                                                ) as any;
+                                                const isEditing = editingRoleDefault === `${role}-${type.id}`;
+
+                                                return (
+                                                    <div key={type.id} className="flex flex-col gap-1.5 p-2 rounded-lg bg-background border border-border/50">
+                                                        <span className="text-xs font-medium text-muted-foreground">{type.name}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <Input
+                                                                type="number"
+                                                                className="h-8 w-full"
+                                                                defaultValue={roleDefault?.default_days || 0}
+                                                                disabled={!isEditing}
+                                                                onBlur={(e) => {
+                                                                    setEditingRoleDefault(null);
+                                                                    const val = parseInt(e.target.value);
+                                                                    if (val < 0) {
+                                                                        toast.error("Default cannot be negative");
+                                                                        return;
+                                                                    }
+                                                                    if (val !== (roleDefault?.default_days || 0)) {
+                                                                        setPendingDefaultUpdate({
+                                                                            role,
+                                                                            typeId: type.id,
+                                                                            default_days: val,
+                                                                            typeName: type.name
+                                                                        });
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <Button
+                                                                variant={isEditing ? "default" : "ghost"}
+                                                                size="icon"
+                                                                className="h-8 w-8 shrink-0"
+                                                                onClick={() => setEditingRoleDefault(isEditing ? null : `${role}-${type.id}`)}
+                                                            >
+                                                                {isEditing ? <Save className="h-4 w-4" /> : <Pencil className="h-3.5 w-3.5" />}
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
 
                 <TabsContent value="staff" className="space-y-4">
                     <Card>
-                        <CardHeader>
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                <div>
-                                    <CardTitle>Staff Leave Overrides</CardTitle>
-                                    <CardDescription>View all staff and adjust individual allowances where special cases apply.</CardDescription>
+                        <CardHeader className="p-5 sm:p-6">
+                            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+                                <div className="space-y-1">
+                                    <CardTitle className="text-lg sm:text-xl">Staff Leave Overrides</CardTitle>
+                                    <CardDescription className="text-sm">
+                                        View all staff and adjust individual allowances where special cases apply.
+                                    </CardDescription>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <Input
-                                        placeholder="Search staff..."
-                                        className="w-[200px] lg:w-[300px]"
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                    />
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                                    <div className="relative flex-1 sm:min-w-[240px]">
+                                        <Input
+                                            placeholder="Search staff..."
+                                            className="h-10 pl-3 pr-10"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                        {searchTerm && (
+                                            <button
+                                                onClick={() => setSearchTerm('')}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                            >
+                                                <XCircle className="h-4 w-4" />
+                                            </button>
+                                        )}
+                                    </div>
                                     <Select value={selectedRoleFilter} onValueChange={setSelectedRoleFilter}>
-                                        <SelectTrigger className="w-[180px]">
+                                        <SelectTrigger className="w-full sm:w-[180px] h-10">
                                             <SelectValue placeholder="All Roles" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -353,25 +425,21 @@ export function AdminBalanceManager() {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {(searchTerm || selectedRoleFilter !== 'all') && (
+                                    {selectedRoleFilter !== 'all' && (
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => {
-                                                setSearchTerm('');
-                                                setSelectedRoleFilter('all');
-                                            }}
-                                            className="h-10 text-muted-foreground hover:bg-secondary transition-colors gap-2"
+                                            onClick={() => setSelectedRoleFilter('all')}
+                                            className="h-10 px-3 text-muted-foreground hover:bg-secondary hidden sm:flex"
                                         >
-                                            <XCircle className="h-4 w-4" />
-                                            <span className="text-xs font-semibold uppercase tracking-wider">Clear Filters</span>
+                                            Clear Role
                                         </Button>
                                     )}
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="rounded-md border overflow-x-auto">
+                            <div className="rounded-md border overflow-x-auto hidden xl:block">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -383,7 +451,7 @@ export function AdminBalanceManager() {
                                     </TableHeader>
                                     <TableBody>
                                         {filteredStaff.map((member: any) => (
-                                            <TableRow key={member.user_id}>
+                                            <TableRow key={`${member.user_id}-${member.role}`}>
                                                 <TableCell className="font-medium">
                                                     <div>
                                                         <p className="flex items-center gap-2">
@@ -475,6 +543,101 @@ export function AdminBalanceManager() {
                                         )}
                                     </TableBody>
                                 </Table>
+                            </div>
+
+                            {/* Mobile/Tablet Staff Cards */}
+                            <div className="xl:hidden space-y-4">
+                                {filteredStaff.map((member: any) => (
+                                    <div key={`${member.user_id}-${member.role}`} className="border rounded-xl p-4 bg-muted/20 space-y-3">
+                                        <div className="flex items-start justify-between border-b pb-2">
+                                            <div className="min-w-0">
+                                                <p className="font-bold truncate text-primary">
+                                                    {member.profiles?.full_name}
+                                                </p>
+                                                <p className="text-[10px] text-muted-foreground truncate">
+                                                    {member.profiles?.email}
+                                                </p>
+                                            </div>
+                                            <Badge variant="secondary" className="text-[10px] capitalize shrink-0">
+                                                {member.role?.replace('_', ' ')}
+                                            </Badge>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {staffWithBalances?.types.map(type => {
+                                                const individualBalance = staffWithBalances.balances.find(
+                                                    b => b.staff_id === member.user_id && b.vacation_type_id === type.id
+                                                );
+
+                                                const roleDefault = staffWithBalances.defaults.find(
+                                                    (d: any) => d.role === member.role && d.vacation_type_id === type.id
+                                                ) as any;
+
+                                                const isLocalUpdating = updating === `${member.user_id}-${type.id}`;
+                                                const isCustom = !!individualBalance;
+                                                const displayValue = individualBalance ? individualBalance.accrued : (roleDefault?.default_days || 0);
+                                                const isEditing = editingCell === `${member.user_id}-${type.id}`;
+
+                                                return (
+                                                    <div key={type.id} className="flex flex-col gap-1.5 p-3 rounded-lg bg-background border border-border/50 shadow-sm">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-xs font-bold text-muted-foreground uppercase tracking-tight">{type.name}</span>
+                                                            {!isCustom && (
+                                                                <Badge variant="outline" className="text-[9px] h-4 px-1 text-blue-500 border-blue-500/30">Inherited</Badge>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Input
+                                                                type="number"
+                                                                className={cn(
+                                                                    "h-9 w-full font-semibold",
+                                                                    !isCustom && "text-muted-foreground italic"
+                                                                )}
+                                                                defaultValue={displayValue}
+                                                                disabled={!isEditing && !isLocalUpdating}
+                                                                onBlur={(e) => {
+                                                                    setEditingCell(null);
+                                                                    const val = parseInt(e.target.value);
+                                                                    if (val < 0) {
+                                                                        toast.error("Balance cannot be negative");
+                                                                        return;
+                                                                    }
+                                                                    if (val !== displayValue) {
+                                                                        setPendingUpdate({
+                                                                            staffId: member.user_id,
+                                                                            typeId: type.id,
+                                                                            accrued: val,
+                                                                            staffName: member.profiles?.full_name || 'Staff member',
+                                                                            typeName: type.name
+                                                                        });
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <Button
+                                                                variant={isEditing ? "default" : "ghost"}
+                                                                size="icon"
+                                                                className="h-9 w-9 shrink-0"
+                                                                onClick={() => setEditingCell(isEditing ? null : `${member.user_id}-${type.id}`)}
+                                                            >
+                                                                {isEditing ? <Save className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                                                            </Button>
+                                                        </div>
+                                                        {individualBalance && (
+                                                            <div className="flex justify-between items-center text-[10px] mt-1 text-muted-foreground bg-muted/30 px-2 py-1 rounded">
+                                                                <span>Used: <span className="font-bold text-foreground">{individualBalance.used}</span></span>
+                                                                <span>Rem: <span className="font-bold text-primary">{individualBalance.balance}</span></span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                                {filteredStaff.length === 0 && (
+                                    <div className="text-center p-8 bg-muted/10 rounded-xl border-dashed border-2">
+                                        <p className="text-muted-foreground">No staff found matching search criteria.</p>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>

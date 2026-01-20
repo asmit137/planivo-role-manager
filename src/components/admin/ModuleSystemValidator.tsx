@@ -139,30 +139,30 @@ const ModuleSystemValidator = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-4 gap-4">
-                <div className="text-center p-4 rounded-lg bg-primary/5">
-                  <div className="text-3xl font-bold text-primary">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className="text-center p-3 sm:p-4 rounded-lg bg-primary/5">
+                  <div className="text-2xl sm:text-3xl font-bold text-primary">
                     {validationResults.summary.total}
                   </div>
-                  <div className="text-sm text-muted-foreground">Total Tests</div>
+                  <div className="text-xs sm:text-sm text-muted-foreground">Total Tests</div>
                 </div>
-                <div className="text-center p-4 rounded-lg bg-success/5">
-                  <div className="text-3xl font-bold text-success">
+                <div className="text-center p-3 sm:p-4 rounded-lg bg-success/5">
+                  <div className="text-2xl sm:text-3xl font-bold text-success">
                     {validationResults.summary.passed}
                   </div>
-                  <div className="text-sm text-muted-foreground">Passed</div>
+                  <div className="text-xs sm:text-sm text-muted-foreground">Passed</div>
                 </div>
-                <div className="text-center p-4 rounded-lg bg-destructive/5">
-                  <div className="text-3xl font-bold text-destructive">
+                <div className="text-center p-3 sm:p-4 rounded-lg bg-destructive/5">
+                  <div className="text-2xl sm:text-3xl font-bold text-destructive">
                     {validationResults.summary.failed}
                   </div>
-                  <div className="text-sm text-muted-foreground">Failed</div>
+                  <div className="text-xs sm:text-sm text-muted-foreground">Failed</div>
                 </div>
-                <div className="text-center p-4 rounded-lg bg-warning/5">
-                  <div className="text-3xl font-bold text-warning">
+                <div className="text-center p-3 sm:p-4 rounded-lg bg-warning/5">
+                  <div className="text-2xl sm:text-3xl font-bold text-warning">
                     {validationResults.summary.warnings}
                   </div>
-                  <div className="text-sm text-muted-foreground">Warnings</div>
+                  <div className="text-xs sm:text-sm text-muted-foreground">Warnings</div>
                 </div>
               </div>
 

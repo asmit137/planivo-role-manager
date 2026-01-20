@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { ResponsiveTabsList } from '@/components/layout/ResponsiveTabsList';
 import { cn } from '@/lib/utils';
 
 const TaskHub = () => {
@@ -30,7 +31,7 @@ const TaskHub = () => {
 
   const [staffSearch, setStaffSearch] = useState('');
   const [preSelectedStaff, setPreSelectedStaff] = useState<string[]>([]);
-   const [viewingStaffId, setViewingStaffId] = useState<string | null>(null);
+  const [viewingStaffId, setViewingStaffId] = useState<string | null>(null);
 
   const [isMessaging, setIsMessaging] = useState(false);
 
@@ -195,24 +196,24 @@ const TaskHub = () => {
     >
       <div className="space-y-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className={cn("grid w-full", canManageTasks ? "grid-cols-3" : "grid-cols-1")}>
+          <ResponsiveTabsList className="justify-center">
             {canManageTasks && (
               <>
-                <TabsTrigger value="manage">
-                  <ListTodo className="h-4 w-4 mr-2" />
-                  Manage Tasks
+                <TabsTrigger value="manage" title="Manage Tasks">
+                  <ListTodo className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Manage Tasks</span>
                 </TabsTrigger>
-                <TabsTrigger value="staff">
-                  <Users className="h-4 w-4 mr-2" />
-                  Staff List
+                <TabsTrigger value="staff" title="Staff List">
+                  <Users className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Staff List</span>
                 </TabsTrigger>
               </>
             )}
-            <TabsTrigger value="my-tasks">
-              <CheckSquare className="h-4 w-4 mr-2" />
-              {isSuperAdmin ? 'Global Task Progress' : 'My Tasks'}
+            <TabsTrigger value="my-tasks" title={isSuperAdmin ? 'Global Task Progress' : 'My Tasks'}>
+              <CheckSquare className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">{isSuperAdmin ? 'Global Progress' : 'My Tasks'}</span>
             </TabsTrigger>
-          </TabsList>
+          </ResponsiveTabsList>
 
           {canManageTasks && (
             <>
@@ -222,7 +223,7 @@ const TaskHub = () => {
                     key={`mgr-${preSelectedStaff.join(',')}`} // Force re-render if selection changes
                     scopeType={scopeInfo.scopeType}
                     scopeId={scopeInfo.scopeId}
-                    hideTaskList={true}
+                    hideTaskList={false}
                     initialSelectedStaffIds={preSelectedStaff}
                   />
                 ) : (
@@ -259,14 +260,7 @@ const TaskHub = () => {
 
                   {staffLoading ? (
                     <LoadingState message="Fetching staff members..." />
-                  ) : viewingStaffId && scopeInfo ? (
-                    <AllStaffTasksView
-                      scopeType={scopeInfo.scopeType}
-                      scopeId={scopeInfo.scopeId}
-                      assigneeId={viewingStaffId}
-                      onBack={() => setViewingStaffId(null)}
-                    />
-                  ) : (
+                  ) : scopeInfo ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {filteredStaff.map((staff: any) => (
                         <Card key={staff.user_id} className="overflow-hidden hover:shadow-md transition-shadow">
@@ -282,19 +276,20 @@ const TaskHub = () => {
                               <Button
                                 variant="outline"
                                 size="icon"
-                                className="h-8 w-8"
+                                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 border-primary/20"
                                 title="Message Staff"
-                                onClick={() => window.location.href = `/dashboard?tab=messaging`}
+                                onClick={() => handleMessageUser(staff.user_id)}
+                                disabled={isMessaging}
                               >
                                 <MessageSquare className="h-4 w-4" />
                               </Button>
                             </div>
 
-                            <div className="flex flex-col gap-2 mt-auto">
+                            <div className="grid grid-cols-2 gap-2 mt-auto">
                               <Button
                                 size="sm"
                                 variant="secondary"
-                                className="w-full gap-1.5 text-xs h-8"
+                                className="w-full gap-1.5 text-xs h-9 font-medium"
                                 onClick={() => setViewingStaffId(staff.user_id)}
                               >
                                 <ListTodo className="h-3.5 w-3.5" />
@@ -303,32 +298,11 @@ const TaskHub = () => {
                               <Button
                                 size="sm"
                                 variant="default"
-                                className="w-full gap-1.5 text-xs h-8"
+                                className="w-full gap-1.5 text-xs h-9 font-medium"
                                 onClick={() => handleAssignTask(staff.user_id)}
                               >
                                 <PlusCircle className="h-3.5 w-3.5" />
                                 Assign New Task
-                              </Button>
-                            </div>
-                            <div className="flex flex-col gap-2">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
-                                onClick={() => handleAssignTask(staff.user_id)}
-                              >
-                                <PlusCircle className="h-4 w-4" />
-                                Assign
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
-                                onClick={() => handleMessageUser(staff.user_id)}
-                                disabled={isMessaging}
-                              >
-                                <MessageSquare className="h-4 w-4" />
-                                Message
                               </Button>
                             </div>
                           </CardContent>
@@ -340,6 +314,10 @@ const TaskHub = () => {
                         </div>
                       )}
                     </div>
+                  ) : (
+                    <Card className="p-12 text-center text-muted-foreground border-2 border-dashed">
+                      {isSuperAdmin ? "Please select an organization from the sidebar to view staff." : "No scope assigned for staff list."}
+                    </Card>
                   )}
                 </div>
               </TabsContent>
@@ -347,7 +325,16 @@ const TaskHub = () => {
           )}
 
           <TabsContent value="my-tasks">
-            <StaffTaskView />
+            {scopeInfo || !isSuperAdmin ? (
+              <StaffTaskView
+                scopeType={scopeInfo?.scopeType}
+                scopeId={scopeInfo?.scopeId}
+              />
+            ) : (
+              <Card className="p-12 text-center text-muted-foreground border-2 border-dashed">
+                Please select an organization from the sidebar to view task progress.
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>

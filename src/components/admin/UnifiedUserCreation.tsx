@@ -148,12 +148,12 @@ const UnifiedUserCreation = ({
             duration: 10000,
             action: {
               label: "Get Script",
-              onClick: () => console.log("User notified of missing script")
+              onClick: () => { } // console.log("User notified of missing script")
             }
           });
         }
       } catch (e) {
-        console.error("Schema check failed", e);
+        // console.error("Schema check failed", e);
       }
     };
 
@@ -249,7 +249,7 @@ const UnifiedUserCreation = ({
         .order('name');
 
       if (!fError && facilityDepts && facilityDepts.length > 0) {
-        console.log(`Found ${facilityDepts.length} facility-specific departments`);
+        // console.log(`Found ${facilityDepts.length} facility-specific departments`);
         return facilityDepts;
       }
 
@@ -276,7 +276,7 @@ const UnifiedUserCreation = ({
             );
 
             if (matchingCategory) {
-              console.log(`Detected category match: ${matchingCategory.name}`);
+              // console.log(`Detected category match: ${matchingCategory.name}`);
               depts = depts.filter(d =>
                 d.category?.toLowerCase() === matchingCategory.name.toLowerCase()
               );
@@ -294,7 +294,7 @@ const UnifiedUserCreation = ({
             return d;
           });
 
-          console.log(`Found ${processed.length} filtered departments`);
+          // console.log(`Found ${processed.length} filtered departments`);
           return processed;
         }
       }
@@ -484,8 +484,8 @@ const UnifiedUserCreation = ({
       onOpenChange(false);
     },
     onError: async (error: any) => {
-      console.error('--- EDGE FUNCTION ERROR ---');
-      console.dir(error);
+      // console.error('--- EDGE FUNCTION ERROR ---');
+      // console.dir(error);
 
       let errorMessage = 'Failed to create user';
 
@@ -493,15 +493,15 @@ const UnifiedUserCreation = ({
       if (error.context && typeof error.context.json === 'function') {
         try {
           const body = await error.context.json();
-          console.log('Processed Error Body:', JSON.stringify(body, null, 2));
+          // console.log('Processed Error Body:', JSON.stringify(body, null, 2));
 
           if (body.error) {
             errorMessage = body.error;
             if (body.details) errorMessage += `: ${body.details}`;
             if (body.hint) errorMessage += ` (Hint: ${body.hint})`;
             if (body.diagnostic) {
-              console.log('--- BACKEND DIAGNOSTIC ---');
-              console.log(JSON.stringify(body.diagnostic, null, 2));
+              // console.log('--- BACKEND DIAGNOSTIC ---');
+              // console.log(JSON.stringify(body.diagnostic, null, 2));
               // Provide more specific info for auth errors
               if (body.error === "Unauthorized_from_code") {
                 errorMessage = `Auth Failed: ${body.details || 'Token invalid'}`;
@@ -509,7 +509,7 @@ const UnifiedUserCreation = ({
             }
           }
         } catch (e) {
-          console.error('Failed to parse error body:', e);
+          // console.error('Failed to parse error body:', e);
           errorMessage = `HTTP ${error.context.status}: ${error.context.statusText || 'Unknown Error'}`;
         }
       } else if (error.message) {

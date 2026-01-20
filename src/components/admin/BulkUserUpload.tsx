@@ -127,7 +127,7 @@ const BulkUserUpload = ({ organizationId }: BulkUserUploadProps) => {
 
       console.log("INVOKING bulk-upload-users - Row count:", users.length);
       const { data: { session } } = await supabase.auth.getSession();
-      console.log("Supabase Session active:", !!session);
+      // console.log("Supabase Session active:", !!session);
 
       const { data, error } = await supabase.functions.invoke('bulk-upload-users', {
         body: {
@@ -163,7 +163,7 @@ const BulkUserUpload = ({ organizationId }: BulkUserUploadProps) => {
       setParsedData([]);
     },
     onError: async (error: any) => {
-      console.error("Bulk upload full error:", error);
+      // console.error("Bulk upload full error:", error);
       let errorMessage = 'Bulk upload failed';
       const rawMessage = error?.message ?? (typeof error === 'string' ? error : '');
 

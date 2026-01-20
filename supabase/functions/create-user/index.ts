@@ -128,7 +128,7 @@ Deno.serve(async (req: Request) => {
             userEmail: requestingUser.email,
             rolesCount: requestingUserRoles?.length || 0,
             rolesError: rolesError,
-            hint: "If rolesError is 'column organization_id does not exist', I have now fixed this in the code. Please redeploy."
+            hint: "Check if the user has at least one administrative role."
           }
         }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -297,7 +297,7 @@ Deno.serve(async (req: Request) => {
       organization_id: resolvedOrganizationId,
       custom_role_id,
       created_by: requestingUser.id,
-    }, { onConflict: 'user_id, role, workspace_id, facility_id, department_id, organization_id' });
+    }, { onConflict: 'user_id,role,workspace_id,facility_id,department_id,organization_id' });
 
     if (roleError) {
       console.error("ROLE ASSIGNMENT ERROR:", roleError);
@@ -349,54 +349,57 @@ Deno.serve(async (req: Request) => {
     }
 
     /* =====================================================
-       8️⃣ SEND WELCOME EMAIL
-    ===================================================== */
-    /* =====================================================
-       8️⃣ SEND WELCOME EMAIL (SENDGRID)
-    ===================================================== */
-    /* =====================================================
        8️⃣ SEND WELCOME EMAIL (RESEND)
     ===================================================== */
-    const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
-    const SENDGRID_SENDER_EMAIL = Deno.env.get("SENDGRID_SENDER_EMAIL") || "no-reply@planivo.com";
-    if (SENDGRID_API_KEY) {
-      console.log(`Sending welcome email to ${email} via SendGrid...`);
+    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+
+    if (RESEND_API_KEY) {
+      console.log(`Sending welcome email to ${email} via Resend...`);
       try {
-        const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${SENDGRID_API_KEY}`,
+            Authorization: `Bearer ${RESEND_API_KEY}`,
           },
           body: JSON.stringify({
-            personalizations: [{ to: [{ email: email }] }],
-            from: { email: SENDGRID_SENDER_EMAIL, name: "Planivo" },
+            from: "Planivo <onboarding@resend.dev>",
+            to: [email],
             subject: "Welcome to Planivo - Your Account Credentials",
-            content: [{
-              type: "text/html",
-              value: `
-                <h1>Welcome to Planivo!</h1>
-                <p>Your account has been successfully created.</p>
-                <p><strong>Username:</strong> ${email}</p>
-                <p><strong>Password:</strong> ${password}</p>
-                <p>Click here to login: <a href="${Deno.env.get("PUBLIC_APP_URL") || 'http://localhost:8080'}">Planivo Login</a></p>
-                <p>Please log in and change your password immediately for security.</p>
-              `
-            }],
+            html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h1 style="color: #0ea5e9;">Welcome to Planivo!</h1>
+                  <p>Your account has been successfully created by an administrator.</p>
+                  <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 0;"><strong>Username:</strong> ${email}</p>
+                    <p style="margin: 10px 0 0 0;"><strong>Password:</strong> ${password}</p>
+                  </div>
+                  <p>
+                    <a href="${Deno.env.get("PUBLIC_APP_URL") || 'http://localhost:8080'}" 
+                       style="background-color: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                      Login to Planivo
+                    </a>
+                  </p>
+                  <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+                    Please log in and change your password immediately for security reasons.
+                  </p>
+                </div>
+              `,
           }),
         });
 
         if (!res.ok) {
           const errorText = await res.text();
-          console.error("SendGrid API error:", errorText);
+          console.error("Resend API error:", errorText);
         } else {
-          console.log("Welcome email sent successfully via SendGrid.");
+          console.log("Welcome email sent successfully via Resend.");
         }
       } catch (emailErr: any) {
-        console.error("Failed to send welcome email:", emailErr);
+        console.error("Failed to send welcome email via Resend:", emailErr);
       }
     } else {
-      console.warn("SENDGRID_API_KEY not set. Welcome email skipped.");
+      console.warn("RESEND_API_KEY not set. Welcome email skipped.");
+      // Fallback to SendGrid if needed, but the objective is to migrate to Resend
     }
 
     return new Response(

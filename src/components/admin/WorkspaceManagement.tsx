@@ -721,7 +721,7 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
 
       {/* Manage Categories Dialog */}
       <Dialog open={manageCategoriesOpen} onOpenChange={setManageCategoriesOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[70vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manage Categories</DialogTitle>
             <DialogDescription>

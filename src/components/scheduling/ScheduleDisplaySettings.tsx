@@ -181,8 +181,8 @@ export function ScheduleDisplaySettings({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
             <CardTitle className="flex items-center gap-2">
               <Monitor className="h-5 w-5" />
               Schedule Display Screens
@@ -261,17 +261,16 @@ export function ScheduleDisplaySettings({
             {tokens.map((token) => (
               <div
                 key={token.id}
-                className="flex items-center justify-between p-4 border rounded-lg bg-card"
+                className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg bg-card gap-4"
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{token.name}</span>
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${
-                        token.is_active
-                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                          : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
-                      }`}
+                      className={`text-xs px-2 py-0.5 rounded-full ${token.is_active
+                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                        }`}
                     >
                       {token.is_active ? "Active" : "Inactive"}
                     </span>
@@ -282,42 +281,46 @@ export function ScheduleDisplaySettings({
                       <> • Last viewed {format(new Date(token.last_accessed_at), "MMM d, HH:mm")}</>
                     )}
                   </div>
-                  <code className="text-xs bg-muted px-2 py-1 rounded block mt-1 max-w-md truncate">
+                  <code className="text-[10px] sm:text-xs bg-muted px-2 py-1 rounded block mt-2 break-all max-w-full lg:max-w-md lg:truncate">
                     {getDisplayUrl(token.token)}
                   </code>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                   <Switch
                     checked={token.is_active}
                     onCheckedChange={(checked) =>
                       toggleTokenMutation.mutate({ tokenId: token.id, isActive: checked })
                     }
                   />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => copyToClipboard(getDisplayUrl(token.token))}
-                    title="Copy URL"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => openInNewTab(token.token)}
-                    title="Open in new tab"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => deleteTokenMutation.mutate(token.id)}
-                    className="text-destructive hover:text-destructive"
-                    title="Delete token"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 sm:h-9 sm:w-9"
+                      onClick={() => copyToClipboard(getDisplayUrl(token.token))}
+                      title="Copy URL"
+                    >
+                      <Copy className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 sm:h-9 sm:w-9"
+                      onClick={() => openInNewTab(token.token)}
+                      title="Open in new tab"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => deleteTokenMutation.mutate(token.id)}
+                      className="text-destructive hover:text-destructive h-8 w-8 sm:h-9 sm:w-9"
+                      title="Delete token"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}

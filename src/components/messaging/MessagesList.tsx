@@ -18,7 +18,7 @@ const MessagesList = () => {
         .select('conversation_id')
         .eq('user_id', user?.id);
 
-      console.log("User Conversations", userConversations)
+      // console.log("User Conversations", userConversations)
 
       if (!userConversations || userConversations.length === 0) return [];
 

@@ -168,13 +168,13 @@ const UnifiedUserHub = ({
     },
   });
 
-  console.log("allDepartments", allDepartments);
-  console.log("activeOrganizationId", activeOrganizationId);
+  // console.log("allDepartments", allDepartments);
+  // console.log("activeOrganizationId", activeOrganizationId);
 
   const { data: users, isLoading: usersLoading, error: usersError } = useQuery({
     queryKey: ['unified-users', detectedScope, detectedScopeId, activeOrganizationId, filterWorkspace, filterDepartment],
     queryFn: async () => {
-      console.log(`[UnifiedUserHub] Scope: ${detectedScope}, ScopeId: ${detectedScopeId}, OrgId: ${activeOrganizationId} `);
+      // console.log(`[UnifiedUserHub] Scope: ${detectedScope}, ScopeId: ${detectedScopeId}, OrgId: ${activeOrganizationId} `);
 
       // Build optimized query based on scope
       // Use !inner for scoped views to filter profiles to those in the scope
@@ -195,7 +195,7 @@ const UnifiedUserHub = ({
         .order('created_at', { ascending: false });
 
       if (detectedScope === 'department' && detectedScopeId) {
-        console.log(`[UnifiedUserHub] Filtering by Department: ${detectedScopeId} `);
+        // console.log(`[UnifiedUserHub] Filtering by Department: ${detectedScopeId} `);
         query = query
           .eq('user_roles.department_id', detectedScopeId);
       } else if (detectedScope === 'facility' && detectedScopeId) {
@@ -214,7 +214,7 @@ const UnifiedUserHub = ({
         throw queryError;
       }
 
-      console.log(`[UnifiedUserHub] Fetched ${profilesWithRoles?.length} users`);
+      // console.log(`[UnifiedUserHub] Fetched ${profilesWithRoles?.length} users`);
 
       // Map back to the structure the component expects
       return (profilesWithRoles || []).map((p: any) => ({
@@ -341,7 +341,7 @@ const UnifiedUserHub = ({
           if (error.context && typeof error.context.json === 'function') {
             try {
               const body = await error.context.json();
-              console.log("Delete error body:", body);
+              // console.log("Delete error body:", body);
               if (body.error) errorMessage = body.error;
             } catch (e) {
               console.error("Failed to parse delete error body", e);
@@ -709,7 +709,7 @@ const UnifiedUserHub = ({
 
 
 
-        <Card className="border-2 shadow-sm">
+        <Card className="border-2 shadow-sm overflow-hidden">
           <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4 gap-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="space-y-1">
@@ -983,7 +983,7 @@ const UnifiedUserHub = ({
 
         {/* Rate Limit Activity - Super Admin Only */}
         {isSuperAdmin && detectedScope === 'system' && (
-          <Card className="border-2 shadow-sm mt-6">
+          <Card className="border-2 shadow-sm mt-6 hidden md:block">
             <CardHeader className="p-4 sm:p-6">
               <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                 <Lock className="h-5 w-5 text-primary" />

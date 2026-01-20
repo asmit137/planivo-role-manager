@@ -471,28 +471,28 @@ const OrganizationManagement = () => {
   );
 
   return (
-    <Card className="border-2">
-      <CardHeader>
-        <div className="flex items-center justify-between">
+    <Card className="border-2 overflow-hidden">
+      <CardHeader className="p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <CardTitle>Organizations</CardTitle>
             <CardDescription>Manage top-level organizations with owners and resource limits</CardDescription>
           </div>
           <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-primary">
-                <Plus className="mr-2 h-4 w-4" />
-                Create Organization
+              <Button className="bg-gradient-primary w-full sm:w-auto h-11 sm:h-10 text-sm px-4">
+                <Plus className="mr-2 h-4 w-4 shrink-0" />
+                <span className="whitespace-nowrap">Create Organization</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create New Organization</DialogTitle>
                 <DialogDescription>
                   Create an organization with an owner who can manage workspaces, facilities, and users
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-4">
+              <form onSubmit={handleCreate} className="space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="org-name">Organization Name *</Label>
                   <Input
@@ -516,22 +516,32 @@ const OrganizationManagement = () => {
 
                 <div className="space-y-3">
                   <Label>Vacation Mode</Label>
-                  <RadioGroup value={vacationMode} onValueChange={(v: any) => setVacationMode(v)} className="flex gap-4">
-                    <div className="flex items-center space-x-2 border p-3 rounded-md flex-1 cursor-pointer hover:bg-muted/50 transition-colors">
-                      <RadioGroupItem value="full" id="mode-full" />
+                  <div className="flex gap-4">
+                    <div
+                      className={`flex items-center space-x-2 border p-2 rounded-md flex-1 cursor-pointer transition-colors ${vacationMode === 'full' ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}
+                      onClick={() => setVacationMode('full')}
+                    >
+                      <div className={`aspect-square h-4 w-4 rounded-full border border-primary flex items-center justify-center ${vacationMode === 'full' ? 'text-primary' : 'text-transparent'}`}>
+                        {vacationMode === 'full' && <div className="h-2.5 w-2.5 rounded-full bg-current" />}
+                      </div>
                       <div>
-                        <Label htmlFor="mode-full" className="font-semibold cursor-pointer">Full Mode</Label>
+                        <span className="font-semibold text-sm">Full Mode</span>
                         <p className="text-xs text-muted-foreground">Balances are deducted. Limits enforced.</p>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2 border p-3 rounded-md flex-1 cursor-pointer hover:bg-muted/50 transition-colors">
-                      <RadioGroupItem value="planning" id="mode-planning" />
+                    <div
+                      className={`flex items-center space-x-2 border p-2 rounded-md flex-1 cursor-pointer transition-colors ${vacationMode === 'planning' ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}
+                      onClick={() => setVacationMode('planning')}
+                    >
+                      <div className={`aspect-square h-4 w-4 rounded-full border border-primary flex items-center justify-center ${vacationMode === 'planning' ? 'text-primary' : 'text-transparent'}`}>
+                        {vacationMode === 'planning' && <div className="h-2.5 w-2.5 rounded-full bg-current" />}
+                      </div>
                       <div>
-                        <Label htmlFor="mode-planning" className="font-semibold cursor-pointer">Planning Mode</Label>
+                        <span className="font-semibold text-sm">Planning Mode</span>
                         <p className="text-xs text-muted-foreground">No balance deducted. For scheduling only.</p>
                       </div>
                     </div>
-                  </RadioGroup>
+                  </div>
                 </div>
 
                 <Separator />
@@ -576,7 +586,7 @@ const OrganizationManagement = () => {
                   <p className="text-sm text-muted-foreground">
                     Set maximum resources this organization can create
                   </p>
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     <LimitInput
                       label="Max Workspaces"
                       state={maxWorkspaces}
@@ -603,7 +613,7 @@ const OrganizationManagement = () => {
           </Dialog>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-2 sm:p-4 md:p-6 overflow-x-hidden">
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
@@ -611,7 +621,7 @@ const OrganizationManagement = () => {
             ))}
           </div>
         ) : organizations && organizations.length > 0 ? (
-          <div className="space-y-3">
+          <div className="space-y-3 overflow-hidden">
             {organizations.map((org) => {
               const orgWorkspaces = getWorkspacesForOrg(org.id);
               const isExpanded = expandedOrgs.has(org.id);
@@ -619,9 +629,9 @@ const OrganizationManagement = () => {
 
               return (
                 <Collapsible key={org.id} open={isExpanded} onOpenChange={() => toggleExpanded(org.id)}>
-                  <div className="border-2 rounded-lg hover:border-primary/20 transition-colors">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 gap-4">
-                      <div className="flex items-start gap-3 min-w-0">
+                  <div className="border-2 rounded-lg hover:border-primary/20 transition-colors overflow-hidden">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-2 sm:p-4 gap-3 sm:gap-4">
+                      <div className="flex items-start gap-2 sm:gap-3 min-w-0">
                         <CollapsibleTrigger asChild>
                           <Button variant="ghost" size="sm" className="p-0 h-8 w-8 shrink-0 mt-1">
                             {isExpanded ? (
@@ -634,7 +644,7 @@ const OrganizationManagement = () => {
                         <div className="p-2 rounded-lg bg-primary/10 shrink-0 mt-0.5">
                           <Building className="h-5 w-5 text-primary" />
                         </div>
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1 overflow-hidden">
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="font-semibold text-base sm:text-lg line-clamp-1">{org.name}</h3>
                             <Badge variant="secondary" className="text-[10px] sm:text-xs h-5 sm:h-auto">
@@ -645,7 +655,7 @@ const OrganizationManagement = () => {
                             <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1 sm:line-clamp-2 mt-0.5">{org.description}</p>
                           )}
                           {owner && (
-                            <p className="text-[10px] sm:text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
+                            <p className="text-[10px] sm:text-xs text-muted-foreground mt-1.5 flex items-center gap-1 max-w-full overflow-hidden">
                               <User className="h-3 w-3 shrink-0" />
                               <span className="truncate">Owner: {owner.full_name} ({owner.email})</span>
                             </p>
@@ -666,7 +676,7 @@ const OrganizationManagement = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex gap-2 justify-end sm:justify-start pt-3 sm:pt-0 border-t sm:border-0">
+                      <div className="flex gap-2 justify-end sm:justify-start pt-3 sm:pt-0 border-t sm:border-0 shrink-0">
                         <Button
                           variant="outline"
                           size="sm"
@@ -725,14 +735,14 @@ const OrganizationManagement = () => {
 
       {/* Edit Organization Dialog */}
       <Dialog open={editOpen} onOpenChange={(open) => { setEditOpen(open); if (!open) resetForm(); }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Organization</DialogTitle>
             <DialogDescription>
               Update organization details and resource limits
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleUpdate} className="space-y-4">
+          <form onSubmit={handleUpdate} className="space-y-3">
             <div className="space-y-2">
               <Label htmlFor="edit-org-name">Organization Name *</Label>
               <Input
@@ -754,22 +764,32 @@ const OrganizationManagement = () => {
 
             <div className="space-y-3">
               <Label>Vacation Mode</Label>
-              <RadioGroup value={vacationMode} onValueChange={(v: any) => setVacationMode(v)} className="flex gap-4">
-                <div className="flex items-center space-x-2 border p-3 rounded-md flex-1 cursor-pointer hover:bg-muted/50 transition-colors">
-                  <RadioGroupItem value="full" id="edit-mode-full" />
+              <div className="flex gap-4">
+                <div
+                  className={`flex items-center space-x-2 border p-2 rounded-md flex-1 cursor-pointer transition-colors ${vacationMode === 'full' ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}
+                  onClick={() => setVacationMode('full')}
+                >
+                  <div className={`aspect-square h-4 w-4 rounded-full border border-primary flex items-center justify-center ${vacationMode === 'full' ? 'text-primary' : 'text-transparent'}`}>
+                    {vacationMode === 'full' && <div className="h-2.5 w-2.5 rounded-full bg-current" />}
+                  </div>
                   <div>
-                    <Label htmlFor="edit-mode-full" className="font-semibold cursor-pointer">Full Mode</Label>
+                    <span className="font-semibold text-sm">Full Mode</span>
                     <p className="text-xs text-muted-foreground">Balances are deducted. Limits enforced.</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2 border p-3 rounded-md flex-1 cursor-pointer hover:bg-muted/50 transition-colors">
-                  <RadioGroupItem value="planning" id="edit-mode-planning" />
+                <div
+                  className={`flex items-center space-x-2 border p-2 rounded-md flex-1 cursor-pointer transition-colors ${vacationMode === 'planning' ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}
+                  onClick={() => setVacationMode('planning')}
+                >
+                  <div className={`aspect-square h-4 w-4 rounded-full border border-primary flex items-center justify-center ${vacationMode === 'planning' ? 'text-primary' : 'text-transparent'}`}>
+                    {vacationMode === 'planning' && <div className="h-2.5 w-2.5 rounded-full bg-current" />}
+                  </div>
                   <div>
-                    <Label htmlFor="edit-mode-planning" className="font-semibold cursor-pointer">Planning Mode</Label>
+                    <span className="font-semibold text-sm">Planning Mode</span>
                     <p className="text-xs text-muted-foreground">No balance deducted. For scheduling only.</p>
                   </div>
                 </div>
-              </RadioGroup>
+              </div>
             </div>
 
             <Separator />
@@ -870,7 +890,7 @@ const OrganizationManagement = () => {
 
             <div className="space-y-3">
               <h4 className="font-medium">Resource Limits</h4>
-              <div className="space-y-4">
+              <div className="space-y-2">
                 <LimitInput
                   label="Max Workspaces"
                   state={maxWorkspaces}

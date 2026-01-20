@@ -73,7 +73,9 @@ const MeetingChatPanel = ({ eventId }: MeetingChatPanelProps) => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [eventId, queryClient]);
 
@@ -135,11 +137,11 @@ const MeetingChatPanel = ({ eventId }: MeetingChatPanelProps) => {
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           )}
-          
+
           {messages?.map((msg) => {
             const isOwnMessage = msg.user_id === user?.id;
             const senderName = msg.profiles?.full_name || 'Unknown';
-            
+
             return (
               <div
                 key={msg.id}
@@ -156,11 +158,10 @@ const MeetingChatPanel = ({ eventId }: MeetingChatPanelProps) => {
                     <span>{format(new Date(msg.sent_at), 'h:mm a')}</span>
                   </div>
                   <div
-                    className={`mt-1 px-3 py-2 rounded-lg max-w-[200px] break-words ${
-                      isOwnMessage
+                    className={`mt-1 px-3 py-2 rounded-lg max-w-[200px] break-words ${isOwnMessage
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted'
-                    }`}
+                      }`}
                   >
                     <p className="text-sm">{msg.message}</p>
                   </div>
@@ -185,8 +186,8 @@ const MeetingChatPanel = ({ eventId }: MeetingChatPanelProps) => {
             placeholder="Type a message..."
             disabled={sendMessageMutation.isPending}
           />
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             size="icon"
             disabled={!newMessage.trim() || sendMessageMutation.isPending}
           >

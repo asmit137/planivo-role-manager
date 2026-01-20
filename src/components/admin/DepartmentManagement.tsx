@@ -318,7 +318,7 @@ const DepartmentManagement = () => {
                     <SelectContent className="bg-background z-50">
                       {facilities?.map((facility: any) => (
                         <SelectItem key={facility.id} value={facility.id}>
-                          {facility.name}
+                          {facility.name} {facility.workspaces?.name && `(${facility.workspaces.name})`}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -390,7 +390,14 @@ const DepartmentManagement = () => {
                           <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </TableCell>
-                      <TableCell>{dept.facilities?.name}</TableCell>
+                      <TableCell>
+                        {dept.facilities?.name}
+                        {dept.facilities?.workspaces?.name && (
+                          <span className="text-xs text-muted-foreground block">
+                            ({dept.facilities.workspaces.name})
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge variant="secondary">
                           <Users className="h-3 w-3 mr-1" />

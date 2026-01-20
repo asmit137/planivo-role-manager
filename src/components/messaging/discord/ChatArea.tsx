@@ -14,8 +14,9 @@ import { useMediaQuery } from '@/hooks/use-media-query';
 interface ChatAreaProps {
     channelId: string | null;
     onMobileMenuToggle: () => void;
+    sidebarOpen?: boolean;
 }
-export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
+export const ChatArea = ({ channelId, onMobileMenuToggle, sidebarOpen }: ChatAreaProps) => {
     const { user } = useAuth();
     const isDesktop = useMediaQuery('(min-width: 768px)');
     const queryClient = useQueryClient();
@@ -128,7 +129,7 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
 
             // 4. Generate Title Logic
             if (fullConversation && !fullConversation.title && fullConversation.type !== 'channel') {
-                console.log('Generating title for conversation:', fullConversation.id);
+                // console.log('Generating title for conversation:', fullConversation.id);
 
                 const others = fullConversation.conversation_participants?.filter(
                     (p: any) => p.user_id !== user?.id
@@ -144,7 +145,7 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
                         })
                         .join(', ');
                 }
-                console.log('Generated Title:', fullConversation.title);
+                // console.log('Generated Title:', fullConversation.title);
             }
 
             return fullConversation;
@@ -300,10 +301,10 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
 
     if (!channelId) {
         return (
-            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground bg-background/50">
-                <div className="absolute top-4 left-4 md:hidden">
-                    <Button variant="ghost" size="icon" onClick={onMobileMenuToggle}>
-                        <Menu className="h-6 w-6" />
+            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground bg-background/50 relative">
+                <div className="absolute top-4 left-4 md:hidden z-20">
+                    <Button variant="ghost" size="icon" onClick={onMobileMenuToggle} className="hover:bg-muted">
+                        {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
                     </Button>
                 </div>
                 <div className="bg-primary/10 p-6 rounded-full mb-6 ring-1 ring-primary/20">
@@ -312,9 +313,13 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
                 <h3 className="text-2xl font-bold text-foreground mb-3">
                     Welcome back, {user?.user_metadata?.full_name?.split(' ')[0] || 'Member'}!
                 </h3>
-                <p className="text-muted-foreground/80 text-center max-w-sm">
+                <p className="text-muted-foreground/80 text-center max-w-sm px-6">
                     Select a channel or conversation from the sidebar to start collaborating with your team.
                 </p>
+                <div className="mt-4 md:hidden animate-pulse flex items-center gap-2 text-primary text-sm font-medium">
+                    <Menu className="h-4 w-4" />
+                    <span>Tap the menu icon in the top-left to view channels</span>
+                </div>
             </div>
         );
     }
@@ -325,7 +330,7 @@ export const ChatArea = ({ channelId, onMobileMenuToggle }: ChatAreaProps) => {
             <div className="h-14 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center justify-between px-4 shadow-sm flex-shrink-0">
                 <div className="flex items-center gap-2">
                     <Button variant="ghost" className="md:hidden mr-2 px-0" onClick={onMobileMenuToggle}>
-                        <Menu className="h-6 w-6" />
+                        {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
                     </Button>
                     {conversation?.type === 'channel' ? (
                         <div className="flex flex-col">

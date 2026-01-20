@@ -304,7 +304,7 @@ const OrganizationTaskMonitor = ({ organizationId }: OrganizationTaskMonitorProp
               </DialogTrigger>
               <DialogContent className="sm:max-w-[600px] max-h-[95vh] overflow-hidden">
                 <DialogHeader>
-                  <DialogTitle>Create Organization Task</DialogTitle>
+                  <DialogTitle>zation Task</DialogTitle>
                 </DialogHeader>
                 <div className="py-2 overflow-y-auto max-h-[calc(95vh-120px)]">
                   <TaskManager

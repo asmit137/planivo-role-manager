@@ -105,9 +105,7 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
         queryKey: ['discord-dms', user?.id],
         queryFn: async () => {
             if (!user) return [];
-
-            console.log('Fetching DMs for user:', user.id);
-
+            // console.log('Fetching DMs for user:', user.id);
             const { data, error } = await supabase
                 .from('conversation_participants')
                 .select('conversation_id, last_read_at, conversations(*)')

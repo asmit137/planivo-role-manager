@@ -44,7 +44,7 @@ export const OTPVerificationDialog = ({
         if (open) {
             const code = Math.floor(100000 + Math.random() * 900000).toString();
             setGeneratedCode(code);
-            console.log(`[SECURITY] OTP for critical action: ${code}`);
+            // console.log(`[SECURITY] OTP for critical action: ${code}`);
 
             toast.info("Security code sent! (Check console in development)", {
                 description: `Code: ${code}`,

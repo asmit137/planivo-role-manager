@@ -299,19 +299,39 @@ Deno.serve(async (req: Request) => {
           await supabaseAdmin.from("leave_balances").upsert(vTypes.map((vt: any) => ({ staff_id: newUserId, vacation_type_id: vt.id, organization_id: rowOrganizationId, accrued: 0, used: 0, balance: 0, year: currentYear })), { onConflict: 'staff_id, vacation_type_id, year' });
         }
 
-        // Welcome Email (SendGrid)
-        const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
-        const SENDGRID_SENDER_EMAIL = Deno.env.get("SENDGRID_SENDER_EMAIL") || "no-reply@planivo.com";
-        if (SENDGRID_API_KEY) {
+        // Welcome Email (RESEND)
+        const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+        if (RESEND_API_KEY) {
           try {
-            await fetch("https://api.sendgrid.com/v3/mail/send", {
+            await fetch("https://api.resend.com/emails", {
               method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${SENDGRID_API_KEY}` },
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${RESEND_API_KEY}`
+              },
               body: JSON.stringify({
-                personalizations: [{ to: [{ email: lowEmail }] }],
-                from: { email: SENDGRID_SENDER_EMAIL, name: "Planivo" },
+                from: "Planivo <onboarding@resend.dev>",
+                to: [lowEmail],
                 subject: "Welcome to Planivo - Your Account Credentials",
-                content: [{ type: "text/html", value: `<h1>Welcome to Planivo!</h1><p>Your account was created via bulk upload.</p><p><strong>Username:</strong> ${lowEmail}</p><p><strong>Password:</strong> 12345678</p><p>Link: <a href=\"${Deno.env.get("PUBLIC_APP_URL") || 'http://localhost:8080'}\">Login</a></p><p>Change your password immediately.</p>` }]
+                html: `
+                  <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h1 style="color: #0ea5e9;">Welcome to Planivo!</h1>
+                    <p>Your account was created via bulk upload.</p>
+                    <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                      <p style="margin: 0;"><strong>Username:</strong> ${lowEmail}</p>
+                      <p style="margin: 10px 0 0 0;"><strong>Password:</strong> 12345678</p>
+                    </div>
+                    <p>
+                      <a href="${Deno.env.get("PUBLIC_APP_URL") || 'http://localhost:8080'}" 
+                         style="background-color: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                        Login to Planivo
+                      </a>
+                    </p>
+                    <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+                      Please log in and change your password immediately for security reasons.
+                    </p>
+                  </div>
+                `
               }),
             });
           } catch (e) { console.error(`Email error Row ${rowNumber}:`, e); }

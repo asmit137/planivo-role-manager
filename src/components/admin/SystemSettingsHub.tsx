@@ -272,19 +272,19 @@ export function SystemSettingsHub() {
                 {modules?.map(module => (
                   <div
                     key={module.id}
-                    className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-muted/50 rounded-lg gap-4 transition-all hover:bg-muted"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${module.is_active ? 'bg-primary/10' : 'bg-muted'}`}>
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className={`p-2 rounded-lg shrink-0 ${module.is_active ? 'bg-primary/10' : 'bg-muted'}`}>
                         <Settings className={`h-4 w-4 ${module.is_active ? 'text-primary' : 'text-muted-foreground'}`} />
                       </div>
-                      <div>
-                        <p className="font-medium">{module.name}</p>
-                        <p className="text-sm text-muted-foreground">{module.description || module.key}</p>
+                      <div className="space-y-1">
+                        <p className="font-medium leading-none">{module.name}</p>
+                        <p className="text-sm text-muted-foreground line-clamp-2">{module.description || module.key}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <Badge variant="outline">{module.key}</Badge>
+                    <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pl-11 sm:pl-0">
+                      <Badge variant="outline" className="font-mono text-xs text-muted-foreground shrink-0">{module.key}</Badge>
                       <Switch
                         checked={module.is_active ?? true}
                         onCheckedChange={(checked) => toggleModuleMutation.mutate({ id: module.id, is_active: checked })}

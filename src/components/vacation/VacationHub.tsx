@@ -83,52 +83,52 @@ const VacationHub = ({ departmentId }: VacationHubProps) => {
         />
       }
     >
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <Tabs defaultValue="calendar" className="space-y-4">
-          <ResponsiveTabsList>
-            <TabsTrigger value="calendar" className="min-h-[44px] px-3 text-sm">
-              <CalendarDays className="h-4 w-4 mr-1.5 sm:mr-2" />
-              <span>Calendar</span>
+          <ResponsiveTabsList wrap>
+            <TabsTrigger value="calendar" title="Calendar" className="min-h-[44px] px-2.5 sm:px-3 text-xs sm:text-sm">
+              <CalendarDays className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Calendar</span>
             </TabsTrigger>
-            <TabsTrigger value="planner" className="min-h-[44px] px-3 text-sm">
-              <Calendar className="h-4 w-4 mr-1.5 sm:mr-2" />
-              <span>Plan Vacation</span>
+            <TabsTrigger value="planner" title="Plan Vacation" className="min-h-[44px] px-2.5 sm:px-3 text-xs sm:text-sm">
+              <Calendar className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Plan Vacation</span>
             </TabsTrigger>
-            <TabsTrigger value="plans" className="min-h-[44px] px-3 text-sm">
-              <List className="h-4 w-4 mr-1.5 sm:mr-2" />
-              <span>My Plans</span>
+            <TabsTrigger value="plans" title="My Plans" className="min-h-[44px] px-2.5 sm:px-3 text-xs sm:text-sm">
+              <List className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">My Plans</span>
             </TabsTrigger>
             {(isApprover || isSuperAdmin) && (
-              <TabsTrigger value="team-plans" className="min-h-[44px] px-3 text-sm">
-                <List className="h-4 w-4 mr-1.5 sm:mr-2" />
-                <span>Team Vacations</span>
+              <TabsTrigger value="team-plans" title="Team Vacations" className="min-h-[44px] px-2.5 sm:px-3 text-xs sm:text-sm">
+                <List className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Team Vacations</span>
               </TabsTrigger>
             )}
             {isApprover && (
-              <TabsTrigger value="approvals" className="min-h-[44px] px-3 text-sm">
-                <CheckSquare className="h-4 w-4 mr-1.5 sm:mr-2" />
-                <span>Approvals</span>
+              <TabsTrigger value="approvals" title="Approvals" className="min-h-[44px] px-2.5 sm:px-3 text-xs sm:text-sm">
+                <CheckSquare className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Approvals</span>
               </TabsTrigger>
             )}
             {isApprover && (
-              <TabsTrigger value="conflicts" className="min-h-[44px] px-3 text-sm">
-                <AlertTriangle className="h-4 w-4 mr-1.5 sm:mr-2" />
-                <span>Conflicts</span>
+              <TabsTrigger value="conflicts" title="Conflicts" className="min-h-[44px] px-2.5 sm:px-3 text-xs sm:text-sm">
+                <AlertTriangle className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Conflicts</span>
               </TabsTrigger>
             )}
             {isStrictSuperAdmin && (
               <>
-                <TabsTrigger value="types" className="min-h-[44px] px-3 text-sm">
-                  <Settings className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  <span>Types</span>
+                <TabsTrigger value="types" title="Types" className="min-h-[44px] px-2.5 sm:px-3 text-xs sm:text-sm">
+                  <Settings className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Types</span>
                 </TabsTrigger>
-                <TabsTrigger value="balances" className="min-h-[44px] px-3 text-sm">
-                  <CheckSquare className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  <span>Balances</span>
+                <TabsTrigger value="balances" title="Balances" className="min-h-[44px] px-2.5 sm:px-3 text-xs sm:text-sm">
+                  <CheckSquare className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Balances</span>
                 </TabsTrigger>
-                <TabsTrigger value="rules" className="min-h-[44px] px-3 text-sm">
-                  <Settings className="h-4 w-4 mr-1.5 sm:mr-2" />
-                  <span>Rules</span>
+                <TabsTrigger value="rules" title="Rules" className="min-h-[44px] px-2.5 sm:px-3 text-xs sm:text-sm">
+                  <Settings className="h-5 w-5 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Rules</span>
                 </TabsTrigger>
               </>
             )}

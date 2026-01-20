@@ -22,6 +22,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { ShiftCalendarView } from './ShiftCalendarView';
 import { SchedulingDashboard } from './SchedulingDashboard';
 import { ScheduleDisplaySettings } from './ScheduleDisplaySettings';
+import { ResponsiveTabsList } from '@/components/layout/ResponsiveTabsList';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { cn } from '@/lib/utils';
 
@@ -537,24 +538,24 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
 
         {/* ... Tab Navigation ... */}
         <div className="mb-6">
-          <TabsList>
-            <TabsTrigger value="schedules" className="flex items-center gap-2">
+          <ResponsiveTabsList className="justify-center">
+            <TabsTrigger value="schedules" className="flex items-center gap-2" title="Schedules">
               <ClipboardList className="h-4 w-4" />
-              <span>Schedules</span>
+              <span className="hidden sm:inline">Schedules</span>
             </TabsTrigger>
-            <TabsTrigger value="calendar" className="flex items-center gap-2">
+            <TabsTrigger value="calendar" className="flex items-center gap-2" title="Calendar">
               <CalendarIcon className="h-4 w-4" />
-              <span>Calendar</span>
+              <span className="hidden sm:inline">Calendar</span>
             </TabsTrigger>
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
+            <TabsTrigger value="dashboard" className="flex items-center gap-2" title="Dashboard">
               <LayoutDashboard className="h-4 w-4" />
-              <span>Dashboard</span>
+              <span className="hidden sm:inline">Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value="display" className="flex items-center gap-2">
+            <TabsTrigger value="display" className="flex items-center gap-2" title="Display Settings">
               <Monitor className="h-4 w-4" />
-              <span>Display</span>
+              <span className="hidden sm:inline">Display</span>
             </TabsTrigger>
-          </TabsList>
+          </ResponsiveTabsList>
         </div>
 
         <TabsContent value="schedules">

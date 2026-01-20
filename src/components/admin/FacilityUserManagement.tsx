@@ -337,23 +337,24 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
   return (
     <div className="space-y-6">
       {/* Header with actions */}
-      <Card className="border-2">
-        <CardHeader>
-          <div className="flex items-center justify-between">
+      <Card className="border-2 overflow-hidden">
+        <CardHeader className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <CardTitle>Workspace & Facility Management</CardTitle>
-              <CardDescription>Manage facilities and users within workspaces</CardDescription>
+              <CardTitle className="text-lg sm:text-xl">Workspace & Facility Management</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Manage facilities and users within workspaces</CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Dialog open={facilityDialogOpen} onOpenChange={setFacilityDialogOpen}>
                 <DialogTrigger asChild>
                   <Button
                     variant="outline"
                     disabled={facilityAtLimit}
                     title={facilityAtLimit ? 'Facility limit reached' : undefined}
+                    className="flex-1 sm:flex-none"
                   >
                     <Building2 className="mr-2 h-4 w-4" />
-                    Add Facility
+                    <span className="whitespace-nowrap">Add Facility</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
@@ -440,8 +441,8 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
       </Card>
 
       {/* Hierarchical View */}
-      <Card className="border-2">
-        <CardHeader>
+      <Card className="border-2 overflow-hidden">
+        <CardHeader className="p-4 sm:p-6">
           <CardTitle>Organizational Structure</CardTitle>
           <CardDescription>View workspaces, facilities, and their users</CardDescription>
         </CardHeader>

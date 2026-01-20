@@ -118,7 +118,7 @@ export const ShiftCalendarView: React.FC<ShiftCalendarViewProps> = ({ department
       </div>
 
       <Card className="border-2">
-        <CardContent className="p-0 sm:p-6 overflow-hidden">
+        <CardContent className="py-6 px-2 sm:p-8 overflow-hidden">
           <div className="w-full">
             <Calendar
               mode="single"
@@ -128,16 +128,16 @@ export const ShiftCalendarView: React.FC<ShiftCalendarViewProps> = ({ department
               month={currentMonth}
               className="p-0 pointer-events-auto w-full"
               classNames={{
-                months: "flex flex-col gap-2 sm:gap-8 w-full justify-center",
-                month: "space-y-2 sm:space-y-4 flex-1",
-                caption: "flex justify-center pt-1 relative items-center mb-2 sm:mb-8 h-8 sm:h-12",
+                months: "flex flex-col gap-4 sm:gap-8 w-full justify-center",
+                month: "space-y-4 sm:space-y-6 flex-1",
+                caption: "flex justify-center pt-2 sm:pt-4 relative items-center mb-4 sm:mb-8 h-8 sm:h-12",
                 caption_label: "text-sm sm:text-2xl font-bold tracking-tight",
                 nav: "flex items-center",
                 nav_button: "h-7 w-7 sm:h-10 sm:w-10 bg-transparent p-0 opacity-60 hover:opacity-100 hover:bg-accent rounded-md sm:rounded-xl transition-all flex items-center justify-center z-20",
                 nav_button_previous: "absolute left-0 top-1/2 -translate-y-1/2",
                 nav_button_next: "absolute right-0 top-1/2 -translate-y-1/2",
-                table: "w-full border-collapse",
-                head_row: "flex w-full mb-1 sm:mb-4",
+                table: "w-full border-collapse pb-4",
+                head_row: "flex w-full mb-2 sm:mb-4",
                 head_cell: "text-muted-foreground/60 rounded-md font-bold text-[0.6rem] sm:text-xs uppercase tracking-widest flex-1 min-w-0 text-center",
                 row: "flex w-full mt-1 sm:mt-2",
                 cell: "relative p-0.5 text-center focus-within:relative focus-within:z-20 flex-1 min-w-0 min-h-[44px] xs:min-h-[50px] sm:min-h-[64px]",

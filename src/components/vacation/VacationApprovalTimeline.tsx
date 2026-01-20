@@ -111,9 +111,15 @@ const VacationApprovalTimeline = ({
   ];
 
   // Find the final approver (the one who actually approved or rejected)
-  // Find the final status (Rejected takes precedence over Approved)
-  const finalApproval = approvals?.find(a => a.status === 'rejected') ||
-    approvals?.find(a => a.status === 'approved');
+  // Fix: Prioritize the approval that MATCHES the current status
+  let finalApproval = approvals?.find(a => a.status === currentStatus);
+
+  if (!finalApproval) {
+    // Fallback: If no matching status found (e.g. data mismatch), default to standard precedence
+    finalApproval = approvals?.find(a => a.status === 'rejected') ||
+      approvals?.find(a => a.status === 'approved');
+  }
+
   const hasAnyConflicts = approvals?.some(a => a.has_conflict);
 
   // Get role name from approval level

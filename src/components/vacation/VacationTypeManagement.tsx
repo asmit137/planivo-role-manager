@@ -182,12 +182,12 @@ const VacationTypeManagement = () => {
                   Requires Documentation
                 </Label>
               </div>
-              <div className="flex gap-2">
-                <Button type="submit">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button type="submit" className="w-full sm:w-auto">
                   {isEditing ? 'Update' : 'Create'}
                 </Button>
                 {isEditing && (
-                  <Button type="button" variant="outline" onClick={resetForm}>
+                  <Button type="button" variant="outline" onClick={resetForm} className="w-full sm:w-auto">
                     Cancel
                   </Button>
                 )}
@@ -206,11 +206,11 @@ const VacationTypeManagement = () => {
             {vacationTypes?.map((type) => (
               <div
                 key={type.id}
-                className="flex items-center justify-between p-4 border rounded-lg"
+                className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border rounded-lg gap-3"
               >
-                <div>
-                  <h3 className="font-semibold">{type.name}</h3>
-                  <p className="text-sm text-muted-foreground">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-semibold truncate">{type.name}</h3>
+                  <p className="text-sm text-muted-foreground line-clamp-2">
                     {type.description}
                   </p>
                   <p className="text-sm">Max days: {type.max_days || 'N/A'}</p>
@@ -218,20 +218,25 @@ const VacationTypeManagement = () => {
                     <p className="text-sm text-warning">Requires documentation</p>
                   )}
                 </div>
-                <div className="flex gap-2">
-                  <Switch
-                    checked={type.is_active}
-                    onCheckedChange={(checked) =>
-                      toggleActiveMutation.mutate({
-                        id: type.id,
-                        is_active: checked,
-                      })
-                    }
-                  />
+                <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor={`active-${type.id}`} className="text-xs sm:hidden">Active</Label>
+                    <Switch
+                      id={`active-${type.id}`}
+                      checked={type.is_active}
+                      onCheckedChange={(checked) =>
+                        toggleActiveMutation.mutate({
+                          id: type.id,
+                          is_active: checked,
+                        })
+                      }
+                    />
+                  </div>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => handleEdit(type)}
+                    className="h-8 w-8 p-0"
                   >
                     <Edit className="h-4 w-4" />
                   </Button>

@@ -125,13 +125,13 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
     }
 
     setLoading(true);
-    console.log('[UserProfile] Initiating OTP request for:', profile.email);
+    // console.log('[UserProfile] Initiating OTP request for:', profile.email);
     try {
       const { data, error } = await supabase.functions.invoke('send-password-otp', {
         body: { email: profile.email },
       });
 
-      console.log('[UserProfile] OTP function response:', { data, error });
+      // console.log('[UserProfile] OTP function response:', { data, error });
 
       if (error) {
         console.error('[UserProfile] Edge Function Error:', error);
@@ -184,7 +184,7 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
         },
       });
 
-      console.log('[UserProfile] Password change response:', { data, error });
+      // console.log('[UserProfile] Password change response:', { data, error });
 
       if (error) {
         console.error('[UserProfile] Edge Function Password Error:', error);

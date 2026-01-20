@@ -7,10 +7,10 @@ interface SecurityProtectionOptions {
 }
 
 export const useSecurityProtection = (options: SecurityProtectionOptions = {}) => {
-  const { 
-    disableRightClick = true, 
+  const {
+    disableRightClick = true,
     disableDevTools = true,
-    disableTextSelection = false 
+    disableTextSelection = false
   } = options;
 
   useEffect(() => {
@@ -68,18 +68,18 @@ export const useSecurityProtection = (options: SecurityProtectionOptions = {}) =
     if (disableDevTools) {
       let devToolsOpen = false;
       const threshold = 160;
-      
+
       const checkDevTools = () => {
         const start = performance.now();
         // debugger statement takes longer when DevTools is open
         // This is a detection method, not prevention
         const duration = performance.now() - start;
-        
+
         if (duration > threshold && !devToolsOpen) {
           devToolsOpen = true;
           console.clear();
-          console.log('%c⚠️ Developer Tools Detected', 'color: red; font-size: 24px; font-weight: bold;');
-          console.log('%cThis is a protected application. Unauthorized access attempts are logged.', 'color: orange; font-size: 14px;');
+          // console.log('%c⚠️ Developer Tools Detected', 'color: red; font-size: 24px; font-weight: bold;');
+          // console.log('%cThis is a protected application. Unauthorized access attempts are logged.', 'color: orange; font-size: 14px;');
         } else if (duration <= threshold) {
           devToolsOpen = false;
         }

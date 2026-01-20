@@ -155,9 +155,9 @@ const NotificationBell = () => {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[calc(100vw-2rem)] max-w-96 p-0">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="font-semibold">Notifications</h3>
+      <DropdownMenuContent align="end" className="w-[calc(100vw-2rem)] max-w-80 p-0">
+        <div className="flex items-center justify-between p-3 border-b">
+          <h3 className="font-semibold text-sm">Notifications</h3>
           <div className="flex gap-2">
             {notifications.length > 0 && (
               <Button
@@ -165,6 +165,7 @@ const NotificationBell = () => {
                 size="sm"
                 onClick={() => deleteAllNotificationsMutation.mutate()}
                 disabled={deleteAllNotificationsMutation.isPending}
+                className="h-7 px-2 text-xs"
               >
                 Clear all
               </Button>
@@ -175,14 +176,14 @@ const NotificationBell = () => {
                 size="sm"
                 onClick={() => markAllAsReadMutation.mutate()}
                 disabled={markAllAsReadMutation.isPending}
-                className="hover:bg-secondary"
+                className="hover:bg-secondary h-7 px-2 text-xs"
               >
-                Mark all as read
+                Mark all read
               </Button>
             )}
           </div>
         </div>
-        <ScrollArea className="h-[400px]">
+        <ScrollArea className="h-[300px]">
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Bell className="h-12 w-12 mb-2 opacity-50" />

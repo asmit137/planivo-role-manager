@@ -1001,9 +1001,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                         {availableRoles.includes('general_admin') && (
                           <SelectItem value="general_admin">General Admin</SelectItem>
                         )}
-                        {availableRoles.includes('workplace_supervisor') && (
-                          <SelectItem value="workplace_supervisor">Workspace Supervisor</SelectItem>
-                        )}
+                        {/* Workplace Supervisor removed per user request */}
                         {availableRoles.includes('workspace_supervisor') && (
                           <SelectItem value="workspace_supervisor">Workspace Supervisor</SelectItem>
                         )}
@@ -1019,7 +1017,10 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                         {availableRoles.includes('intern') && (
                           <SelectItem value="intern">Intern</SelectItem>
                         )}
-                        {availableRoles.includes('custom') && customRoles?.map((cr) => (
+                        {availableRoles.includes('custom') && customRoles?.filter(cr =>
+                          // Filter out custom roles that duplicate system role names
+                          !['intern', 'staff', 'admin'].includes(cr.name.toLowerCase())
+                        ).map((cr) => (
                           <SelectItem key={cr.id} value={cr.id}>
                             {cr.name} (Custom)
                           </SelectItem>
