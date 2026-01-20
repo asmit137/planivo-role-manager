@@ -47,33 +47,35 @@ Deno.serve(async (req: Request) => {
 
         if (dbError) throw dbError;
 
-        const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-
-        // 4. Send OTP via Resend (if configured)
-        if (RESEND_API_KEY) {
-            console.log(`Attempting to send OTP email to ${email} via Resend...`);
-            const res = await fetch("https://api.resend.com/emails", {
+        const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
+        const SENDGRID_SENDER_EMAIL = Deno.env.get("SENDGRID_SENDER_EMAIL") || "no-reply@planivo.com";
+        if (SENDGRID_API_KEY) {
+            console.log(`Attempting to send OTP email to ${email} via SendGrid...`);
+            const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${RESEND_API_KEY}`,
+                    Authorization: `Bearer ${SENDGRID_API_KEY}`,
                 },
                 body: JSON.stringify({
-                    from: "Planivo <onboarding@resend.dev>", // Replace with your verified domain
-                    to: [email],
+                    personalizations: [{ to: [{ email: email }] }],
+                    from: { email: SENDGRID_SENDER_EMAIL, name: "Planivo" },
                     subject: "Your Password Change Verification Code",
-                    html: `<p>Your verification code for changing your password is: <strong>${otp}</strong></p><p>This code expires in 10 minutes.</p>`,
+                    content: [{
+                        type: "text/html",
+                        value: `<p>Your verification code for changing your password is: <strong>${otp}</strong></p><p>This code expires in 10 minutes.</p>`,
+                    }],
                 }),
             });
 
             if (!res.ok) {
                 const error = await res.text();
-                console.error("Resend API error:", error);
+                console.error("SendGrid API error:", error);
             } else {
-                console.log("OTP email sent successfully via Resend");
+                console.log("OTP email sent successfully via SendGrid");
             }
         } else {
-            console.warn("RESEND_API_KEY not set. OTP will only be logged to console.");
+            console.warn("SENDGRID_API_KEY not set. OTP will only be logged to console.");
         }
 
         // For development: log the OTP to Supabase logs

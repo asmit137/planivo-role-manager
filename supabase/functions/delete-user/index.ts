@@ -1,6 +1,4 @@
 // @ts-ignore
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-// @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 declare const Deno: any;
@@ -10,9 +8,9 @@ const corsHeaders = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
     if (req.method === "OPTIONS") {
-        return new Response(null, { headers: corsHeaders });
+        return new Response(null, { status: 200, headers: corsHeaders });
     }
 
     try {
@@ -33,15 +31,16 @@ serve(async (req: Request) => {
         const body = await req.json();
         const { userId } = body;
 
-        // 1. Validate the requesting user using the ANON client (same as create-user)
         const authHeader = req.headers.get("Authorization");
-        const token = authHeader?.replace("Bearer ", "");
+        if (!authHeader) {
+            return new Response(JSON.stringify({ error: "Missing authorization" }), { status: 401, headers: corsHeaders });
+        }
 
+        const token = authHeader.replace("Bearer ", "");
+
+        // 1. Validate the requesting user (Robust Pattern)
         const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY!, {
-            auth: {
-                persistSession: false,
-                autoRefreshToken: false,
-            },
+            auth: { persistSession: false },
         });
 
         const { data: { user: requestingUser }, error: authError } = await authClient.auth.getUser(token);
@@ -52,11 +51,6 @@ serve(async (req: Request) => {
                 JSON.stringify({
                     error: "Unauthorized_from_code",
                     details: authError?.message || "Invalid token",
-                    diagnostic: {
-                        authErrorMessage: authError?.message,
-                        headerPrefix: authHeader?.substring(0, 25) + "...",
-                        tokenLength: token?.length,
-                    }
                 }),
                 { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
@@ -64,10 +58,7 @@ serve(async (req: Request) => {
 
         // 2. Perform the deletion using the ADMIN client
         const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-            auth: {
-                autoRefreshToken: false,
-                persistSession: false,
-            },
+            auth: { autoRefreshToken: false, persistSession: false },
         });
 
         // Check if requesting user is a Super Admin or General Admin

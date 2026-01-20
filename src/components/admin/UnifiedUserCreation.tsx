@@ -468,9 +468,6 @@ const UnifiedUserCreation = ({
             custom_role_id: userData.custom_role_id,
             force_password_change: true,
           },
-          headers: {
-            Authorization: `Bearer ${session.access_token}`
-          }
         }
       );
 
