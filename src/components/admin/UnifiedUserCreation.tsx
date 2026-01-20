@@ -45,12 +45,12 @@ const UnifiedUserCreation = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('12345678');
   const [fullName, setFullName] = useState('');
-  const [organizationId, setOrganizationId] = useState(initialOrganizationId || '');
-  const [workspaceId, setWorkspaceId] = useState('');
-  const [facilityId, setFacilityId] = useState('');
-  const [departmentId, setDepartmentId] = useState('');
-  const [specialtyId, setSpecialtyId] = useState('');
-  const [customRoleId, setCustomRoleId] = useState('');
+  const [organizationId, setOrganizationId] = useState<string | undefined>(initialOrganizationId);
+  const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
+  const [facilityId, setFacilityId] = useState<string | undefined>(undefined);
+  const [departmentId, setDepartmentId] = useState<string | undefined>(undefined);
+  const [specialtyId, setSpecialtyId] = useState<string | undefined>(undefined);
+  const [customRoleId, setCustomRoleId] = useState<string | undefined>(undefined);
   const [role, setRole] = useState<'staff' | 'intern' | 'department_head' | 'facility_supervisor' | 'workplace_supervisor' | 'workspace_supervisor' | 'general_admin' | 'organization_admin' | 'custom'>('staff');
   const queryClient = useQueryClient();
 
@@ -570,34 +570,34 @@ const UnifiedUserCreation = ({
     setEmail('');
     setPassword('');
     setFullName('');
-    setOrganizationId(initialOrganizationId || '');
-    setWorkspaceId('');
-    setFacilityId('');
-    setDepartmentId('');
-    setSpecialtyId('');
-    setCustomRoleId('');
+    setOrganizationId(initialOrganizationId);
+    setWorkspaceId(undefined);
+    setFacilityId(undefined);
+    setDepartmentId(undefined);
+    setSpecialtyId(undefined);
+    setCustomRoleId(undefined);
     setRole('staff');
   };
 
   const handleOrganizationChange = (value: string) => {
     setOrganizationId(value);
-    setWorkspaceId('');
-    setFacilityId('');
-    setDepartmentId('');
-    setSpecialtyId('');
+    setWorkspaceId(undefined);
+    setFacilityId(undefined);
+    setDepartmentId(undefined);
+    setSpecialtyId(undefined);
   };
 
   const handleWorkspaceChange = (value: string) => {
     setWorkspaceId(value);
-    setFacilityId('');
-    setDepartmentId('');
-    setSpecialtyId('');
+    setFacilityId(undefined);
+    setDepartmentId(undefined);
+    setSpecialtyId(undefined);
   };
 
   const handleFacilityChange = (value: string) => {
     setFacilityId(value);
-    setDepartmentId('');
-    setSpecialtyId('');
+    setDepartmentId(undefined);
+    setSpecialtyId(undefined);
   };
 
   const handleDepartmentChange = (value: string) => {
@@ -809,11 +809,17 @@ const UnifiedUserCreation = ({
                         <SelectValue placeholder={!organizationId ? "Select organization first" : "Select workspace"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {workspaces?.map((ws) => (
-                          <SelectItem key={ws.id} value={ws.id}>
-                            {ws.name}
-                          </SelectItem>
-                        ))}
+                        {workspaces && workspaces.length > 0 ? (
+                          workspaces.map((ws) => (
+                            <SelectItem key={ws.id} value={ws.id}>
+                              {ws.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-xs text-muted-foreground text-center">
+                            No workspaces available
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -833,11 +839,17 @@ const UnifiedUserCreation = ({
                         <SelectValue placeholder={!workspaceId ? "Select workspace first" : "Select facility"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {facilities?.map((f) => (
-                          <SelectItem key={f.id} value={f.id}>
-                            {f.name}
-                          </SelectItem>
-                        ))}
+                        {facilities && facilities.length > 0 ? (
+                          facilities.map((f) => (
+                            <SelectItem key={f.id} value={f.id}>
+                              {f.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-xs text-muted-foreground text-center">
+                            No facilities available
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -857,11 +869,17 @@ const UnifiedUserCreation = ({
                         <SelectValue placeholder={!facilityId ? "Select facility first" : "Select department"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {departments?.map((d) => (
-                          <SelectItem key={d.id} value={d.id}>
-                            {d.name}
-                          </SelectItem>
-                        ))}
+                        {departments && departments.length > 0 ? (
+                          departments.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>
+                              {d.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-xs text-muted-foreground text-center">
+                            No departments available
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -880,11 +898,17 @@ const UnifiedUserCreation = ({
                         <SelectValue placeholder={!departmentId ? "Select department first" : "Select specialty"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {specialties?.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.name}
-                          </SelectItem>
-                        ))}
+                        {specialties && specialties.length > 0 ? (
+                          specialties.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-xs text-muted-foreground text-center">
+                            No specialties available
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>

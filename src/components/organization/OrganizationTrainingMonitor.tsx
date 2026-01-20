@@ -25,29 +25,47 @@ const OrganizationTrainingMonitor = ({ organizationId }: OrganizationTrainingMon
   const { data: trainingStats, isLoading: statsLoading } = useQuery({
     queryKey: ['org-training-stats', organizationId],
     queryFn: async () => {
-      const { count: upcoming } = await supabase
+      let upcomingQuery = supabase
         .from('training_events')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
+        .select('*', { count: 'exact', head: true });
+
+      if (organizationId && organizationId !== 'all') {
+        upcomingQuery = upcomingQuery.eq('organization_id', organizationId);
+      }
+
+      const { count: upcoming } = await upcomingQuery
         .eq('status', 'published')
         .gt('start_datetime', new Date().toISOString());
 
-      const { count: completed } = await supabase
+      let completedQuery = supabase
         .from('training_events')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
-        .eq('status', 'completed');
+        .select('*', { count: 'exact', head: true });
 
-      const { count: draft } = await supabase
-        .from('training_events')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
-        .eq('status', 'draft');
+      if (organizationId && organizationId !== 'all') {
+        completedQuery = completedQuery.eq('organization_id', organizationId);
+      }
 
-      const { count: total } = await supabase
+      const { count: completed } = await completedQuery.eq('status', 'completed');
+
+      let draftQuery = supabase
         .from('training_events')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', organizationId);
+        .select('*', { count: 'exact', head: true });
+
+      if (organizationId && organizationId !== 'all') {
+        draftQuery = draftQuery.eq('organization_id', organizationId);
+      }
+
+      const { count: draft } = await draftQuery.eq('status', 'draft');
+
+      let totalQuery = supabase
+        .from('training_events')
+        .select('*', { count: 'exact', head: true });
+
+      if (organizationId && organizationId !== 'all') {
+        totalQuery = totalQuery.eq('organization_id', organizationId);
+      }
+
+      const { count: total } = await totalQuery;
 
       return {
         upcoming: upcoming || 0,
@@ -63,7 +81,7 @@ const OrganizationTrainingMonitor = ({ organizationId }: OrganizationTrainingMon
   const { data: recentEvents, isLoading: eventsLoading } = useQuery({
     queryKey: ['org-recent-training', organizationId],
     queryFn: async () => {
-      const { data: events, error } = await supabase
+      let query = supabase
         .from('training_events')
         .select(`
           id,
@@ -76,8 +94,13 @@ const OrganizationTrainingMonitor = ({ organizationId }: OrganizationTrainingMon
           max_participants,
           responsible_user_id,
           created_by
-        `)
-        .eq('organization_id', organizationId)
+        `);
+
+      if (organizationId && organizationId !== 'all') {
+        query = query.eq('organization_id', organizationId);
+      }
+
+      const { data: events, error } = await query
         .order('start_datetime', { ascending: false })
         .limit(10);
 

@@ -73,7 +73,7 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
         .eq('is_active', true)
         .order('name');
 
-      if (organizationId) {
+      if (organizationId && organizationId !== 'all') {
         query = supabase.from('organizations').select('*').eq('id', organizationId);
       }
 
@@ -575,11 +575,17 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
                         <SelectValue placeholder="Select organization..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {organizations?.map((org) => (
-                          <SelectItem key={org.id} value={org.id}>
-                            {org.name}
-                          </SelectItem>
-                        ))}
+                        {organizations && organizations.length > 0 ? (
+                          organizations.map((org) => (
+                            <SelectItem key={org.id} value={org.id}>
+                              {org.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="p-2 text-xs text-muted-foreground text-center">
+                            No organizations available
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>

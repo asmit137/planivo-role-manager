@@ -632,11 +632,17 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {availableOrganizations?.map((org) => (
-                              <SelectItem key={org.id} value={org.id}>
-                                {org.name}
-                              </SelectItem>
-                            ))}
+                            {availableOrganizations && availableOrganizations.length > 0 ? (
+                              availableOrganizations.map((org) => (
+                                <SelectItem key={org.id} value={org.id}>
+                                  {org.name}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <div className="p-2 text-xs text-muted-foreground text-center">
+                                No organizations available
+                              </div>
+                            )}
                           </SelectContent>
                         </Select>
                       )}
@@ -856,17 +862,23 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {potentialCoordinators?.map((coord: any) => (
-                              <SelectItem key={coord.id} value={coord.id}>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 flex items-center gap-0.5 bg-primary/5 shrink-0">
-                                    <ShieldCheck className="h-2.5 w-2.5" />
-                                    {formatRole(coord.role, coord.custom_role_name)}
-                                  </Badge>
-                                  <span className="truncate">{coord.full_name}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
+                            {potentialCoordinators && potentialCoordinators.length > 0 ? (
+                              potentialCoordinators.map((coord: any) => (
+                                <SelectItem key={coord.id} value={coord.id}>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 flex items-center gap-0.5 bg-primary/5 shrink-0">
+                                      <ShieldCheck className="h-2.5 w-2.5" />
+                                      {formatRole(coord.role, coord.custom_role_name)}
+                                    </Badge>
+                                    <span className="truncate">{coord.full_name}</span>
+                                  </div>
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <div className="p-2 text-xs text-muted-foreground text-center">
+                                No coordinators available
+                              </div>
+                            )}
                           </SelectContent>
                         </Select>
                         <FormDescription>

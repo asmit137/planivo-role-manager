@@ -46,12 +46,12 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   const { user } = useAuth();
   const { organization: currentOrganization } = useOrganization();
   const queryClient = useQueryClient();
-  const [selectedStaff, setSelectedStaff] = useState<string>('');
+  const [selectedStaff, setSelectedStaff] = useState<string | undefined>(undefined);
   const [selectionMode, setSelectionMode] = useState<'single' | 'group'>('single');
   const [selectedRole, setSelectedRole] = useState<string>('staff');
-  const [selectedVacationType, setSelectedVacationType] = useState<string>('');
+  const [selectedVacationType, setSelectedVacationType] = useState<string | undefined>(undefined);
   const [notes, setNotes] = useState('');
-  const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState<string | undefined>(undefined);
   const [splits, setSplits] = useState<VacationSplit[]>([
     { start_date: new Date(), end_date: new Date(), days: 1 }
   ]);
@@ -91,24 +91,10 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   const { data: allDepartments } = useQuery({
     queryKey: ['all-departments', currentOrganization?.id],
     queryFn: async () => {
-      // First, get all department IDs that actually have staff members
-      const { data: rolesData } = await supabase
-        .from('user_roles')
-        .select('department_id')
-        .eq('role', 'staff');
-
-      const activeDeptIds = [...new Set((rolesData || []).map(r => r.department_id).filter(Boolean))];
-
       let query = supabase
         .from('departments')
         .select('id, name, facilities!inner(name, workspaces!inner(organizations!inner(id, is_active)))')
         .eq('facilities.workspaces.organizations.is_active', true);
-
-      if (activeDeptIds.length > 0) {
-        query = query.in('id', activeDeptIds);
-      } else {
-        return []; // No departments with staff
-      }
 
       // If specific organization is selected (and not 'all'), filter by it
       if (currentOrganization?.id && currentOrganization.id !== 'all') {
@@ -377,6 +363,9 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       // Check validation only if NOT in planning mode OR if explicitly requested (e.g. strict check passed)
       // Actually, we perform checks in handleSubmit. Here we just trust the inputs mostly, 
       // EXCEPT for concurrency checks which are still good.
+      let finalStatus = planData.status || 'pending_approval';
+      let autoRejectionReason = '';
+
       if (currentOrganization?.vacation_mode !== 'planning') {
         // Check for same-user overlapping vacation plans
         const targetStaffId = effectiveStaffOnly ? user?.id : planData.staff_id;
@@ -391,41 +380,47 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
           const eDate = new Date(overlap.end_date);
           const startStr = !isNaN(sDate.getTime()) ? format(sDate, 'PPP') : 'Unknown Start';
           const endStr = !isNaN(eDate.getTime()) ? format(eDate, 'PPP') : 'Unknown End';
-          throw new Error(
-            `You already have a vacation request from ${startStr} to ${endStr} (${overlap.vacation_type}) that overlaps with this date range.`
-          );
+          autoRejectionReason = `Conflict with existing vacation from ${startStr} to ${endStr} (${overlap.vacation_type}).`;
+          finalStatus = 'rejected';
         }
 
-        // Check for Shift Assignments
-        for (const split of planData.splits) {
-          const { data: shifts } = await supabase
-            .from('shift_assignments')
-            .select('*, shifts(name, start_time, end_time)')
-            .eq('staff_id', targetStaffId)
-            .gte('assignment_date', split.start_date)
-            .lte('assignment_date', split.end_date);
+        if (!autoRejectionReason) {
+          // Check for Shift Assignments
+          for (const split of planData.splits) {
+            const { data: shifts } = await supabase
+              .from('shift_assignments')
+              .select('*, shifts(name, start_time, end_time)')
+              .eq('staff_id', targetStaffId)
+              .gte('assignment_date', split.start_date)
+              .lte('assignment_date', split.end_date);
 
-          if (shifts && shifts.length > 0) {
-            const s = shifts[0] as any;
-            const aDate = new Date(s.assignment_date);
-            const dateStr = !isNaN(aDate.getTime()) ? format(aDate, 'PPP') : 'Unknown Date';
-            throw new Error(`Conflict with shift: ${s.shifts?.name} on ${dateStr}. Please resolve the schedule conflict first.`);
-          }
+            if (shifts && shifts.length > 0) {
+              const s = shifts[0] as any;
+              const aDate = new Date(s.assignment_date);
+              const dateStr = !isNaN(aDate.getTime()) ? format(aDate, 'PPP') : 'Unknown Date';
+              autoRejectionReason = `Conflict with shift: ${s.shifts?.name} on ${dateStr}.`;
+              finalStatus = 'rejected';
+              break;
+            }
 
-          // Check for Training/Meeting Events
-          const { data: trainingTargets } = await supabase
-            .from('training_event_targets')
-            .select('*, training_events(title, event_type, start_datetime, end_datetime)')
-            .eq('user_id', targetStaffId)
-            .eq('target_type', 'user')
-            .gte('training_events.start_datetime', `${split.start_date}T00:00:00`)
-            .lte('training_events.end_datetime', `${split.end_date}T23:59:59`);
+            // Check for Training/Meeting Events (Standard overlap logic)
+            const { data: trainingTargets } = await supabase
+              .from('training_event_targets')
+              .select('*, training_events!inner(title, event_type, start_datetime, end_datetime)')
+              .eq('user_id', targetStaffId)
+              .eq('target_type', 'user')
+              .lte('training_events.start_datetime', `${split.end_date}T23:59:59`)
+              .gte('training_events.end_datetime', `${split.start_date}T00:00:00`);
 
-          if (trainingTargets && trainingTargets.length > 0) {
-            const t = trainingTargets[0] as any;
-            const tDate = new Date(t.training_events?.start_datetime);
-            const dateStr = !isNaN(tDate.getTime()) ? format(tDate, 'PPP') : 'Unknown Date';
-            throw new Error(`Conflict with ${t.training_events?.event_type || 'training'}: ${t.training_events?.title} on ${dateStr}.`);
+            if (trainingTargets && trainingTargets.length > 0) {
+              const t = trainingTargets[0] as any;
+              console.info('Conflict detected with training event:', t);
+              const tDate = new Date(t.training_events?.start_datetime);
+              const dateStr = !isNaN(tDate.getTime()) ? format(tDate, 'PPP') : 'Unknown Date';
+              autoRejectionReason = `Conflict with ${t.training_events?.event_type || 'training'}: ${t.training_events?.title} on ${dateStr}.`;
+              finalStatus = 'rejected';
+              break;
+            }
           }
         }
       }
@@ -437,9 +432,9 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
           department_id: targetDepartmentId,
           vacation_type_id: planData.vacation_type_id,
           total_days: planData.total_days,
-          notes: planData.notes,
+          notes: autoRejectionReason ? `${planData.notes}\n\n[Auto-Rejected: ${autoRejectionReason}]` : planData.notes,
           created_by: user?.id,
-          status: planData.status || 'pending_approval', // Use passed status
+          status: finalStatus,
         })
         .select()
         .single();
@@ -453,7 +448,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
             planData.splits.map((split: any) => ({
               vacation_plan_id: plan.id,
               ...split,
-              status: planData.status === 'approved' ? 'approved' : 'pending', // Auto-approve splits too
+              status: finalStatus === 'approved' ? 'approved' : finalStatus === 'rejected' ? 'rejected' : 'pending',
             }))
           );
         if (splitsError) throw splitsError;
@@ -466,7 +461,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       queryClient.invalidateQueries({ queryKey: ['vacations'] });
 
       // Send notification if approved
-      if (variables.status === 'approved') {
+      if (data.status === 'approved') {
         await sendVacationStatusNotification(
           data.id,
           'approved',
@@ -475,8 +470,18 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
           'Auto-approved by manager'
         );
         toast.success('Vacation plan created and approved successfully');
+      } else if (data.status === 'rejected') {
+        // If auto-rejected, notify too
+        await sendVacationStatusNotification(
+          data.id,
+          'rejected',
+          variables.staff_id,
+          'System',
+          'Auto-rejected due to scheduling conflict or insufficient balance'
+        );
+        toast.error('Vacation plan rejected due to conflicts');
       } else {
-        toast.success('Vacation plan created');
+        toast.success('Vacation plan submitted for approval');
       }
 
       // Send chat message if created by manager for staff
@@ -570,10 +575,10 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   };
 
   const resetForm = () => {
-    setSelectedStaff('');
-    setSelectedVacationType('');
+    setSelectedStaff(undefined);
+    setSelectedVacationType(undefined);
     setNotes('');
-    setSelectedDepartment('');
+    setSelectedDepartment(undefined);
     setSplits([
       { start_date: new Date(), end_date: new Date(), days: 1 }
     ]);
@@ -616,24 +621,43 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     };
 
     if (selectionMode === 'single') {
-      // Manager Auto-Approval Logic
-      const isManagerPlanning = (isSuperAdmin || isSupervisor || isDepartmentHead) && selectedStaff && selectedStaff !== user?.id;
+      // Scenario Detection
+      const isSelfRequest = selectedStaff === user?.id;
+      const isManagerAction = (isSuperAdmin || isSupervisor || isDepartmentHead) && !isSelfRequest;
+      const isAdminSelfRequest = (isSupervisor || isDepartmentHead || isSuperAdmin) && isSelfRequest;
+
       let initialStatus = 'pending_approval';
 
-      if (isManagerPlanning) {
+      // Scenario 2: Manager planning for staff -> Direct Approval
+      if (isManagerAction) {
         if (currentOrganization?.vacation_mode === 'full') {
           const typeBalance = (staffBalances as any)?.find((b: any) => b.vacation_type_id === selectedVacationType);
           if (!typeBalance || totalDays > (typeBalance as any).balance) {
             const typeName = vacationTypes?.find(t => t.id === selectedVacationType)?.name || 'this vacation type';
             const balance = typeBalance ? (typeBalance as any).balance : 0;
-            toast.error(`Insufficient leave balance for ${selectedStaff}. REQUEST: ${totalDays} days, REMAINING: ${balance} days. Cannot auto-approve.`);
+            toast.error(`Auto-rejection: Insufficient leave balance for staff member. REQUEST: ${totalDays} days, REMAINING: ${balance} days.`);
+
+            // Auto-reject scenario: Create as rejected
+            createPlanMutation.mutate({
+              ...commonData,
+              staff_id: selectedStaff,
+              status: 'rejected',
+              notes: `${notes}\n\n[Auto-Rejected: Insufficient Balance]`,
+            });
             return;
           }
           initialStatus = 'approved';
-        } else if (currentOrganization?.vacation_mode === 'planning') {
+        } else {
           initialStatus = 'approved';
         }
       }
+      // Scenario 3: Admin/Supervisor self-request -> Specifically pending for Super Admin
+      else if (isAdminSelfRequest) {
+        initialStatus = 'pending_approval'; // We will filter this for Super Admin in the Workflow component
+      }
+
+      // Check for conflicts before creating (Mandatory for all scenarios)
+      // This will be handled inside createPlanMutation, but we can also do a quick check here if we want to "Directly reject"
 
       createPlanMutation.mutate({
         ...commonData,
@@ -641,7 +665,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
         status: initialStatus,
       });
     } else {
-      // Group Selection Mode
+      // Group Selection Mode (Usually manager action)
       const targetUsers = (effectiveStaffList || []).filter(s => s.role === selectedRole);
 
       if (targetUsers.length === 0) {
@@ -651,10 +675,8 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
       toast.info(`Creating vacations for ${targetUsers.length} users...`);
 
-      // We'll use a sequence of mutations for now or handle them via Promise.all if we had a bulk endpoint
-      // For simplicity and matching current flow, we iterate. 
-      // NOTE: In planning mode, this is safe. In full mode, some might fail due to balance.
       targetUsers.forEach(staff => {
+        // Auto-approve by default in planning mode, otherwise pending
         createPlanMutation.mutate({
           ...commonData,
           staff_id: staff.user_id,
@@ -688,11 +710,17 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                   <SelectValue placeholder="Select a department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allDepartments?.map((dept: any) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name} {dept.facilities?.name && `(${dept.facilities.name})`}
-                    </SelectItem>
-                  ))}
+                  {allDepartments && allDepartments.length > 0 ? (
+                    allDepartments.map((dept: any) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name} {dept.facilities?.name && `(${dept.facilities.name})`}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="p-2 text-xs text-muted-foreground text-center">
+                      No departments available
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -730,11 +758,17 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
                       <SelectValue placeholder="Select staff member" />
                     </SelectTrigger>
                     <SelectContent>
-                      {effectiveStaffList.map((staff) => (
-                        <SelectItem key={staff.user_id} value={staff.user_id}>
-                          {staff.profiles?.full_name || 'Unknown User'} ({staff.role})
-                        </SelectItem>
-                      ))}
+                      {effectiveStaffList && effectiveStaffList.length > 0 ? (
+                        effectiveStaffList.map((staff) => (
+                          <SelectItem key={staff.user_id} value={staff.user_id}>
+                            {staff.profiles?.full_name || 'Unknown User'} ({staff.role})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="p-2 text-xs text-muted-foreground text-center">
+                          No staff members available
+                        </div>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -763,14 +797,20 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
             <Label>Vacation Type</Label>
             <Select value={selectedVacationType} onValueChange={setSelectedVacationType}>
               <SelectTrigger>
-                <SelectValue placeholder="Select type" />
+                <SelectValue placeholder="Select vacation type" />
               </SelectTrigger>
               <SelectContent>
-                {vacationTypes?.map((type) => (
-                  <SelectItem key={type.id} value={type.id}>
-                    {type.name} {type.max_days && `(Max: ${type.max_days} days)`}
-                  </SelectItem>
-                ))}
+                {vacationTypes && vacationTypes.length > 0 ? (
+                  vacationTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.name} {type.max_days && `(Max: ${type.max_days} days)`}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="p-2 text-xs text-muted-foreground text-center">
+                    No vacation types available
+                  </div>
+                )}
               </SelectContent>
             </Select>
           </div>

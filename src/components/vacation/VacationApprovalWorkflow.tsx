@@ -175,33 +175,27 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         const roles = Array.isArray(p.staff_roles) ? p.staff_roles : [];
         const roleNames = roles.map((r: any) => r.role);
 
-        // If roles failed to load, log warning but show the plan (better than hiding valid requests)
-        if (roleNames.length === 0) {
-          console.warn(`Plan ${p.id} has no roles loaded. Role-based visibility check bypassed.`);
-          return true;
-        }
-
-        // Higher roles that ONLY Super Admin can approve
         const higherRoles = [
           'super_admin',
           'organization_admin',
           'general_admin',
-          'workplace_supervisor',
-          'facility_supervisor',
           'workspace_supervisor',
+          'facility_supervisor',
           'department_head'
         ];
 
-        const hasHigherRole = roleNames.some(role => higherRoles.includes(role));
         const isStaffOrIntern = roleNames.includes('staff') || roleNames.includes('intern');
+        const hasHigherRole = roleNames.some(role => higherRoles.includes(role));
 
-        // Supervisors (L1, L2, L3) should ONLY see plans for pure staff/interns
-        // If they have ANY higher role, they must be approved by Super Admin
-        if (approvalLevel >= 1 && approvalLevel <= 3) {
-          return isStaffOrIntern && !hasHigherRole;
-        }
+        // 1. Never show your own request in your approval list
+        if (p.staff_id === user?.id) return false;
 
-        return false;
+        // 2. Super Admin (Global scope) sees EVERYTHING else (including other admins)
+        if (scopeId === 'all') return true;
+
+        // 3. Supervisors (DH, FS, WS) only see STAFF requests within their scope
+        // Requests from other supervisors/admins are only visible to Super Admin (scopeId='all')
+        return isStaffOrIntern && !hasHigherRole;
       });
 
       // console.log(`Final plans for approval level ${approvalLevel}:`, finalPlans.length);
@@ -220,6 +214,17 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
       conflictingPlans = [],
       selectedSplitIds = []
     }: any) => {
+      // First, fetch current plan status to avoid race conditions and check if it's already rejected
+      const { data: currentPlanData } = await supabase
+        .from('vacation_plans')
+        .select('status, staff_id')
+        .eq('id', planId)
+        .single();
+
+      if (currentPlanData?.status === 'rejected') {
+        throw new Error('This plan has already been rejected and cannot be modified.');
+      }
+
       let effectiveAction = action;
       let rejectionReason = '';
       // Check for conflicts before approval (only for Department Head level)
@@ -281,7 +286,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         }
       }
 
-      if (action === 'approve' && approvalLevel === 1 && !hasConflict) {
+      if (action === 'approve' && !hasConflict) {
         const { data: planData } = await supabase
           .from('vacation_plans')
           .select('department_id')
@@ -324,18 +329,19 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                 });
               }
 
-              // Check for Training/Meeting Events
+              // Check for Training/Meeting Events (Standard overlap logic)
               const { data: trainingTargets } = await supabase
                 .from('training_event_targets')
-                .select('*, training_events(title, event_type, start_datetime, end_datetime)')
+                .select('*, training_events!inner(title, event_type, start_datetime, end_datetime)')
                 .eq('user_id', planWithSplits.staff_id)
                 .eq('target_type', 'user')
-                .gte('training_events.start_datetime', `${split.start_date}T00:00:00`)
-                .lte('training_events.end_datetime', `${split.end_date}T23:59:59`);
+                .lte('training_events.start_datetime', `${split.end_date}T23:59:59`)
+                .gte('training_events.end_datetime', `${split.start_date}T00:00:00`);
 
               if (trainingTargets && trainingTargets.length > 0) {
                 trainingTargets.forEach((t: any) => {
                   if (t.training_events) {
+                    console.info('Conflict detected with training event:', t);
                     schedulingConflicts.push({
                       type: t.training_events.event_type || 'training',
                       name: t.training_events.title,
@@ -427,8 +433,18 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
         await supabase.from('vacation_approvals').insert(approvalData);
       }
 
-      // Update vacation plan status
-      const newStatus = effectiveAction === 'approve' ? 'approved' : 'rejected';
+      // 10. Update vacation plan status based on approval level
+      let newStatus = 'approved';
+      if (effectiveAction === 'reject') {
+        newStatus = 'rejected';
+      } else {
+        // In parallel flow, any approval is final
+        newStatus = 'approved';
+
+        // Final safeguard: if any level rejects, the plan is rejected.
+        // If we are approving, we must not override a rejection (already checked above, but keep logic clean)
+        if (currentPlanData?.status === 'rejected') newStatus = 'rejected';
+      }
 
       const { error: updateError } = await supabase
         .from('vacation_plans')

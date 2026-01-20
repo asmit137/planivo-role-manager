@@ -45,15 +45,15 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
   facilityId: propFacilityId,
   workspaceId: propWorkspaceId
 }) => {
-  const [selectedFacilityId, setSelectedFacilityId] = useState<string>(propFacilityId || '');
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>(propWorkspaceId || '');
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string | undefined>(propFacilityId || undefined);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | undefined>(propWorkspaceId || undefined);
   const { user } = useAuth();
   const { organization } = useOrganization();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('schedules');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [filterDepartmentId, setFilterDepartmentId] = useState<string>('all');
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | undefined>(undefined);
   const [editingSchedule, setEditingSchedule] = useState<any>(null);
 
   // Use the effective facility ID (prop or selected)
@@ -360,7 +360,7 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
     setStartDate('');
     setEndDate('');
     setShiftCount(1);
-    setSelectedDepartmentId('');
+    setSelectedDepartmentId(undefined);
     setShifts([{ name: 'Morning Shift', startTime: '06:00', endTime: '14:00', requiredStaff: 1, color: '#3b82f6' }]);
     setEditingSchedule(null);
   };
@@ -451,18 +451,24 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
                   value={selectedWorkspaceId}
                   onValueChange={(value) => {
                     setSelectedWorkspaceId(value);
-                    setSelectedFacilityId(''); // Reset facility when workspace changes
+                    setSelectedFacilityId(undefined); // Reset facility when workspace changes
                   }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a workspace..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {workspaces?.map((ws: any) => (
-                      <SelectItem key={ws.id} value={ws.id}>
-                        {ws.name}
-                      </SelectItem>
-                    ))}
+                    {workspaces && workspaces.length > 0 ? (
+                      workspaces.map((ws: any) => (
+                        <SelectItem key={ws.id} value={ws.id}>
+                          {ws.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-xs text-muted-foreground text-center">
+                        No workspaces available
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               )}
@@ -480,11 +486,17 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
                   <SelectValue placeholder={!selectedWorkspaceId ? "Select workspace first" : "Select a facility..."} />
                 </SelectTrigger>
                 <SelectContent>
-                  {facilities?.map((f: any) => (
-                    <SelectItem key={f.id} value={f.id}>
-                      {f.name}
-                    </SelectItem>
-                  ))}
+                  {facilities && facilities.length > 0 ? (
+                    facilities.map((f: any) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="p-2 text-xs text-muted-foreground text-center">
+                      No facilities available
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -565,11 +577,17 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Departments</SelectItem>
-                    {departments?.map((dept) => (
-                      <SelectItem key={dept.id} value={dept.id}>
-                        {dept.name}
-                      </SelectItem>
-                    ))}
+                    {departments && departments.length > 0 ? (
+                      departments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-xs text-muted-foreground text-center">
+                        No departments found
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
 
@@ -598,11 +616,17 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
                             <SelectValue placeholder="Select department" />
                           </SelectTrigger>
                           <SelectContent>
-                            {departments?.map((dept) => (
-                              <SelectItem key={dept.id} value={dept.id}>
-                                {dept.name}
-                              </SelectItem>
-                            ))}
+                            {departments && departments.length > 0 ? (
+                              departments.map((dept) => (
+                                <SelectItem key={dept.id} value={dept.id}>
+                                  {dept.name}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <div className="p-2 text-xs text-muted-foreground text-center">
+                                No departments available
+                              </div>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
