@@ -11,6 +11,8 @@ import { Download, Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2 }
 import { downloadBulkUserTemplate, parseBulkUserExcel, BulkUserTemplate } from '@/utils/excelTemplate';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 interface BulkUploadResult {
   success: number;
@@ -28,63 +30,124 @@ const BulkUserUpload = ({ organizationId }: BulkUserUploadProps) => {
   const [uploadResult, setUploadResult] = useState<BulkUploadResult | null>(null);
   const queryClient = useQueryClient();
 
+  const [selectedOrgId, setSelectedOrgId] = useState<string>("");
+  const effectiveOrgId = organizationId || selectedOrgId;
+
   // Fetch data for dropdowns
   const { data: organizations } = useQuery({
-    queryKey: ['organizations'],
+    queryKey: ['organizations', organizationId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('organizations').select('id, name');
+      let query = supabase.from('organizations').select('id, name');
+
+      // If organizationId is provided, only fetch that org
+      // Otherwise, fetch all orgs (Super Admin universal template)
+      if (organizationId) {
+        query = query.eq('id', organizationId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
   });
 
   const { data: workspaces } = useQuery({
-    queryKey: ['workspaces', organizationId],
+    queryKey: ['workspaces', organizationId], // Depends on prop, not selection
     queryFn: async () => {
-      if (!organizationId) return [];
-      const { data, error } = await supabase
-        .from('workspaces')
-        .select('id, name')
-        .eq('organization_id', organizationId);
+      let query = supabase.from('workspaces').select('id, name, organization_id');
+
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!organizationId,
+    // Always enabled if we are super admin or have orgId
+    enabled: true,
   });
 
   const { data: facilities } = useQuery({
     queryKey: ['facilities', organizationId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('facilities')
-        .select('id, name, workspace_id, workspaces!inner(organization_id)')
-        .eq('workspaces.organization_id', organizationId);
+      let query = supabase.from('facilities').select('id, name, workspace_id, workspaces!inner(organization_id)');
+
+      if (organizationId) {
+        query = query.eq('workspaces.organization_id', organizationId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!organizationId,
+    enabled: true,
   });
 
   const { data: departments } = useQuery({
     queryKey: ['departments', organizationId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('departments')
-        .select('id, name, facility_id, facilities!inner(workspaces!inner(organization_id))')
-        .eq('facilities.workspaces.organization_id', organizationId);
+      let query = supabase.from('departments').select('id, name, facility_id, facilities!inner(workspaces!inner(organization_id))');
+
+      if (organizationId) {
+        query = query.eq('facilities.workspaces.organization_id', organizationId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    enabled: !!organizationId,
+    enabled: true,
   });
 
   const handleDownload = () => {
+    // 1. Build Lookup Maps
+    const orgMap = new Map<string, any>();
+    const wsMap = new Map<string, any>();
+    const facMap = new Map<string, any>();
+
+    // Initialize Organizations
+    organizations?.forEach(org => {
+      orgMap.set(org.id, { name: org.name, workspaces: [] });
+    });
+
+    // Process Workspaces
+    workspaces?.forEach(ws => {
+      const org = orgMap.get(ws.organization_id);
+      if (org) {
+        // Only add if parent org exists in our map (which it should)
+        const wsObj = { id: ws.id, name: ws.name, facilities: [] };
+        org.workspaces.push(wsObj);
+        wsMap.set(ws.id, wsObj);
+      } else if (!effectiveOrgId && organizations?.length === 0) {
+        // Fallback: If no orgs loaded but we have vars (edge case), ignore
+      }
+    });
+
+    // Process Facilities
+    facilities?.forEach(fac => {
+      const ws = wsMap.get(fac.workspace_id);
+      if (ws) {
+        const facObj = { id: fac.id, name: fac.name, departments: [] };
+        ws.facilities.push(facObj);
+        facMap.set(fac.id, facObj);
+      }
+    });
+
+    // Process Departments
+    departments?.forEach(dept => {
+      const fac = facMap.get(dept.facility_id);
+      if (fac) {
+        fac.departments.push({ name: dept.name });
+      }
+    });
+
+    // Convert map values to array
+    const hierarchicalData = Array.from(orgMap.values());
+
     downloadBulkUserTemplate({
-      organizations: organizations?.map(o => o.name) || [],
-      workspaces: workspaces?.map(w => w.name) || [],
-      facilities: facilities?.map(f => f.name) || [],
-      departments: departments?.map(d => d.name) || [],
-      roles: ['staff', 'department_head', 'facility_supervisor', 'workplace_supervisor', 'general_admin', 'organization_admin']
+      organizations: hierarchicalData,
+      roles: ['staff', 'department_head', 'facility_supervisor', 'workplace_supervisor', 'general_admin', 'organization_admin', 'workspace_supervisor', 'intern']
     });
   };
 
@@ -121,18 +184,21 @@ const BulkUserUpload = ({ organizationId }: BulkUserUploadProps) => {
 
   const uploadMutation = useMutation({
     mutationFn: async (users: BulkUserTemplate[]) => {
-      if (!organizationId) {
-        throw new Error('No organization context found. Please select an organization first.');
+      // If no global org context, check that all rows have organization_name specified
+      if (!effectiveOrgId) {
+        const missingOrg = users.some(u => !u.organization_name);
+        if (missingOrg) {
+          throw new Error('No organization context found. Please select an organization or ensure all rows in the Excel file have an Organization Name specified.');
+        }
       }
 
       console.log("INVOKING bulk-upload-users - Row count:", users.length);
       const { data: { session } } = await supabase.auth.getSession();
-      // console.log("Supabase Session active:", !!session);
 
       const { data, error } = await supabase.functions.invoke('bulk-upload-users', {
         body: {
           users,
-          organizationId
+          organizationId: effectiveOrgId || null  // Can be null if each row specifies its own org
         },
         headers: {
           Authorization: `Bearer ${session?.access_token}`
@@ -235,6 +301,24 @@ const BulkUserUpload = ({ organizationId }: BulkUserUploadProps) => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {!organizationId && (
+            <div className="space-y-2">
+              <Label>Target Organization</Label>
+              <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Organization" />
+                </SelectTrigger>
+                <SelectContent>
+                  {organizations?.map((org) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <Alert>
             <Download className="h-4 w-4" />
             <AlertDescription>

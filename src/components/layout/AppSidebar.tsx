@@ -338,6 +338,8 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
       if (customRole) return customRole.name;
     }
 
+    if (primaryRole === 'workplace_supervisor') return 'Workspace Supervisor';
+
     return primaryRole.split('_').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
@@ -346,8 +348,10 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
   // Filter modules based on permissions
   const visibleModules = moduleConfig
     .map(module => {
-      // For Super Admin: transform Organization to a flat link (removes sub-items)
-      if (module.key === 'organization' && isSuperAdmin) {
+      // For Super Admin and Supervisors: transform Organization to a flat link (removes sub-items)
+      const isSupervisor = ['workplace_supervisor', 'workspace_supervisor', 'facility_supervisor'].includes(primaryRole || '');
+
+      if (module.key === 'organization' && (isSuperAdmin || isSupervisor)) {
         return {
           key: 'organization',
           label: 'Organization',

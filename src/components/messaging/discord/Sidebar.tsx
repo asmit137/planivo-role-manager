@@ -200,6 +200,12 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
 
     return (
         <div className="flex flex-col h-full bg-muted/10 text-muted-foreground border-r">
+            <div className="h-14 flex items-center px-4 border-b border-border/40 flex-shrink-0">
+                <h1 className="text-lg font-bold text-foreground tracking-tight flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                    Messaging
+                </h1>
+            </div>
 
             <ScrollArea className="flex-1 px-3">
                 <div className="space-y-6 py-4">

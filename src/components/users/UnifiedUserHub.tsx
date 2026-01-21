@@ -523,33 +523,36 @@ const UnifiedUserHub = ({
   }
 
   // Add Actions column
-  columns.push({
-    key: 'actions',
-    header: 'Actions',
-    cell: (row) => (
-      <div className="flex items-center gap-1 justify-end">
-        {hasEditPermission && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleEdit(row)}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-        )}
-        {(hasDeletePermission && detectedScope === 'department') || isSuperAdmin ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleDeleteClick(row.id)}
-            disabled={deleteUserMutation.isPending && deleteUserId === row.id}
-          >
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        ) : null}
-      </div>
-    ),
-  });
+  // Hide Actions column for Workspace and Facility Supervisors as requested
+  if (isSuperAdmin || (detectedScope !== 'workspace' && detectedScope !== 'facility')) {
+    columns.push({
+      key: 'actions',
+      header: 'Actions',
+      cell: (row) => (
+        <div className="flex items-center gap-1 justify-end">
+          {hasEditPermission && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleEdit(row)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
+          {(hasDeletePermission && detectedScope === 'department') || isSuperAdmin ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleDeleteClick(row.id)}
+              disabled={deleteUserMutation.isPending && deleteUserId === row.id}
+            >
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          ) : null}
+        </div>
+      ),
+    });
+  }
 
   const scopeTitle = detectedScope === 'department' ? 'Staff Management' : 'User Management';
   const scopeDescription = detectedScope === 'department'

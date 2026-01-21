@@ -170,22 +170,22 @@ export function sanitizeSearchQuery(query: string): string {
 // Validation Helper
 // ============================================
 
-export function validateInput<T>(schema: z.ZodSchema<T>, data: unknown): { 
-  success: true; 
-  data: T; 
-} | { 
-  success: false; 
-  errors: string[]; 
+export function validateInput<T>(schema: z.ZodSchema<T>, data: unknown): {
+  success: true;
+  data: T;
+} | {
+  success: false;
+  errors: string[];
 } {
   const result = schema.safeParse(data);
-  
+
   if (result.success) {
     return { success: true, data: result.data };
   }
-  
-  const errors = result.error.errors.map((err) => 
+
+  const errors = result.error.errors.map((err) =>
     `${err.path.join('.')}: ${err.message}`
   );
-  
+
   return { success: false, errors };
 }

@@ -71,7 +71,9 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
         .select('id, name')
         .order('name');
 
-      if (organization?.id && organization.id !== 'all') {
+      if (propWorkspaceId) {
+        query = query.eq('id', propWorkspaceId);
+      } else if (organization?.id && organization.id !== 'all') {
         query = query.eq('organization_id', organization.id);
       }
 
@@ -79,7 +81,7 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
       if (error) throw error;
       return data || [];
     },
-    enabled: !propWorkspaceId && !propFacilityId, // Only fetch if we are in selection mode
+    enabled: !propFacilityId, // Fetch if we need to select facility (even if workspace is fixed)
   });
 
   // Fetch facilities for the selected workspace
@@ -454,6 +456,7 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
                     setSelectedWorkspaceId(value);
                     setSelectedFacilityId(undefined); // Reset facility when workspace changes
                   }}
+                  disabled={!!propWorkspaceId}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a workspace..." />

@@ -301,7 +301,7 @@ export const ChatArea = ({ channelId, onMobileMenuToggle, sidebarOpen }: ChatAre
 
     if (!channelId) {
         return (
-            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground bg-background/50 relative">
+            <div className="h-full flex flex-col items-center justify-center text-muted-foreground bg-background/50 relative">
                 <div className="absolute top-4 left-4 md:hidden z-20">
                     <Button variant="ghost" size="icon" onClick={onMobileMenuToggle} className="hover:bg-muted">
                         {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}

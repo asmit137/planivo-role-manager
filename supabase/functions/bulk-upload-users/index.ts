@@ -51,7 +51,7 @@ const bulkUserSchema = z.object({
 
 const bulkUploadSchema = z.object({
   users: z.array(bulkUserSchema).min(1, 'At least one user required').max(100, 'Maximum 100 users per upload'),
-  organizationId: z.string().uuid('Invalid organization ID'),
+  organizationId: z.string().uuid('Invalid organization ID').optional().nullable(),
 });
 
 interface BulkUploadResult {
@@ -184,11 +184,16 @@ Deno.serve(async (req: Request) => {
           if (orgCache.has(orgName)) {
             rowOrganizationId = orgCache.get(orgName)!;
           } else {
-            const { data: org } = await supabaseAdmin.from('organizations').select('id').eq('name', orgName).maybeSingle();
+            const { data: org } = await supabaseAdmin.from('organizations').select('id').ilike('name', orgName).maybeSingle();
             if (!org) throw new Error(`Organization "${orgName}" not found`);
             orgCache.set(orgName, org.id);
             rowOrganizationId = org.id;
           }
+        }
+
+        // Validate that we have an organization context
+        if (!rowOrganizationId) {
+          throw new Error(`Organization context missing. Please specify organization_name in the row or select a global organization.`);
         }
 
         // Workspace resolution
@@ -197,8 +202,8 @@ Deno.serve(async (req: Request) => {
           if (workspaceCache.has(wsKey)) {
             workspaceId = workspaceCache.get(wsKey)!;
           } else {
-            const { data: ws } = await supabaseAdmin.from('workspaces').select('id').eq('name', user.workspace_name.trim()).eq('organization_id', rowOrganizationId).maybeSingle();
-            if (!ws) throw new Error(`Workspace "${user.workspace_name}" not found`);
+            const { data: ws } = await supabaseAdmin.from('workspaces').select('id').ilike('name', user.workspace_name.trim()).eq('organization_id', rowOrganizationId).maybeSingle();
+            if (!ws) throw new Error(`Workspace "${user.workspace_name}" not found in the specified organization`);
             workspaceCache.set(wsKey, ws.id);
             workspaceId = ws.id;
           }
@@ -212,10 +217,10 @@ Deno.serve(async (req: Request) => {
           if (facilityCache.has(facKey)) {
             facilityId = facilityCache.get(facKey)!;
           } else {
-            let q = supabaseAdmin.from('facilities').select('id, workspace_id, workspaces!inner(organization_id)').eq('name', facName).eq('workspaces.organization_id', rowOrganizationId);
+            let q = supabaseAdmin.from('facilities').select('id, workspace_id, workspaces!inner(organization_id)').ilike('name', facName).eq('workspaces.organization_id', rowOrganizationId);
             if (workspaceId) q = q.eq('workspace_id', workspaceId);
             const { data: fac } = await q.maybeSingle();
-            if (!fac) throw new Error(`Facility "${facName}" not found`);
+            if (!fac) throw new Error(`Facility "${facName}" not found in the specified organization/workspace`);
             facilityCache.set(facKey, fac.id);
             facilityId = fac.id;
             if (!workspaceId) workspaceId = fac.workspace_id;
@@ -229,8 +234,8 @@ Deno.serve(async (req: Request) => {
             if (departmentCache.has(deptKey)) {
               departmentId = departmentCache.get(deptKey)!;
             } else {
-              const { data: dept } = await supabaseAdmin.from('departments').select('id').eq('name', deptName).eq('facility_id', facilityId).maybeSingle();
-              if (!dept) throw new Error(`Department "${deptName}" not found`);
+              const { data: dept } = await supabaseAdmin.from('departments').select('id').ilike('name', deptName).eq('facility_id', facilityId).maybeSingle();
+              if (!dept) throw new Error(`Department "${deptName}" not found in facility "${facName}"`);
               departmentCache.set(deptKey, dept.id);
               departmentId = dept.id;
             }
@@ -242,7 +247,7 @@ Deno.serve(async (req: Request) => {
               if (specialtyCache.has(specKey)) {
                 specialtyId = specialtyCache.get(specKey)!;
               } else {
-                const { data: spec } = await supabaseAdmin.from('departments').select('id').eq('name', specName).eq('parent_department_id', departmentId).maybeSingle();
+                const { data: spec } = await supabaseAdmin.from('departments').select('id').ilike('name', specName).eq('parent_department_id', departmentId).maybeSingle();
                 if (spec) {
                   specialtyCache.set(specKey, spec.id);
                   specialtyId = spec.id;
