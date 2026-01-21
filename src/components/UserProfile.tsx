@@ -154,7 +154,9 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
 
       setIsOtpSent(true);
       setOtpCooldown(60);
-      toast.success('Verification code sent to your email');
+      toast.success('Verification code sent!', {
+        description: "Please check your email. Be sure to check your spam folder too."
+      });
     } catch (error: any) {
       console.error('[UserProfile] Error in handleSendOTP:', error);
       toast.error(error.message || 'Failed to send verification code');

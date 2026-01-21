@@ -219,9 +219,13 @@ const BulkUserUpload = ({ organizationId }: BulkUserUploadProps) => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
 
       if (result.failed === 0) {
-        toast.success(`Successfully created ${result.success} users!`);
+        toast.success(`Successfully created ${result.success} users!`, {
+          description: "Please remind them to check their spam folder for the welcome emails."
+        });
       } else {
-        toast.warning(`Created ${result.success} users, ${result.failed} failed`);
+        toast.warning(`Created ${result.success} users, ${result.failed} failed`, {
+          description: "Note: Successful users should check their spam folder for emails."
+        });
       }
 
       // Clear file input

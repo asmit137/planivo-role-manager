@@ -91,7 +91,9 @@ const Auth = () => {
       }
 
       if (data.user) {
-        toast.success('Registration successful! Please check your email for verification.');
+        toast.success('Registration successful!', {
+          description: "Please check your email for verification. Don't forget to check your spam folder too."
+        });
         setMode('login');
       }
     } catch (error) {
@@ -144,7 +146,9 @@ const Auth = () => {
       }
 
       setResetSent(true);
-      toast.success('Password reset link sent to your email!');
+      toast.success('Password reset link sent!', {
+        description: "Please check your email. Be sure to check your spam folder if you don't see it."
+      });
     } catch (error) {
       toast.error('An error occurred. Please try again.');
     } finally {
