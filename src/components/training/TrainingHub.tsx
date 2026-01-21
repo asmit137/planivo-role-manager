@@ -52,9 +52,9 @@ const TrainingHub = ({ departmentId }: TrainingHubProps) => {
         />
       }
     >
-      <div className="space-y-6">
+      <div className="space-y-6 px-1 sm:px-0 overflow-hidden">
         <Tabs defaultValue="calendar" className="space-y-4">
-          <ResponsiveTabsList>
+          <ResponsiveTabsList wrap={true}>
             <TabsTrigger value="calendar" className="min-h-[44px] px-3 text-sm">
               <CalendarDays className="h-4 w-4 mr-1.5 sm:mr-2" />
               <span className="hidden sm:inline">Calendar</span>

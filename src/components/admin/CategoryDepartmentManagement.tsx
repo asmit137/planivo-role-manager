@@ -409,7 +409,7 @@ const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryD
 
   return (
     <Card className="border-none shadow-none sm:border-2 sm:shadow-sm">
-      <CardHeader className="px-3 sm:px-6 pt-0 sm:pt-6">
+      <CardHeader className="px-3 sm:px-6 pt-2 sm:pt-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl font-bold tracking-tight">
@@ -426,7 +426,7 @@ const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryD
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="px-3 sm:px-6 py-0 sm:py-6">
+      <CardContent className="px-3 sm:px-6 py-2 sm:py-6">
         {categoriesLoading ? (
           <div className="text-center py-8 text-muted-foreground">
             Loading...
@@ -444,7 +444,7 @@ const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryD
 
               return (
                 <Card key={category.id} className="border-2 sm:border bg-card/50">
-                  <div className="p-3 sm:p-4">
+                  <div className="px-3 py-6 sm:px-4 sm:py-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         <Button
@@ -526,7 +526,7 @@ const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryD
                           const subs = getSubdepartments(dept.id);
 
                           return (
-                            <div key={dept.id} className="border-2 rounded-lg p-3 sm:p-4 bg-background shadow-sm hover:border-primary/20 transition-all">
+                            <div key={dept.id} className="border-2 rounded-lg px-3 py-6 sm:px-4 sm:py-6 bg-background shadow-sm hover:border-primary/20 transition-all">
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div className="flex-1 min-w-0">
                                   <div className="font-semibold text-sm sm:text-base text-foreground truncate">{dept.name}</div>
