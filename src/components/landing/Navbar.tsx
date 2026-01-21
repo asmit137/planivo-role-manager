@@ -29,10 +29,10 @@ export function Navbar() {
         <div className="hidden md:flex items-center gap-3">
           <ThemeToggle />
           <Button asChild variant="ghost">
-            <Link to="/auth">Sign In</Link>
+            <Link to="/auth?mode=login">Sign In</Link>
           </Button>
           <Button asChild>
-            <Link to="/auth">Get Started</Link>
+            <Link to="/auth?mode=signup">Get Started</Link>
           </Button>
         </div>
 
@@ -57,10 +57,10 @@ export function Navbar() {
               </SheetHeader>
               <div className="mt-8 flex flex-col gap-4">
                 <Button asChild variant="ghost" className="w-full justify-start" onClick={() => setIsOpen(false)}>
-                  <Link to="/auth">Sign In</Link>
+                  <Link to="/auth?mode=login">Sign In</Link>
                 </Button>
                 <Button asChild className="w-full justify-start" onClick={() => setIsOpen(false)}>
-                  <Link to="/auth">Get Started</Link>
+                  <Link to="/auth?mode=signup">Get Started</Link>
                 </Button>
               </div>
             </SheetContent>

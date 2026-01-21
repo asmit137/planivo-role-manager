@@ -301,24 +301,26 @@ const GroupManagement = () => {
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <UsersRound className="h-5 w-5" />
+      <CardHeader className="pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
+              <UsersRound className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
               User Groups
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm sm:text-base">
               Create reusable groups for quick user selection
             </CardDescription>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-            <Button onClick={() => setShowCreateDialog(true)} disabled={isSuperAdmin && !organizationId}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Group
-            </Button>
-          </div>
+          <Button
+            onClick={() => setShowCreateDialog(true)}
+            disabled={isSuperAdmin && !organizationId}
+            className="w-full sm:w-auto h-11 sm:h-10"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Group
+          </Button>
         </div>
       </CardHeader>
       <CardContent>
@@ -329,43 +331,48 @@ const GroupManagement = () => {
             description="Create groups to quickly select multiple users for events"
           />
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {groups.map(group => (
               <Card key={group.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium truncate">{group.name}</h4>
-                      {group.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                          {group.description}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="secondary">
-                          <Users className="h-3 w-3 mr-1" />
-                          {group.member_count} member{group.member_count !== 1 ? 's' : ''}
-                        </Badge>
-                        <Badge variant="outline" className="capitalize">
-                          {group.scope_type}
-                        </Badge>
+                <CardContent className="p-4 sm:p-5">
+                  <div className="flex flex-col h-full space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-base sm:text-lg truncate">{group.name}</h4>
+                        {group.description && (
+                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                            {group.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={() => handleEdit(group)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDelete(group)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex gap-1 ml-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(group)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(group)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-2">
+                      <Badge variant="secondary" className="whitespace-nowrap px-2.5 py-1">
+                        <Users className="h-3.5 w-3.5 mr-1.5" />
+                        {group.member_count} member{group.member_count !== 1 ? 's' : ''}
+                      </Badge>
+                      <Badge variant="outline" className="capitalize whitespace-nowrap px-2.5 py-1">
+                        {group.scope_type}
+                      </Badge>
                     </div>
                   </div>
                 </CardContent>

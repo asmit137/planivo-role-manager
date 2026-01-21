@@ -54,14 +54,14 @@ export function HeroSection() {
           {/* CTAs */}
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Button asChild size="lg" className="min-w-[180px] gap-2">
-              <Link to="/auth">
+              <Link to="/auth?mode=signup">
                 Get Started Free
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
-            <Button 
-              variant="outline" 
-              size="lg" 
+            <Button
+              variant="outline"
+              size="lg"
               className="min-w-[180px]"
               onClick={() => scrollToSection('pricing')}
             >

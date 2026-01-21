@@ -128,7 +128,7 @@ const StaffManagementPage = () => {
             </CardHeader>
             <CardContent className="p-0 sm:p-6">
                 {/* Mobile Card List */}
-                <div className="block sm:hidden divide-y divide-border/60">
+                <div className="block sm:hidden divide-y divide-border/60 max-h-[500px] overflow-y-auto custom-scrollbar">
                     {filteredStaff?.map((member) => (
                         <div key={member.id} className="p-4 space-y-3 bg-card/50">
                             <div className="flex justify-between items-start gap-2">
@@ -168,6 +168,8 @@ const StaffManagementPage = () => {
                         columns={columns}
                         isLoading={staffLoading}
                         error={staffError as Error}
+                        maxHeight={500}
+                        enableStickyHeader={true}
                         emptyState={{
                             title: 'No staff members found',
                             description: 'There are no staff members in the system yet.',

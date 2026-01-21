@@ -647,8 +647,8 @@ const OrganizationManagement = () => {
                         <div className="min-w-0 flex-1 overflow-hidden flex flex-col gap-1">
                           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 max-w-full min-w-0">
                             <h3 className="font-semibold text-sm sm:text-lg line-clamp-1 break-all flex-1 min-w-0">{org.name}</h3>
-                            <Badge variant="secondary" className="text-[9px] sm:text-xs h-4 sm:h-auto whitespace-nowrap px-1 sm:px-2">
-                              {orgWorkspaces.length} Ws
+                            <Badge variant="secondary" className="text-[10px] sm:text-xs h-5 sm:h-auto whitespace-nowrap px-1.5 sm:px-2.5 py-0.5">
+                              {orgWorkspaces.length} <span className="hidden sm:inline">Workspaces</span><span className="sm:hidden">Ws</span>
                             </Badge>
                           </div>
                           {org.description && (
@@ -660,18 +660,21 @@ const OrganizationManagement = () => {
                               <span className="truncate break-all">Owner: {owner.full_name} ({owner.email})</span>
                             </p>
                           )}
-                          <div className="flex flex-wrap gap-1 sm:gap-1.5 mt-2 max-w-full overflow-hidden">
-                            <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 h-4 sm:h-5 flex items-center gap-0.5 sm:gap-1 shrink-0">
-                              WS: {formatLimit(org.max_workspaces)}
+                          <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-2.5 max-w-full overflow-hidden">
+                            <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 sm:px-2 h-5 sm:h-6 flex items-center gap-1 shrink-0">
+                              <span className="hidden sm:inline">Workspaces:</span>
+                              <span className="sm:hidden">WS:</span> {formatLimit(org.max_workspaces)}
                             </Badge>
-                            <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 h-4 sm:h-5 flex items-center gap-0.5 sm:gap-1 shrink-0">
-                              Fac: {formatLimit(org.max_facilities)}
+                            <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 sm:px-2 h-5 sm:h-6 flex items-center gap-1 shrink-0">
+                              <span className="hidden sm:inline">Facilities:</span>
+                              <span className="sm:hidden">Fac:</span> {formatLimit(org.max_facilities)}
                             </Badge>
-                            <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 h-4 sm:h-5 flex items-center gap-0.5 sm:gap-1 shrink-0">
-                              Users: {formatLimit(org.max_users)}
+                            <Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 sm:px-2 h-5 sm:h-6 flex items-center gap-1 shrink-0">
+                              <span className="hidden sm:inline">Users:</span>
+                              <span className="sm:hidden">Users:</span> {formatLimit(org.max_users)}
                             </Badge>
-                            <Badge variant={org.vacation_mode === 'planning' ? 'secondary' : 'default'} className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 h-4 sm:h-5 shrink-0">
-                              {org.vacation_mode === 'planning' ? 'Plan' : 'Full'}
+                            <Badge variant={org.vacation_mode === 'planning' ? 'secondary' : 'default'} className="text-[10px] sm:text-xs px-1.5 sm:px-2 h-5 sm:h-6 shrink-0">
+                              <span className="hidden sm:inline">Mode:</span> {org.vacation_mode === 'planning' ? 'Planning' : 'Full Mode'}
                             </Badge>
                           </div>
                         </div>

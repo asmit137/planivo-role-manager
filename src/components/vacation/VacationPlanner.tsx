@@ -79,13 +79,20 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     }
   }, [effectiveStaffOnly, user?.id, selectedStaff]);
 
+  // Reset selections when organization changes
+  useEffect(() => {
+    setSelectedDepartment(undefined);
+    setSelectedStaff(undefined);
+    setSelectedVacationType(undefined);
+  }, [currentOrganization?.id]);
+
   // Fetch all departments for Super Admin
   const { data: allDepartments } = useQuery({
     queryKey: ['all-departments', currentOrganization?.id],
     queryFn: async () => {
       let query = supabase
         .from('departments')
-        .select('id, name, facilities!inner(name, workspaces!inner(organizations!inner(id, is_active)))')
+        .select('id, name, facility_id, facilities!inner(id, name, workspace_id, workspaces!inner(id, organizations!inner(id, is_active)))')
         .eq('facilities.workspaces.organizations.is_active', true);
 
       // If specific organization is selected (and not 'all'), filter by it
@@ -134,7 +141,6 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     queryFn: async () => {
       if (!effectiveDepartmentId) return [];
 
-      // First get user_roles for the department
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id, role')
@@ -144,7 +150,6 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       if (rolesError) throw rolesError;
       if (!roles || roles.length === 0) return [];
 
-      // Get profile data for these users
       const userIds = roles.map(r => r.user_id);
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
@@ -153,10 +158,8 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
       if (profilesError) throw profilesError;
 
-      // Ensure profiles is always an array
       const profilesArray = profiles || [];
 
-      // Combine the data with safe fallback
       return roles
         .map(role => {
           const profile = profilesArray.find(p => p.id === role.user_id);
@@ -166,9 +169,8 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
             profiles: profile || { id: role.user_id, full_name: 'Unknown User', email: 'No email' }
           };
         })
-        .filter(item => item.profiles !== null) // Extra safety filter
+        .filter(item => item.profiles !== null)
         .sort((a, b) => {
-          // Department heads first
           if (a.role === 'department_head' && b.role !== 'department_head') return -1;
           if (b.role === 'department_head' && a.role !== 'department_head') return 1;
           return 0;
@@ -177,18 +179,8 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     enabled: Boolean((effectiveDepartmentId && (isDepartmentHead || isSuperAdmin || isSupervisor || !effectiveStaffOnly)) || isSupervisor),
   });
 
-  // Effect: If I am a Supervisor/Admin planning for myself, and I am not in the list, inject myself or handle it.
-  // Actually, simpler: If I am a supervisor, I probably want to select MYSELF by default if I picked a department.
-  // But wait, if I pick a department, do I become a "staff" of that department?
-  // User Requirement: "supervisors can plan there vacation".
-  // Solution: If the user is a Supervisor, just allow them to be the "selectedStaff" even if not in the list, 
-  // OR fetch their profile specifically.
-
   if (!user) return null;
 
-  // Note: 'organization' and 'staffView' are not defined in the current scope.
-  // Assuming 'currentOrganization' is intended for 'organization' and 'staffOnly' for 'staffView'.
-  // If these are meant to be different, they need to be passed as props or defined.
   if (isSuperAdmin && !currentOrganization?.id && !staffOnly) {
     return (
       <Card className="p-8 text-center text-muted-foreground border-2 border-dashed">
@@ -215,16 +207,45 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     enabled: !!user?.id
   });
 
-  // Merge current user into departmentStaff if missing (for Supervisors planning for themselves)
-  const effectiveStaffList = [...(departmentStaff || [])];
-  if (isSupervisor && userProfile && !effectiveStaffList.find(s => s.user_id === user?.id)) {
-    const primaryRole = userRoles?.find(r => r.user_id === user?.id)?.role || 'supervisor';
-    effectiveStaffList.push({
-      user_id: user!.id,
-      role: primaryRole,
-      profiles: userProfile
+  const uniqueDepartments = useMemo(() => {
+    if (!allDepartments) return [];
+    const seen = new Set();
+    return allDepartments.filter(dept => {
+      if (seen.has(dept.id)) return false;
+      seen.add(dept.id);
+      return true;
     });
-  }
+  }, [allDepartments]);
+
+  const effectiveStaffList = useMemo(() => {
+    const list = [...(departmentStaff || [])];
+    if (isSupervisor && userProfile && !list.find(s => s.user_id === user?.id)) {
+      const primaryRole = userRoles?.find(r => r.user_id === user?.id)?.role || 'supervisor';
+      list.push({
+        user_id: user!.id,
+        role: primaryRole,
+        profiles: userProfile
+      });
+    }
+
+    // Final uniqueness check for staff
+    const seen = new Set();
+    return list.filter(staff => {
+      if (seen.has(staff.user_id)) return false;
+      seen.add(staff.user_id);
+      return true;
+    });
+  }, [departmentStaff, isSupervisor, userProfile, user?.id, userRoles]);
+
+  const uniqueVacationTypes = useMemo(() => {
+    if (!vacationTypes) return [];
+    const seen = new Set();
+    return vacationTypes.filter(type => {
+      if (seen.has(type.id)) return false;
+      seen.add(type.id);
+      return true;
+    });
+  }, [vacationTypes]);
 
   const targetStaffIdForBalance = effectiveStaffOnly ? user?.id : (selectedStaff || user?.id);
 
@@ -233,7 +254,6 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     queryFn: async () => {
       if (!targetStaffIdForBalance) return [];
 
-      // 1. Get the target user's role and organization
       const { data: userRoleData, error: roleError } = await (supabase
         .from('user_roles' as any)
         .select('role, organization_id')
@@ -242,7 +262,6 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
       if (roleError) throw roleError;
 
-      // 2. Get existing individual balances
       const { data: balances, error: balancesError } = await (supabase
         .from('leave_balances' as any) as any)
         .select('*')
@@ -251,7 +270,6 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
       if (balancesError) throw balancesError;
 
-      // 3. If we have a role/org, fetch the defaults
       let defaults: any[] = [];
       if (userRoleData?.role && userRoleData?.organization_id) {
         const { data: defaultsData, error: defaultsError } = await (supabase
@@ -264,11 +282,6 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
         if (!defaultsError) defaults = defaultsData || [];
       }
 
-      // 4. Merge: For each vacation type, use individual balance if exists, otherwise use default
-      // We need to fetch vacation types too or use the already fetched ones if possible
-      // But queryFn should be self-contained or use closures. 
-      // Since vacationTypes is available in the component, we can use it, but vacationTypes might be null initially.
-
       const { data: vTypes } = await supabase
         .from('vacation_types')
         .select('id, name')
@@ -280,20 +293,18 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
         if (individual) return individual;
 
-        // Return a mock balance object based on default
         return {
           vacation_type_id: type.id,
           accrued: roleDefault?.default_days || 0,
           balance: roleDefault?.default_days || 0,
           used: 0,
-          is_default: true // Marker for UI if needed
+          is_default: true
         };
       });
     },
     enabled: !!targetStaffIdForBalance,
   });
 
-  // Fetch team vacations for busy date indicators
   const { data: teamVacations } = useQuery({
     queryKey: ['team-vacations', effectiveDepartmentId],
     queryFn: async () => {
@@ -315,7 +326,6 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     enabled: !!effectiveDepartmentId,
   });
 
-  // Calculate busy dates from team vacations
   const busyDatesMap = useMemo(() => {
     const map = new Map<string, { names: string[], count: number }>();
     if (!teamVacations) return map;
@@ -351,25 +361,21 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     return busyDatesMap.get(key);
   };
 
-
   const createPlanMutation = useMutation({
     mutationFn: async (planData: any) => {
-      // Use the effective department ID
-      const targetDepartmentId = effectiveDepartmentId;
+      const targetDepartmentId = planData.department_id;
 
       if (!targetDepartmentId) {
         throw new Error('No department ID available');
       }
 
-      // Check validation only if NOT in planning mode OR if explicitly requested (e.g. strict check passed)
-      // Actually, we perform checks in handleSubmit. Here we just trust the inputs mostly, 
-      // EXCEPT for concurrency checks which are still good.
       let finalStatus = planData.status || 'pending_approval';
       let autoRejectionReason = '';
 
+      const targetStaffId = planData.staff_id;
+
       if (currentOrganization?.vacation_mode !== 'planning') {
-        // Check for same-user overlapping vacation plans
-        const targetStaffId = effectiveStaffOnly ? user?.id : planData.staff_id;
+
         const { data: userOverlaps } = await supabase.rpc('check_user_vacation_overlap', {
           _staff_id: targetStaffId,
           _splits: planData.splits
@@ -386,36 +392,35 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
         }
 
         if (!autoRejectionReason) {
-          // Check for Shift Assignments
           for (const split of planData.splits) {
             const { data: shifts } = await supabase
               .from('shift_assignments')
-              .select('*, shifts(name, start_time, end_time)')
+              .select('assignment_date, shifts(name)')
               .eq('staff_id', targetStaffId)
               .gte('assignment_date', split.start_date)
-              .lte('assignment_date', split.end_date);
+              .lte('assignment_date', split.end_date)
+              .limit(1);
 
             if (shifts && shifts.length > 0) {
               const s = shifts[0] as any;
               const aDate = new Date(s.assignment_date);
               const dateStr = !isNaN(aDate.getTime()) ? format(aDate, 'PPP') : 'Unknown Date';
-              autoRejectionReason = `Conflict with shift: ${s.shifts?.name} on ${dateStr}.`;
+              autoRejectionReason = `Conflict with shift: ${s.shifts?.name || 'Assigned shift'} on ${dateStr}.`;
               finalStatus = 'rejected';
               break;
             }
 
-            // Check for Training/Meeting Events (Standard overlap logic)
             const { data: trainingTargets } = await supabase
               .from('training_event_targets')
-              .select('*, training_events!inner(title, event_type, start_datetime, end_datetime)')
+              .select('training_events!inner(title, event_type, start_datetime, end_datetime)')
               .eq('user_id', targetStaffId)
               .eq('target_type', 'user')
               .lte('training_events.start_datetime', `${split.end_date}T23:59:59`)
-              .gte('training_events.end_datetime', `${split.start_date}T00:00:00`);
+              .gte('training_events.end_datetime', `${split.start_date}T00:00:00`)
+              .limit(1);
 
             if (trainingTargets && trainingTargets.length > 0) {
               const t = trainingTargets[0] as any;
-              console.info('Conflict detected with training event:', t);
               const tDate = new Date(t.training_events?.start_datetime);
               const dateStr = !isNaN(tDate.getTime()) ? format(tDate, 'PPP') : 'Unknown Date';
               autoRejectionReason = `Conflict with ${t.training_events?.event_type || 'training'}: ${t.training_events?.title} on ${dateStr}.`;
@@ -429,8 +434,10 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       const { data: plan, error: planError } = await supabase
         .from('vacation_plans')
         .insert({
-          staff_id: effectiveStaffOnly ? user?.id : planData.staff_id,
+          staff_id: targetStaffId,
           department_id: targetDepartmentId,
+          facility_id: planData.facility_id,
+          workspace_id: planData.workspace_id,
           vacation_type_id: planData.vacation_type_id,
           total_days: planData.total_days,
           notes: autoRejectionReason ? `${planData.notes}\n\n[Auto-Rejected: ${autoRejectionReason}]` : planData.notes,
@@ -461,7 +468,6 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       queryClient.invalidateQueries({ queryKey: ['vacation-plans'] });
       queryClient.invalidateQueries({ queryKey: ['vacations'] });
 
-      // Send notification if approved
       if (data.status === 'approved') {
         await sendVacationStatusNotification(
           data.id,
@@ -472,7 +478,6 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
         );
         toast.success('Vacation plan created and approved successfully');
       } else if (data.status === 'rejected') {
-        // If auto-rejected, notify too
         await sendVacationStatusNotification(
           data.id,
           'rejected',
@@ -485,13 +490,13 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
         toast.success('Vacation plan submitted for approval');
       }
 
-      // Send chat message if created by manager for staff
       if (user?.id && variables.staff_id && user.id !== variables.staff_id) {
         await sendVacationMessage(
           data.id,
           variables.staff_id,
           user.id,
-          userProfile?.full_name || 'Manager'
+          userProfile?.full_name || 'Manager',
+          data.status
         );
       }
 
@@ -510,7 +515,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     }
     const lastSplit = splits[splits.length - 1];
     const newStartDate = lastSplit ? addDays(new Date(lastSplit.end_date), 1) : new Date();
-    const newEndDate = addDays(newStartDate, 0); // Default to same day (1 day total)
+    const newEndDate = addDays(newStartDate, 0);
 
     setSplits([
       ...splits,
@@ -519,7 +524,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   };
 
   const removeSplit = (index: number) => {
-    if (index === 0) return; // First split is mandatory
+    if (index === 0) return;
     setSplits(splits.filter((_, i) => i !== index));
   };
 
@@ -533,12 +538,10 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     if (field === 'start_date') {
       const start = new Date(value);
       if (start && !isNaN(start.getTime())) {
-        // If end_date is before new start_date, or not set, set it to start_date (1 day)
         if (!newSplits[index].end_date || newSplits[index].end_date < start) {
           newSplits[index].end_date = start;
           newSplits[index].days = 1;
         } else {
-          // Recalculate days based on existing end_date
           const end = new Date(newSplits[index].end_date);
           const diffTime = Math.abs(end.getTime() - start.getTime());
           newSplits[index].days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
@@ -555,19 +558,14 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
           toast.error('End date cannot be before start date');
           return;
         }
-
         const diffTime = Math.abs(end.getTime() - start.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
         if (maxDays && diffDays > maxDays) {
           toast.warning(`You can plan the vacation only for ${maxDays} days for this vacation type`);
-          // Optionally reset to max allowed, or just warn. User said "show the message".
         }
-
         newSplits[index].days = diffDays;
       }
     }
-
     setSplits(newSplits);
   };
 
@@ -576,9 +574,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
     setSelectedVacationType(undefined);
     setNotes('');
     setSelectedDepartment(undefined);
-    setSplits([
-      { start_date: new Date(), end_date: new Date(), days: 1 }
-    ]);
+    setSplits([{ start_date: new Date(), end_date: new Date(), days: 1 }]);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -589,8 +585,8 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       return;
     }
 
-    if (!effectiveStaffOnly && !selectedStaff) {
-      toast.error('Please select staff member');
+    if (selectionMode === 'single' && !effectiveStaffOnly && !selectedStaff) {
+      toast.error('Please select an individual staff member');
       return;
     }
 
@@ -623,26 +619,36 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       })),
     };
 
+    if (!effectiveDepartmentId) {
+      toast.error('Department context is missing. Please select a department or verify your profile.');
+      return;
+    }
+
+    const deptContext = allDepartments?.find((d: any) => d.id === effectiveDepartmentId);
+    const facilityId = deptContext?.facility_id;
+    const workspaceId = deptContext?.facilities?.workspace_id;
+
+    const basePlanData = {
+      ...commonData,
+      facility_id: facilityId,
+      workspace_id: workspaceId,
+    };
+
     if (selectionMode === 'single') {
-      // Scenario Detection
       const isSelfRequest = selectedStaff === user?.id;
       const isManagerAction = (isSuperAdmin || isSupervisor || isDepartmentHead) && !isSelfRequest;
       const isAdminSelfRequest = (isSupervisor || isDepartmentHead || isSuperAdmin) && isSelfRequest;
 
       let initialStatus = 'pending_approval';
 
-      // Scenario 2: Manager planning for staff -> Direct Approval
       if (isManagerAction) {
         if (currentOrganization?.vacation_mode === 'full') {
           const typeBalance = (staffBalances as any)?.find((b: any) => b.vacation_type_id === selectedVacationType);
           if (!typeBalance || totalDays > (typeBalance as any).balance) {
-            const typeName = vacationTypes?.find(t => t.id === selectedVacationType)?.name || 'this vacation type';
-            const balance = typeBalance ? (typeBalance as any).balance : 0;
-            toast.error(`Auto-rejection: Insufficient leave balance for staff member. REQUEST: ${totalDays} days, REMAINING: ${balance} days.`);
-
-            // Auto-reject scenario: Create as rejected
+            toast.error(`Auto-rejection: Insufficient leave balance.`);
             createPlanMutation.mutate({
-              ...commonData,
+              ...basePlanData,
+              department_id: effectiveDepartmentId,
               staff_id: selectedStaff,
               status: 'rejected',
               notes: `${notes}\n\n[Auto-Rejected: Insufficient Balance]`,
@@ -653,39 +659,53 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
         } else {
           initialStatus = 'approved';
         }
+      } else if (isAdminSelfRequest) {
+        initialStatus = 'pending_approval';
       }
-      // Scenario 3: Admin/Supervisor self-request -> Specifically pending for Super Admin
-      else if (isAdminSelfRequest) {
-        initialStatus = 'pending_approval'; // We will filter this for Super Admin in the Workflow component
-      }
-
-      // Check for conflicts before creating (Mandatory for all scenarios)
-      // This will be handled inside createPlanMutation, but we can also do a quick check here if we want to "Directly reject"
 
       createPlanMutation.mutate({
-        ...commonData,
+        ...basePlanData,
+        department_id: effectiveDepartmentId,
         staff_id: selectedStaff,
         status: initialStatus,
       });
     } else {
-      // Group Selection Mode (Usually manager action)
       const targetUsers = (effectiveStaffList || []).filter(s => s.role === selectedRole);
-
       if (targetUsers.length === 0) {
         toast.error(`No users found with role: ${selectedRole}`);
         return;
       }
 
-      toast.info(`Creating vacations for ${targetUsers.length} users...`);
+      const processBulk = async () => {
+        const toastId = toast.loading(`Processing 0/${targetUsers.length} staff members...`);
+        let successCount = 0;
+        let failCount = 0;
 
-      targetUsers.forEach(staff => {
-        // Auto-approve by default in planning mode, otherwise pending
-        createPlanMutation.mutate({
-          ...commonData,
-          staff_id: staff.user_id,
-          status: currentOrganization?.vacation_mode === 'planning' ? 'approved' : 'pending_approval',
-        });
-      });
+        for (let i = 0; i < targetUsers.length; i++) {
+          const staff = targetUsers[i];
+          try {
+            toast.loading(`Processing ${i + 1}/${targetUsers.length} staff members...`, { id: toastId });
+            await createPlanMutation.mutateAsync({
+              ...basePlanData,
+              department_id: effectiveDepartmentId,
+              staff_id: staff.user_id,
+              status: currentOrganization?.vacation_mode === 'planning' ? 'approved' : 'pending_approval',
+            });
+            successCount++;
+          } catch (err) {
+            console.error(`Failed to create vacation for ${staff.user_id}:`, err);
+            failCount++;
+          }
+        }
+
+        if (failCount > 0) {
+          toast.success(`Processed ${successCount} plans. ${failCount} failed.`, { id: toastId });
+        } else {
+          toast.success(`Successfully processed ${successCount} vacation plans.`, { id: toastId });
+        }
+      };
+
+      processBulk();
     }
   };
 
@@ -708,13 +728,17 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
           {(isSuperAdmin || isSupervisor) && !departmentId && (
             <div>
               <Label>Select Department *</Label>
-              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+              <Select
+                key={currentOrganization?.id || 'no-org'}
+                value={selectedDepartment}
+                onValueChange={setSelectedDepartment}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allDepartments && allDepartments.length > 0 ? (
-                    allDepartments.map((dept: any) => (
+                  {uniqueDepartments && uniqueDepartments.length > 0 ? (
+                    uniqueDepartments.map((dept: any) => (
                       <SelectItem key={dept.id} value={dept.id}>
                         {dept.name} {dept.facilities?.name && `(${dept.facilities.name})`}
                       </SelectItem>
@@ -756,7 +780,11 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
               {selectionMode === 'single' ? (
                 <div>
                   <Label>Select Staff Member *</Label>
-                  <Select value={selectedStaff} onValueChange={setSelectedStaff}>
+                  <Select
+                    key={`${currentOrganization?.id}-staff`}
+                    value={selectedStaff}
+                    onValueChange={setSelectedStaff}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select staff member" />
                     </SelectTrigger>
@@ -798,13 +826,17 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
           <div>
             <Label>Vacation Type</Label>
-            <Select value={selectedVacationType} onValueChange={setSelectedVacationType}>
+            <Select
+              key={`${currentOrganization?.id}-type`}
+              value={selectedVacationType}
+              onValueChange={setSelectedVacationType}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select vacation type" />
               </SelectTrigger>
               <SelectContent>
-                {vacationTypes && vacationTypes.length > 0 ? (
-                  vacationTypes.map((type) => (
+                {uniqueVacationTypes && uniqueVacationTypes.length > 0 ? (
+                  uniqueVacationTypes.map((type) => (
                     <SelectItem key={type.id} value={type.id}>
                       {type.name} {type.max_days && `(Max: ${type.max_days} days)`}
                     </SelectItem>
@@ -818,105 +850,61 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
             </Select>
           </div>
 
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <Label>Vacation Splits (Up to 6)</Label>
-              <Button type="button" size="sm" onClick={addSplit}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add Split
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold">Vacation Periods</Label>
+              <Button type="button" variant="outline" size="sm" onClick={addSplit} disabled={splits.length >= maxSplits}>
+                <Plus className="h-4 w-4 mr-1" /> Add Period
               </Button>
             </div>
-            <div className="space-y-4">
+
+            <div className="grid gap-4">
               {splits.map((split, index) => (
-                <div key={index} className="border p-3 sm:p-4 rounded-lg space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold text-sm sm:text-base">Split {index + 1}</span>
-                    {index > 0 && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive-ghost"
-                        onClick={() => removeSplit(index)}
-                        className="min-h-[44px] min-w-[44px]"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                    <div>
-                      <Label className="text-sm">Start Date</Label>
+                <div key={index} className="p-4 border rounded-lg space-y-4 relative bg-muted/30">
+                  {index > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-2 right-2 h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => removeSplit(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">Start Date</Label>
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className={cn(
-                              'w-full justify-start text-left font-normal min-h-[44px] text-sm',
-                              !split.start_date && 'text-muted-foreground'
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                            <span className="truncate">
-                              {split.start_date ? format(split.start_date, 'PP') : 'Pick date'}
-                            </span>
+                          <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !split.start_date && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {split.start_date ? format(split.start_date, "PPP") : <span>Pick a date</span>}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent
-                          className="w-auto p-0 pointer-events-auto"
-                          align="center"
-                          side="bottom"
-                          sideOffset={4}
-                        >
-                          <div className="p-2 pb-0">
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                              <div className="w-3 h-3 bg-warning/30 rounded" />
-                              <span>Team member on leave</span>
-                            </div>
-                          </div>
+                        <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
                             mode="single"
                             selected={split.start_date}
                             onSelect={(date) => date && updateSplit(index, 'start_date', date)}
-                            disabled={{ before: new Date() }}
+                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                             initialFocus
-                            className="pointer-events-auto"
-                            modifiers={{
-                              busy: (date) => !!getBusyInfo(date)
-                            }}
-                            modifiersClassNames={{
-                              busy: 'bg-warning/30 hover:bg-warning/40 font-semibold'
-                            }}
                           />
                         </PopoverContent>
                       </Popover>
                     </div>
-                    <div>
-                      <Label className="text-sm">End Date</Label>
+                    <div className="space-y-2">
+                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">End Date</Label>
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className={cn(
-                              'w-full justify-start text-left font-normal min-h-[44px] text-sm',
-                              !split.end_date && 'text-muted-foreground'
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                            <span className="truncate">
-                              {split.end_date ? format(split.end_date, 'PP') : 'Pick date'}
-                            </span>
+                          <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !split.end_date && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {split.end_date ? format(split.end_date, "PPP") : <span>Pick a date</span>}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent
-                          className="w-auto p-0 pointer-events-auto"
-                          align="center"
-                          side="bottom"
-                          sideOffset={4}
-                        >
-                          <div className="p-2 pb-0">
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <div className="p-3 border-b bg-muted/50">
+                            <div className="flex items-center gap-2 text-sm">
                               <div className="w-3 h-3 bg-warning/30 rounded" />
                               <span>Team member on leave</span>
                             </div>

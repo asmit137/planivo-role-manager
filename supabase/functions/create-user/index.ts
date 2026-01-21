@@ -1,5 +1,7 @@
 // @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+// @ts-ignore
+import nodemailer from "npm:nodemailer@6.9.10";
 
 declare const Deno: any;
 
@@ -15,6 +17,16 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { status: 200, headers: corsHeaders });
   }
+
+  // Helper to generate a random password
+  const generatePassword = (length = 12) => {
+    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+    let retVal = "";
+    for (let i = 0, n = charset.length; i < length; ++i) {
+      retVal += charset.charAt(Math.floor(Math.random() * n));
+    }
+    return retVal;
+  };
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
@@ -88,7 +100,6 @@ Deno.serve(async (req: Request) => {
 
     const {
       email,
-      password,
       full_name,
       role,
       organization_id,
@@ -99,6 +110,9 @@ Deno.serve(async (req: Request) => {
       custom_role_id,
       force_password_change,
     } = body;
+
+    // Generate a random password if not provided
+    const password = body.password || generatePassword();
 
     /* =====================================================
        3️⃣ ADMIN CLIENT & ROLE VALIDATION
@@ -163,7 +177,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    if (!email || !password || !full_name || !role) {
+    if (!email || !full_name || !role) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -348,58 +362,57 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    /* =====================================================
-       8️⃣ SEND WELCOME EMAIL (RESEND)
-    ===================================================== */
-    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+    // 4. Send Welcome Email (SMTP)
+    const SMTP_HOST = Deno.env.get("SMTP_HOST");
+    const SMTP_PORT = Deno.env.get("SMTP_PORT");
+    const SMTP_USER = Deno.env.get("SMTP_USER");
+    const SMTP_PASS = Deno.env.get("SMTP_PASS");
+    const SMTP_FROM = Deno.env.get("SMTP_FROM") || "Planivo <noreply@planivo.com>";
 
-    if (RESEND_API_KEY) {
-      console.log(`Sending welcome email to ${email} via Resend...`);
+    if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+      console.log(`Sending welcome email to ${email} via SMTP...`);
       try {
-        const res = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${RESEND_API_KEY}`,
+        const transporter = nodemailer.createTransport({
+          host: SMTP_HOST,
+          port: parseInt(SMTP_PORT || "587"),
+          secure: parseInt(SMTP_PORT || "587") === 465, // true for 465, false for other ports
+          auth: {
+            user: SMTP_USER,
+            pass: SMTP_PASS,
           },
-          body: JSON.stringify({
-            from: "Planivo <onboarding@resend.dev>",
-            to: [email],
-            subject: "Welcome to Planivo - Your Account Credentials",
-            html: `
-                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                  <h1 style="color: #0ea5e9;">Welcome to Planivo!</h1>
-                  <p>Your account has been successfully created by an administrator.</p>
-                  <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                    <p style="margin: 0;"><strong>Username:</strong> ${email}</p>
-                    <p style="margin: 10px 0 0 0;"><strong>Password:</strong> ${password}</p>
-                  </div>
-                  <p>
-                    <a href="${Deno.env.get("PUBLIC_APP_URL") || 'http://localhost:8080'}" 
-                       style="background-color: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                      Login to Planivo
-                    </a>
-                  </p>
-                  <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
-                    Please log in and change your password immediately for security reasons.
-                  </p>
-                </div>
-              `,
-          }),
         });
 
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("Resend API error:", errorText);
-        } else {
-          console.log("Welcome email sent successfully via Resend.");
-        }
+        const info = await transporter.sendMail({
+          from: SMTP_FROM,
+          to: email,
+          subject: "Welcome to Planivo - Your Account Credentials",
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+              <h1 style="color: #0ea5e9;">Welcome to Planivo!</h1>
+              <p>Your account has been successfully created by an administrator.</p>
+              <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0;"><strong>Username:</strong> ${email}</p>
+                <p style="margin: 10px 0 0 0;"><strong>Password:</strong> ${password}</p>
+              </div>
+              <p>
+                <a href="${Deno.env.get("PUBLIC_APP_URL") || 'http://localhost:8080'}" 
+                   style="background-color: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  Login to Planivo
+                </a>
+              </p>
+              <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+                Please log in and change your password immediately for security reasons.
+              </p>
+            </div>
+          `,
+        });
+
+        console.log("Welcome email sent via SMTP:", info.messageId);
       } catch (emailErr: any) {
-        console.error("Failed to send welcome email via Resend:", emailErr);
+        console.error("Failed to send welcome email via SMTP:", emailErr);
       }
     } else {
-      console.warn("RESEND_API_KEY not set. Welcome email skipped.");
-      // Fallback to SendGrid if needed, but the objective is to migrate to Resend
+      console.warn("SMTP environment variables not set. Welcome email skipped.");
     }
 
     return new Response(

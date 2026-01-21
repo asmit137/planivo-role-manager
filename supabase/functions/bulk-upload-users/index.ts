@@ -2,6 +2,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 // @ts-ignore
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+// @ts-ignore
+import nodemailer from "npm:nodemailer@6.9.10";
 
 declare const Deno: any;
 
@@ -166,9 +168,21 @@ Deno.serve(async (req: Request) => {
     const specialtyCache = new Map<string, string>();
     const vTypesCache = new Map<string, any[]>();
 
+
+    // Helper to generate a random password
+    const generatePassword = (length = 12) => {
+      const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+      let retVal = "";
+      for (let i = 0, n = charset.length; i < length; ++i) {
+        retVal += charset.charAt(Math.floor(Math.random() * n));
+      }
+      return retVal;
+    };
+
     for (let i = 0; i < users.length; i++) {
       const user = users[i];
       const rowNumber = i + 2;
+      const password = generatePassword(); // Generate unique password for each user
 
       try {
         let userRole = user.role;
@@ -267,7 +281,7 @@ Deno.serve(async (req: Request) => {
         } else {
           const { data: authUser, error: createAuthError } = await supabaseAdmin.auth.admin.createUser({
             email: lowEmail,
-            password: '12345678',
+            password: password,
             email_confirm: true,
             user_metadata: { full_name: user.full_name },
           });
@@ -304,27 +318,37 @@ Deno.serve(async (req: Request) => {
           await supabaseAdmin.from("leave_balances").upsert(vTypes.map((vt: any) => ({ staff_id: newUserId, vacation_type_id: vt.id, organization_id: rowOrganizationId, accrued: 0, used: 0, balance: 0, year: currentYear })), { onConflict: 'staff_id, vacation_type_id, year' });
         }
 
-        // Welcome Email (RESEND)
-        const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-        if (RESEND_API_KEY) {
+
+        // Welcome Email (SMTP)
+        const SMTP_HOST = Deno.env.get("SMTP_HOST");
+        const SMTP_PORT = Deno.env.get("SMTP_PORT");
+        const SMTP_USER = Deno.env.get("SMTP_USER");
+        const SMTP_PASS = Deno.env.get("SMTP_PASS");
+        const SMTP_FROM = Deno.env.get("SMTP_FROM") || "Planivo <noreply@planivo.com>";
+
+        if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
           try {
-            await fetch("https://api.resend.com/emails", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${RESEND_API_KEY}`
+            const transporter = nodemailer.createTransport({
+              host: SMTP_HOST,
+              port: parseInt(SMTP_PORT || "587"),
+              secure: parseInt(SMTP_PORT || "587") === 465,
+              auth: {
+                user: SMTP_USER,
+                pass: SMTP_PASS,
               },
-              body: JSON.stringify({
-                from: "Planivo <onboarding@resend.dev>",
-                to: [lowEmail],
-                subject: "Welcome to Planivo - Your Account Credentials",
-                html: `
+            });
+
+            await transporter.sendMail({
+              from: SMTP_FROM,
+              to: lowEmail,
+              subject: "Welcome to Planivo - Your Account Credentials",
+              html: `
                   <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
                     <h1 style="color: #0ea5e9;">Welcome to Planivo!</h1>
                     <p>Your account was created via bulk upload.</p>
                     <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
                       <p style="margin: 0;"><strong>Username:</strong> ${lowEmail}</p>
-                      <p style="margin: 10px 0 0 0;"><strong>Password:</strong> 12345678</p>
+                      <p style="margin: 10px 0 0 0;"><strong>Password:</strong> ${password}</p>
                     </div>
                     <p>
                       <a href="${Deno.env.get("PUBLIC_APP_URL") || 'http://localhost:8080'}" 
@@ -336,10 +360,11 @@ Deno.serve(async (req: Request) => {
                       Please log in and change your password immediately for security reasons.
                     </p>
                   </div>
-                `
-              }),
+                `,
             });
           } catch (e) { console.error(`Email error Row ${rowNumber}:`, e); }
+        } else {
+          // console.warn("SMTP environment variables not set. Welcome email skipped.");
         }
 
         result.success++;

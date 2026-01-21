@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,7 +23,17 @@ const Auth = () => {
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [resetSent, setResetSent] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
+
+  useEffect(() => {
+    const requestedMode = searchParams.get('mode');
+    if (requestedMode === 'signup') {
+      setMode('signup');
+    } else if (requestedMode === 'login') {
+      setMode('login');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (user) {
