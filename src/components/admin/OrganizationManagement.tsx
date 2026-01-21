@@ -471,8 +471,8 @@ const OrganizationManagement = () => {
   );
 
   return (
-    <Card className="border-2 overflow-hidden">
-      <CardHeader className="p-4 sm:p-6">
+    <Card className="border-2 overflow-hidden w-full max-w-full box-border">
+      <CardHeader className="p-4 pt-6 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <CardTitle>Organizations</CardTitle>
@@ -613,7 +613,7 @@ const OrganizationManagement = () => {
           </Dialog>
         </div>
       </CardHeader>
-      <CardContent className="p-2 sm:p-4 md:p-6 overflow-x-hidden">
+      <CardContent className="px-3 py-4 sm:p-6 overflow-x-hidden w-full flex flex-col min-w-0">
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
@@ -629,9 +629,9 @@ const OrganizationManagement = () => {
 
               return (
                 <Collapsible key={org.id} open={isExpanded} onOpenChange={() => toggleExpanded(org.id)}>
-                  <div className="border-2 rounded-lg hover:border-primary/20 transition-colors overflow-hidden">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-2 sm:p-4 gap-3 sm:gap-4">
-                      <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+                  <div className="border-2 rounded-lg hover:border-primary/20 transition-colors overflow-hidden w-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 py-6 sm:px-4 sm:py-6 gap-3 sm:gap-4 w-full min-w-0">
+                      <div className="flex items-start gap-2 sm:gap-3 min-w-0 w-full flex-1">
                         <CollapsibleTrigger asChild>
                           <Button variant="ghost" size="sm" className="p-0 h-8 w-8 shrink-0 mt-1">
                             {isExpanded ? (
@@ -641,37 +641,37 @@ const OrganizationManagement = () => {
                             )}
                           </Button>
                         </CollapsibleTrigger>
-                        <div className="p-2 rounded-lg bg-primary/10 shrink-0 mt-0.5">
-                          <Building className="h-5 w-5 text-primary" />
+                        <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10 shrink-0 mt-0.5">
+                          <Building className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                         </div>
-                        <div className="min-w-0 flex-1 overflow-hidden">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-semibold text-base sm:text-lg line-clamp-1">{org.name}</h3>
-                            <Badge variant="secondary" className="text-[10px] sm:text-xs h-5 sm:h-auto">
-                              {orgWorkspaces.length} Workspace{orgWorkspaces.length !== 1 ? 's' : ''}
+                        <div className="min-w-0 flex-1 overflow-hidden flex flex-col gap-1">
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 max-w-full min-w-0">
+                            <h3 className="font-semibold text-sm sm:text-lg line-clamp-1 break-all flex-1 min-w-0">{org.name}</h3>
+                            <Badge variant="secondary" className="text-[9px] sm:text-xs h-4 sm:h-auto whitespace-nowrap px-1 sm:px-2">
+                              {orgWorkspaces.length} Ws
                             </Badge>
                           </div>
                           {org.description && (
                             <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1 sm:line-clamp-2 mt-0.5">{org.description}</p>
                           )}
                           {owner && (
-                            <p className="text-[10px] sm:text-xs text-muted-foreground mt-1.5 flex items-center gap-1 max-w-full overflow-hidden">
+                            <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 flex items-center gap-1 max-w-full overflow-hidden">
                               <User className="h-3 w-3 shrink-0" />
-                              <span className="truncate">Owner: {owner.full_name} ({owner.email})</span>
+                              <span className="truncate break-all">Owner: {owner.full_name} ({owner.email})</span>
                             </p>
                           )}
-                          <div className="flex flex-wrap gap-1.5 mt-2.5">
-                            <Badge variant="outline" className="text-[10px] px-1.5 h-5 flex items-center gap-1">
-                              Workspaces: {formatLimit(org.max_workspaces)}
+                          <div className="flex flex-wrap gap-1 sm:gap-1.5 mt-2 max-w-full overflow-hidden">
+                            <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 h-4 sm:h-5 flex items-center gap-0.5 sm:gap-1 shrink-0">
+                              WS: {formatLimit(org.max_workspaces)}
                             </Badge>
-                            <Badge variant="outline" className="text-[10px] px-1.5 h-5 flex items-center gap-1">
-                              Facilities: {formatLimit(org.max_facilities)}
+                            <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 h-4 sm:h-5 flex items-center gap-0.5 sm:gap-1 shrink-0">
+                              Fac: {formatLimit(org.max_facilities)}
                             </Badge>
-                            <Badge variant="outline" className="text-[10px] px-1.5 h-5 flex items-center gap-1">
+                            <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 h-4 sm:h-5 flex items-center gap-0.5 sm:gap-1 shrink-0">
                               Users: {formatLimit(org.max_users)}
                             </Badge>
-                            <Badge variant={org.vacation_mode === 'planning' ? 'secondary' : 'default'} className="text-[10px] px-1.5 h-5">
-                              {org.vacation_mode === 'planning' ? 'Planning Mode' : 'Full Mode'}
+                            <Badge variant={org.vacation_mode === 'planning' ? 'secondary' : 'default'} className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 h-4 sm:h-5 shrink-0">
+                              {org.vacation_mode === 'planning' ? 'Plan' : 'Full'}
                             </Badge>
                           </div>
                         </div>

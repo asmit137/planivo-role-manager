@@ -533,7 +533,7 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
 
   return (
     <Card className="border-none shadow-none sm:border-2 sm:shadow-sm">
-      <CardHeader className="px-3 sm:px-6 pt-0 sm:pt-6">
+      <CardHeader className="px-3 sm:px-6 pt-2 sm:pt-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight">Workspaces</CardTitle>
@@ -608,7 +608,7 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
           )}
         </div>
       </CardHeader>
-      <CardContent className="px-3 sm:px-6 py-0 sm:py-6">
+      <CardContent className="px-3 sm:px-6 py-2 sm:py-6">
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
@@ -620,7 +620,7 @@ const WorkspaceManagement = ({ organizationId, workspaceId, maxWorkspaces, curre
             {workspaces.map((workspace) => (
               <div
                 key={workspace.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border-2 rounded-lg bg-card/50 hover:border-primary/20 transition-all duration-200 gap-3"
+                className="flex flex-col sm:flex-row sm:items-center justify-between px-3 py-6 sm:px-4 sm:py-6 border-2 rounded-lg bg-card/50 hover:border-primary/20 transition-all duration-200 gap-3"
               >
                 <div className="flex items-start sm:items-center gap-3 min-w-0">
                   <div className="p-2 rounded-lg bg-primary/10 shrink-0">

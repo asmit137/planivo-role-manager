@@ -24,8 +24,8 @@ const OrganizationHub = ({ organizationId, workspaceId }: OrganizationHubProps =
         />
       }
     >
-      <div className="space-y-4 md:space-y-6">
-        <Tabs defaultValue={organizationId ? "workspaces" : "organizations"} className="space-y-4">
+      <div className="space-y-4 md:space-y-6 px-1 sm:px-0 overflow-hidden py-1 sm:py-0">
+        <Tabs defaultValue={organizationId ? "workspaces" : "organizations"} className="space-y-4 w-full">
           <ResponsiveTabsList>
             {!organizationId && (
               <TabsTrigger value="organizations" className="min-h-[44px] px-3 text-sm">
@@ -52,23 +52,23 @@ const OrganizationHub = ({ organizationId, workspaceId }: OrganizationHubProps =
           </ResponsiveTabsList>
 
           {!organizationId && (
-            <TabsContent value="organizations">
+            <TabsContent value="organizations" className="py-6">
               <OrganizationManagement />
             </TabsContent>
           )}
 
-          <TabsContent value="workspaces">
+          <TabsContent value="workspaces" className="py-6">
             <WorkspaceManagement
               organizationId={organizationId}
               workspaceId={workspaceId}
             />
           </TabsContent>
 
-          <TabsContent value="facilities">
+          <TabsContent value="facilities" className="py-6">
             <FacilityUserManagement />
           </TabsContent>
 
-          <TabsContent value="categories">
+          <TabsContent value="categories" className="py-6">
             <CategoryDepartmentManagement
               organizationId={organizationId}
               workspaceId={workspaceId}

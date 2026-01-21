@@ -475,7 +475,9 @@ const UnifiedUserCreation = ({
       return data;
     },
     onSuccess: () => {
-      toast.success(`User created successfully!`);
+      toast.success(`User created successfully!`, {
+        description: "Please remind them to check their spam folder for the welcome email."
+      });
       queryClient.invalidateQueries({ queryKey: ['unified-users'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['profiles'] });

@@ -15,14 +15,14 @@ interface ResponsiveTabsListProps {
 export const ResponsiveTabsList = ({ children, className, wrap = false }: ResponsiveTabsListProps) => {
   return (
     <div className={cn(
-      "w-full relative",
+      "w-full relative max-w-full overflow-hidden",
       !wrap && "overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide"
     )}>
       <TabsList
         className={cn(
           "inline-flex h-auto min-w-full w-fit justify-start gap-1 p-1 bg-muted/20 backdrop-blur-sm",
           wrap ? "flex-wrap justify-center" : "flex-nowrap",
-          "lg:flex-wrap lg:justify-center lg:w-full",
+          "lg:flex-wrap lg:justify-center lg:w-full max-w-full",
           className
         )}
       >
