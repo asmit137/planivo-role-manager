@@ -229,7 +229,7 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
     const labels: Record<string, string> = {
       super_admin: 'Super Admin',
       general_admin: 'General Admin',
-      workplace_supervisor: 'Workplace Supervisor',
+      workplace_supervisor: 'Workspace Supervisor',
       facility_supervisor: 'Facility Supervisor',
       department_head: 'Department Head',
       staff: 'Staff',

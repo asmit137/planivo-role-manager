@@ -30,7 +30,7 @@ export const DiscordLayout = () => {
     };
 
     return (
-        <div className="flex h-[calc(100vh-4rem)] md:h-[calc(100vh-8rem)] w-full overflow-hidden bg-background text-foreground relative -m-4 md:-m-6 lg:-m-8">
+        <div className="flex h-[calc(100vh-8rem)] w-full overflow-hidden bg-background text-foreground relative rounded-2xl border border-border mt-2 shadow-sm">
             {/* Sidebar - Persistent on all screens, but can be hidden/shown */}
             <div className={cn(
                 "w-72 flex-shrink-0 border-r border-border bg-muted/10 transition-all duration-300 ease-in-out h-full overflow-hidden",
