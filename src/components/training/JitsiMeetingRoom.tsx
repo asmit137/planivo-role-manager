@@ -129,12 +129,17 @@ const JitsiMeetingRoom = ({ eventId, onLeave }: JitsiMeetingRoomProps) => {
     if (!event || !jitsiConfig || !profile || !jitsiContainerRef.current) return;
 
     // Load Jitsi Meet External API script
+    let serverUrl = jitsiConfig.server_url || 'https://meet.jit.si';
+    serverUrl = serverUrl.replace(/\/$/, ''); // Remove trailing slash if present
+    const scriptSrc = `${serverUrl}/external_api.js`;
+
     const script = document.createElement('script');
-    script.src = `${jitsiConfig.server_url}/external_api.js`;
+    script.src = scriptSrc;
     script.async = true;
     script.onload = initializeJitsi;
     script.onerror = () => {
-      toast.error('Failed to load video conferencing system');
+      console.error(`Failed to load Jitsi script from: ${scriptSrc}`);
+      toast.error(`Failed to load video conferencing system from ${scriptSrc}`);
       setIsLoading(false);
     };
     document.body.appendChild(script);
@@ -152,7 +157,15 @@ const JitsiMeetingRoom = ({ eventId, onLeave }: JitsiMeetingRoomProps) => {
   const initializeJitsi = () => {
     if (!event || !jitsiConfig || !profile || !jitsiContainerRef.current) return;
 
-    const domain = new URL(jitsiConfig.server_url).hostname;
+    let serverUrl = jitsiConfig.server_url || 'https://meet.jit.si';
+    serverUrl = serverUrl.replace(/\/$/, '');
+
+    // Ensure protocol is present for URL constructor
+    if (!serverUrl.startsWith('http://') && !serverUrl.startsWith('https://')) {
+      serverUrl = `https://${serverUrl}`;
+    }
+
+    const domain = new URL(serverUrl).hostname;
     const roomName = event.jitsi_room_name || `planivo-${eventId}`;
 
     const options = {
@@ -163,13 +176,13 @@ const JitsiMeetingRoom = ({ eventId, onLeave }: JitsiMeetingRoomProps) => {
       configOverwrite: {
         startWithAudioMuted: false,
         startWithVideoMuted: false,
-        prejoinPageEnabled: false,
+        prejoinPageEnabled: true,
         disableDeepLinking: true,
         enableWelcomePage: false,
         enableClosePage: false,
-        disableInviteFunctions: true,
-        requireDisplayName: true,
-        enableLobbyChat: event.require_lobby,
+        // disableInviteFunctions: true,
+        // requireDisplayName: true,
+        enableLobbyChat: false,
         ...(event.allow_recording && { fileRecordingsEnabled: true }),
       },
       interfaceConfigOverwrite: {
@@ -233,6 +246,10 @@ const JitsiMeetingRoom = ({ eventId, onLeave }: JitsiMeetingRoomProps) => {
 
     } catch (error) {
       console.error('Jitsi initialization error:', error);
+      // Don't show generic error for membersOnly/connection issues as the banner handles it
+      if (error?.toString().includes('membersOnly') || error?.toString().includes('connection')) {
+        return;
+      }
       toast.error('Failed to initialize video meeting');
       setIsLoading(false);
     }
@@ -302,61 +319,70 @@ const JitsiMeetingRoom = ({ eventId, onLeave }: JitsiMeetingRoomProps) => {
       </div>
 
       {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Video container */}
-        <div className="flex-1 relative bg-black">
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-              <LoadingState message="Connecting to video meeting..." />
-            </div>
-          )}
-          <div ref={jitsiContainerRef} className="w-full h-full" />
-
-          {/* Custom controls overlay */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-            <div className="flex items-center justify-center gap-3">
-              <Button
-                variant={isAudioMuted ? 'destructive' : 'secondary'}
-                size="icon"
-                className="rounded-full h-12 w-12"
-                onClick={toggleAudio}
-              >
-                {isAudioMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-              </Button>
-              <Button
-                variant={isVideoMuted ? 'destructive' : 'secondary'}
-                size="icon"
-                className="rounded-full h-12 w-12"
-                onClick={toggleVideo}
-              >
-                {isVideoMuted ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
-              </Button>
-              <Button
-                variant="destructive"
-                size="icon"
-                className="rounded-full h-14 w-14"
-                onClick={hangUp}
-              >
-                <PhoneOff className="h-6 w-6" />
-              </Button>
-              <Button
-                variant="secondary"
-                size="icon"
-                className="rounded-full h-12 w-12"
-                onClick={toggleFullscreen}
-              >
-                {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
-              </Button>
-            </div>
-          </div>
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Info Banner for Jitsi Auth */}
+        <div className="bg-blue-50 dark:bg-blue-900/20 px-4 py-2 border-b border-blue-100 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300 flex items-center justify-center text-center">
+          <span>
+            <strong>Note:</strong> If you see "Waiting for moderator", please click the <strong>Log-in</strong> button in the video window to start the meeting.
+          </span>
         </div>
 
-        {/* Chat panel */}
-        {showChat && (
-          <div className="w-80 border-l bg-card">
-            <MeetingChatPanel eventId={eventId} />
+        <div className="flex flex-1 overflow-hidden">
+          {/* Video container */}
+          <div className="flex-1 relative bg-black">
+            {isLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+                <LoadingState message="Connecting to video meeting..." />
+              </div>
+            )}
+            <div ref={jitsiContainerRef} className="w-full h-full" />
+
+            {/* Custom controls overlay */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+              <div className="flex items-center justify-center gap-3">
+                <Button
+                  variant={isAudioMuted ? 'destructive' : 'secondary'}
+                  size="icon"
+                  className="rounded-full h-12 w-12"
+                  onClick={toggleAudio}
+                >
+                  {isAudioMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                </Button>
+                <Button
+                  variant={isVideoMuted ? 'destructive' : 'secondary'}
+                  size="icon"
+                  className="rounded-full h-12 w-12"
+                  onClick={toggleVideo}
+                >
+                  {isVideoMuted ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="rounded-full h-14 w-14"
+                  onClick={hangUp}
+                >
+                  <PhoneOff className="h-6 w-6" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="rounded-full h-12 w-12"
+                  onClick={toggleFullscreen}
+                >
+                  {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+                </Button>
+              </div>
+            </div>
           </div>
-        )}
+
+          {/* Chat panel */}
+          {showChat && (
+            <div className="w-80 border-l bg-card">
+              <MeetingChatPanel eventId={eventId} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

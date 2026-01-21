@@ -145,7 +145,7 @@ export function PricingSection() {
             {plans.map((plan) => (
               <Card
                 key={plan.slug}
-                className={`relative flex flex-col w-full ${plan.isPopular
+                className={`relative flex flex-col h-full w-full ${plan.isPopular
                   ? "border-primary shadow-lg shadow-primary/10 ring-2 ring-primary scale-105 z-10"
                   : "border-border/50 bg-card/50 hover:border-primary/30 hover:shadow-lg transition-all"
                   }`}
@@ -194,7 +194,7 @@ export function PricingSection() {
                       size="lg"
                       variant="outline"
                     >
-                      <Link to="/auth">Get Started Free</Link>
+                      <Link to="/auth?mode=signup">Get Started Free</Link>
                     </Button>
                   ) : (
                     <Button

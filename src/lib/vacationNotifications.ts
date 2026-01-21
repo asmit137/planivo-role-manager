@@ -136,7 +136,8 @@ export const sendVacationMessage = async (
   vacationPlanId: string,
   staffId: string,
   managerId: string,
-  managerName?: string
+  managerName?: string,
+  status: string = 'approved'
 ) => {
   try {
     // 1. Get vacation plan details
@@ -216,14 +217,24 @@ export const sendVacationMessage = async (
       ]);
     }
 
-    // 3. Send Message
-    const messageContent = `Hello ${staffName.split(' ')[0]},
+    // 3. Prepare Message Content based on Status
+    let messageContent = '';
+    if (status === 'rejected') {
+      messageContent = `Hello ${staffName.split(' ')[0]},
+
+I tried to create a ${vacationType} plan for you${dateRange} (${totalDays} days), but it has been rejected due to a scheduling conflict.
+
+Best regards,
+${managerName || 'Manager'}`;
+    } else {
+      messageContent = `Hello ${staffName.split(' ')[0]},
 
 I have created a ${vacationType} plan for you${dateRange} (${totalDays} days).
 It has been automatically approved.
 
 Best regards,
 ${managerName || 'Manager'}`;
+    }
 
     await supabase.from('messages').insert({
       conversation_id: conversationId,

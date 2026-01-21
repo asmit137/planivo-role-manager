@@ -11,6 +11,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface DateTimePickerProps {
   value?: string;
@@ -35,6 +42,21 @@ export function DateTimePicker({
   );
   const [open, setOpen] = React.useState(false);
 
+  // Helper to get 12h parts from 24h string
+  const get12hParts = (time24: string) => {
+    let [hours, minutes] = time24.split(":").map(Number);
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    return {
+      hour: hours.toString(),
+      minute: minutes.toString().padStart(2, '0'),
+      ampm
+    };
+  };
+
+  const { hour, minute, ampm } = React.useMemo(() => get12hParts(time), [time]);
+
   React.useEffect(() => {
     if (value) {
       const d = new Date(value);
@@ -49,23 +71,42 @@ export function DateTimePicker({
     updateDateTime(selectedDate, time);
   };
 
-  const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTime = e.target.value;
-    setTime(newTime);
-    if (date) updateDateTime(date, newTime);
-  };
-
   const updateDateTime = (d: Date, t: string) => {
     const [hours, minutes] = t.split(":").map(Number);
     const newDate = new Date(d);
     newDate.setHours(hours, minutes, 0, 0);
-    onChange(newDate.toISOString().slice(0, 16));
+    onChange(newDate.toISOString());
+  };
+
+  const handleTimePartChange = (part: 'hour' | 'minute' | 'ampm', newValue: string) => {
+    let h = parseInt(hour);
+    let m = parseInt(minute);
+    let ap = ampm;
+
+    if (part === 'hour') h = parseInt(newValue);
+    if (part === 'minute') m = parseInt(newValue);
+    if (part === 'ampm') ap = newValue;
+
+    // Convert back to 24h
+    let h24 = h;
+    if (ap === "PM" && h < 12) h24 += 12;
+    if (ap === "AM" && h === 12) h24 = 0;
+
+    const newTime24 = `${h24.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    setTime(newTime24);
+    if (date) {
+      // Create a temporary date object to ensure immediate update with correct time
+      const [hours, minutes] = newTime24.split(":").map(Number);
+      const newDate = new Date(date);
+      newDate.setHours(hours, minutes, 0, 0);
+      onChange(newDate.toISOString());
+    }
   };
 
   const displayValue = React.useMemo(() => {
     if (!date) return placeholder;
-    return `${format(date, "EEE, MMM d, yyyy")} at ${time}`;
-  }, [date, time, placeholder]);
+    return `${format(date, "EEE, MMM d, yyyy")} at ${hour}:${minute} ${ampm}`;
+  }, [date, hour, minute, ampm, placeholder]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -89,7 +130,6 @@ export function DateTimePicker({
         className="w-auto p-0 border shadow-md bg-card rounded-lg overflow-hidden"
       >
         <div className="flex flex-col p-3 space-y-3">
-          {/* Calendar - Standard Sizing */}
           <Calendar
             mode="single"
             selected={date}
@@ -104,7 +144,6 @@ export function DateTimePicker({
             className="p-0 border-0"
           />
 
-          {/* Time Picker - Compact */}
           <div className="space-y-2 pt-2 border-t border-border">
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2 text-muted-foreground">
@@ -114,19 +153,49 @@ export function DateTimePicker({
                 </span>
               </div>
               <span className="text-[0.7rem] font-bold text-primary">
-                {time}
+                {hour}:{minute} {ampm}
               </span>
             </div>
 
-            <Input
-              type="time"
-              value={time}
-              onChange={handleTimeChange}
-              className="h-8 text-xs font-semibold bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/30"
-            />
+            <div className="flex gap-1">
+              <Select value={hour} onValueChange={(v) => handleTimePartChange('hour', v)}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+                    <SelectItem key={h} value={h.toString()}>
+                      {h}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={minute} onValueChange={(v) => handleTimePartChange('minute', v)}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={ampm} onValueChange={(v) => handleTimePartChange('ampm', v)}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AM">AM</SelectItem>
+                  <SelectItem value="PM">PM</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* Confirm Button */}
           <Button
             onClick={() => setOpen(false)}
             disabled={!date}

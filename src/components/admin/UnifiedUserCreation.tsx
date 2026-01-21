@@ -43,7 +43,8 @@ const UnifiedUserCreation = ({
   scopeId: propScopeId
 }: UnifiedUserCreationProps) => {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('12345678');
+  // Password is now generated on the server for security
+  // const [password, setPassword] = useState('12345678');
   const [fullName, setFullName] = useState('');
   const [organizationId, setOrganizationId] = useState<string | undefined>(initialOrganizationId);
   const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
@@ -65,8 +66,8 @@ const UnifiedUserCreation = ({
       'super_admin',
       'organization_admin',
       'general_admin',
-      'workplace_supervisor',
       'workspace_supervisor',
+      'workplace_supervisor',
       'facility_supervisor',
       'department_head',
       'staff',
@@ -88,9 +89,9 @@ const UnifiedUserCreation = ({
   const getAvailableRoles = (): AppRole[] => {
     switch (highestRole) {
       case 'super_admin':
-        return ['organization_admin', 'general_admin', 'workplace_supervisor', 'workspace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern', 'custom'];
+        return ['organization_admin', 'general_admin', 'workspace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern', 'custom'];
       case 'organization_admin':
-        return ['workplace_supervisor', 'workspace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern'];
+        return ['workspace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern'];
       case 'workplace_supervisor':
       case 'workspace_supervisor':
         return ['facility_supervisor', 'department_head', 'staff', 'intern'];
@@ -119,7 +120,7 @@ const UnifiedUserCreation = ({
         if (currentUserRole.organization_id) setOrganizationId(currentUserRole.organization_id);
         if (currentUserRole.workspace_id) setWorkspaceId(currentUserRole.workspace_id);
         if (currentUserRole.facility_id) setFacilityId(currentUserRole.facility_id);
-      } else if (highestRole === 'workplace_supervisor' || highestRole === 'workspace_supervisor') {
+      } else if (highestRole === 'workspace_supervisor' || highestRole === 'workplace_supervisor') {
         if (currentUserRole.organization_id) setOrganizationId(currentUserRole.organization_id);
         if (currentUserRole.workspace_id) setWorkspaceId(currentUserRole.workspace_id);
       }
@@ -457,7 +458,7 @@ const UnifiedUserCreation = ({
         {
           body: {
             email: userData.email,
-            password,
+            // password, // Password generated on server
             full_name: userData.full_name,
             role: userData.role,
             organization_id: userData.organization_id,
@@ -476,7 +477,7 @@ const UnifiedUserCreation = ({
     },
     onSuccess: () => {
       toast.success(`User created successfully!`, {
-        description: "Please remind them to check their spam folder for the welcome email."
+        description: "Credentials have been sent to their email address."
       });
       queryClient.invalidateQueries({ queryKey: ['unified-users'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -538,7 +539,7 @@ const UnifiedUserCreation = ({
     // Role-specific validation
     if (role === 'organization_admin') {
       if (!organizationId) { toast.error('Organization is required'); return; }
-    } else if (role === 'workplace_supervisor' || role === 'workspace_supervisor') {
+    } else if (role === 'workspace_supervisor' || role === 'workplace_supervisor') {
       if (!organizationId) { toast.error('Organization is required'); return; }
       if (!workspaceId) { toast.error('Workspace is required'); return; }
     } else if (role === 'facility_supervisor') {
@@ -567,7 +568,7 @@ const UnifiedUserCreation = ({
 
   const handleReset = () => {
     setEmail('');
-    setPassword('');
+    // setPassword('');
     setFullName('');
     setOrganizationId(initialOrganizationId);
     setWorkspaceId(undefined);
@@ -681,24 +682,10 @@ const UnifiedUserCreation = ({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Initial Password *</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Minimum 6 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                maxLength={128}
-                autoComplete="new-password"
-              />
-              <p className="text-xs text-muted-foreground">
-                User will be required to change this password on first login
-              </p>
-            </div>
           </div>
+
+          {/* Password input removed - generated on server */}
+
 
           {/* Role Assignment - Moved BEFORE Organization Assignment */}
           <div className="space-y-4">
@@ -720,8 +707,8 @@ const UnifiedUserCreation = ({
                   {availableRoles.includes('general_admin') && (
                     <SelectItem value="general_admin">General Admin</SelectItem>
                   )}
-                  {availableRoles.includes('workplace_supervisor') && (
-                    <SelectItem value="workplace_supervisor">Workspace Supervisor</SelectItem>
+                  {availableRoles.includes('workspace_supervisor') && (
+                    <SelectItem value="workspace_supervisor">Workspace Supervisor</SelectItem>
                   )}
                   {availableRoles.includes('facility_supervisor') && (
                     <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
@@ -735,20 +722,21 @@ const UnifiedUserCreation = ({
                   {availableRoles.includes('intern') && (
                     <SelectItem value="intern">Intern</SelectItem>
                   )}
-                  {availableRoles.includes('workspace_supervisor') && (
-                    <SelectItem value="workspace_supervisor">Workspace Supervisor</SelectItem>
-                  )}
+                  {/* Removed workplace_supervisor to prevent double entry */}
                   {availableRoles.includes('custom') && customRoles?.map((cr) => (
-                    <SelectItem key={cr.id} value={cr.id}>
-                      {cr.name} (Custom)
-                    </SelectItem>
+                    // Filter out custom roles that have the same name as built-in roles to prevent confusion
+                    !['staff', 'intern', 'department head', 'facility supervisor', 'workspace supervisor'].includes(cr.name.toLowerCase()) && (
+                      <SelectItem key={cr.id} value={cr.id}>
+                        {cr.name} (Custom)
+                      </SelectItem>
+                    )
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
                 {role === 'organization_admin' && 'Organization-level access - manages workspaces, facilities, and users within an organization'}
                 {role === 'general_admin' && 'General admin access - manages the workspace'}
-                {role === 'workplace_supervisor' && 'Workspace-level access - no facility/department required'}
+                {(role === 'workspace_supervisor' || role === 'workplace_supervisor') && 'Workspace-level access - no facility/department required'}
                 {role === 'facility_supervisor' && 'Facility-level access - department not required'}
                 {role === 'department_head' && 'Department-level access - requires facility and department'}
                 {role === 'staff' && 'Staff member - requires facility and department'}
@@ -794,8 +782,8 @@ const UnifiedUserCreation = ({
                   )}
                 </div>
 
-                {/* Workspace - Required for Workplace Supervisor and below */}
-                {['workplace_supervisor', 'workspace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern'].includes(role) && (
+                {/* Workspace - Required for Workspace Supervisor and below */}
+                {['workspace_supervisor', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern'].includes(role) && (
                   <div className="space-y-2">
                     <Label htmlFor="workspace">Workspace *</Label>
                     <Select
@@ -854,8 +842,8 @@ const UnifiedUserCreation = ({
                   </div>
                 )}
 
-                {/* Department - Required for Department Head and Staff */}
-                {['department_head', 'staff'].includes(role) && (
+                {/* Department - Required for Department Head, Staff, and Intern */}
+                {['department_head', 'staff', 'intern'].includes(role) && (
                   <div className="space-y-2">
                     <Label htmlFor="department">Department *</Label>
                     <Select
@@ -884,8 +872,8 @@ const UnifiedUserCreation = ({
                   </div>
                 )}
 
-                {/* Specialty - Optional for Staff */}
-                {role === 'staff' && (
+                {/* Specialty - Optional for Staff and Intern */}
+                {['staff', 'intern'].includes(role) && (
                   <div className="space-y-2">
                     <Label htmlFor="specialty">Specialty (Optional)</Label>
                     <Select
@@ -921,7 +909,7 @@ const UnifiedUserCreation = ({
             <AlertDescription>
               User will receive email: <strong>{email || 'user@example.com'}</strong>
               <br />
-              Initial password: <strong>{password || '(not set)'}</strong> (must change on first login)
+              Initial password will be <strong>randomly generated</strong> and sent to this email.
             </AlertDescription>
           </Alert>
 

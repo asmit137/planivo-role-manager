@@ -181,6 +181,27 @@ const TrainingEventList = ({
     onSelectEvent?.(eventId);
   };
 
+  const getEmptyStateParams = () => {
+    if (showOnlyRegistered) {
+      return {
+        title: "No Registrations",
+        description: "You haven't registered for any events yet. Browse upcoming events to register."
+      };
+    }
+
+    if (searchQuery || eventTypeFilter !== 'all') {
+      return {
+        title: "No Events Found",
+        description: "No events match your current filters."
+      };
+    }
+
+    return {
+      title: "No Events Found",
+      description: "No training events are scheduled. Check back later!"
+    };
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -237,14 +258,8 @@ const TrainingEventList = ({
       {filteredEvents.length === 0 ? (
         <EmptyState
           icon={Calendar}
-          title={showOnlyRegistered ? "No Registrations" : "No Events Found"}
-          description={
-            showOnlyRegistered
-              ? "You haven't registered for any events yet. Browse upcoming events to register."
-              : searchQuery || eventTypeFilter !== 'all'
-                ? "No events match your current filters."
-                : "No training events are scheduled. Check back later!"
-          }
+          title={getEmptyStateParams().title}
+          description={getEmptyStateParams().description}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -1,5 +1,7 @@
 // @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// @ts-ignore
+import nodemailer from "npm:nodemailer@6.9.10";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -47,18 +49,29 @@ Deno.serve(async (req: Request) => {
 
         if (dbError) throw dbError;
 
-        const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-        if (RESEND_API_KEY) {
-            console.log(`Attempting to send OTP email to ${email} via Resend...`);
-            const res = await fetch("https://api.resend.com/emails", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${RESEND_API_KEY}`,
-                },
-                body: JSON.stringify({
-                    from: "Planivo <onboarding@resend.dev>",
-                    to: [email],
+        // Send OTP via SMTP
+        const SMTP_HOST = Deno.env.get("SMTP_HOST");
+        const SMTP_PORT = Deno.env.get("SMTP_PORT");
+        const SMTP_USER = Deno.env.get("SMTP_USER");
+        const SMTP_PASS = Deno.env.get("SMTP_PASS");
+        const SMTP_FROM = Deno.env.get("SMTP_FROM") || "Planivo <noreply@planivo.com>";
+
+        if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+            console.log(`Attempting to send OTP email to ${email} via SMTP...`);
+            try {
+                const transporter = nodemailer.createTransport({
+                    host: SMTP_HOST,
+                    port: parseInt(SMTP_PORT || "587"),
+                    secure: parseInt(SMTP_PORT || "587") === 465,
+                    auth: {
+                        user: SMTP_USER,
+                        pass: SMTP_PASS,
+                    },
+                });
+
+                await transporter.sendMail({
+                    from: SMTP_FROM,
+                    to: email,
                     subject: "Your Password Change Verification Code",
                     html: `
                         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
@@ -72,17 +85,15 @@ Deno.serve(async (req: Request) => {
                             <p style="color: #6b7280; font-size: 14px;">If you did not request this change, please ignore this email.</p>
                         </div>
                     `,
-                }),
-            });
-
-            if (!res.ok) {
-                const error = await res.text();
-                console.error("Resend API error:", error);
-            } else {
-                console.log("OTP email sent successfully via Resend");
+                });
+                console.log("OTP email sent successfully via SMTP");
+            } catch (error) {
+                console.error("Failed to send OTP email via SMTP:", error);
+                // Don't throw error to client if email fails, but log it. 
+                // Client usually needs to know if OTP generation succeeded.
             }
         } else {
-            console.warn("RESEND_API_KEY not set. OTP will only be logged to console.");
+            console.warn("SMTP environment variables not set. OTP will only be logged to console.");
         }
 
         // For development: log the OTP to Supabase logs

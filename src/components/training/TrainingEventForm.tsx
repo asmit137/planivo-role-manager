@@ -241,9 +241,9 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
       location_type: (existingEvent?.location_type as EventFormData['location_type']) || 'physical',
       location_address: existingEvent?.location_address || '',
       online_link: existingEvent?.online_link || '',
-      start_datetime: existingEvent?.start_datetime ? new Date(existingEvent.start_datetime).toISOString().slice(0, 16) : '',
-      end_datetime: existingEvent?.end_datetime ? new Date(existingEvent.end_datetime).toISOString().slice(0, 16) : '',
-      organization_id: existingEvent?.organization_id || organizationId || userOrganization?.id || '',
+      start_datetime: existingEvent?.start_datetime ? new Date(existingEvent.start_datetime).toISOString() : '',
+      end_datetime: existingEvent?.end_datetime ? new Date(existingEvent.end_datetime).toISOString() : '',
+      organization_id: existingEvent?.organization_id || organizationId || selectedOrganizationId || userOrganization?.id || '',
       max_participants: existingEvent?.max_participants || null,
       status: (existingEvent?.status as EventFormData['status']) || 'published',
       // Registration defaults
@@ -267,9 +267,9 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
         location_type: (existingEvent.location_type as EventFormData['location_type']),
         location_address: existingEvent.location_address || '',
         online_link: existingEvent.online_link || '',
-        start_datetime: new Date(existingEvent.start_datetime).toISOString().slice(0, 16),
-        end_datetime: new Date(existingEvent.end_datetime).toISOString().slice(0, 16),
-        organization_id: existingEvent.organization_id || organizationId || userOrganization?.id || '',
+        start_datetime: new Date(existingEvent.start_datetime).toISOString(),
+        end_datetime: new Date(existingEvent.end_datetime).toISOString(),
+        organization_id: existingEvent.organization_id || organizationId || selectedOrganizationId || userOrganization?.id || '',
         max_participants: existingEvent.max_participants || null,
         status: (existingEvent.status as EventFormData['status']),
         registration_type: (existingEvent.registration_type as EventFormData['registration_type']) || 'open',
@@ -750,8 +750,19 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
                         Online Meeting Link
                       </FormLabel>
                       <FormControl>
-                        <Input placeholder="https://..." {...field} />
+                        {enableVideoConference ? (
+                          <div className="flex items-center h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground italic">
+                            System-generated Video Meeting (Link will be created automatically)
+                          </div>
+                        ) : (
+                          <Input placeholder="https://zoom.us/..." {...field} />
+                        )}
                       </FormControl>
+                      {!enableVideoConference && (
+                        <FormDescription>
+                          Paste your invite link here (Zoom, Google Meet, Teams, etc.)
+                        </FormDescription>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}

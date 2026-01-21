@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { User, Settings, Loader2, Mail, Briefcase, Phone } from 'lucide-react';
+import { User, Settings, Loader2, Mail, Briefcase, Phone, Lock, ChevronDown, ChevronUp } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 
@@ -21,13 +21,16 @@ interface UserProfileProps {
 }
 
 const UserProfile = ({ collapsed = false }: UserProfileProps) => {
+  const passwordSectionRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [roles, setRoles] = useState<any[]>([]);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
+
+  // Password Change States
+  const [showPasswordFields, setShowPasswordFields] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [otp, setOtp] = useState('');
@@ -39,6 +42,24 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
       loadProfile();
     }
   }, [open]);
+
+  useEffect(() => {
+    let timer: any;
+    if (otpCooldown > 0) {
+      timer = setTimeout(() => setOtpCooldown(prev => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [otpCooldown]);
+
+  useEffect(() => {
+    if (showPasswordFields) {
+      // Small timeout to allow the element to render/expand before scrolling
+      const timeout = setTimeout(() => {
+        passwordSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+      return () => clearTimeout(timeout);
+    }
+  }, [showPasswordFields]);
 
   const loadProfile = async () => {
     try {
@@ -119,46 +140,29 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
       return;
     }
 
-    if (newPassword === '123456') {
-      toast.error('Please choose a more secure password than the default');
-      return;
-    }
-
     setLoading(true);
-    // console.log('[UserProfile] Initiating OTP request for:', profile.email);
     try {
-      const { data, error } = await supabase.functions.invoke('send-password-otp', {
+      const { error } = await supabase.functions.invoke('send-password-otp', {
         body: { email: profile.email },
       });
 
-      // console.log('[UserProfile] OTP function response:', { data, error });
-
       if (error) {
-        console.error('[UserProfile] Edge Function Error:', error);
-
-        // Attempt to parse the error message from the response body if possible
         let errorMessage = error.message;
         if (error instanceof Error && (error as any).context) {
           try {
             const body = await (error as any).context.json();
-            if (body && body.error) {
-              errorMessage = body.error;
-            }
-          } catch (e) {
-            console.error('[UserProfile] Failed to parse error body:', e);
-          }
+            if (body && body.error) errorMessage = body.error;
+          } catch (e) { }
         }
-
         throw new Error(errorMessage);
       }
 
       setIsOtpSent(true);
       setOtpCooldown(60);
       toast.success('Verification code sent!', {
-        description: "Please check your email. Be sure to check your spam folder too."
+        description: "Please check your email (and spam folder)."
       });
     } catch (error: any) {
-      console.error('[UserProfile] Error in handleSendOTP:', error);
       toast.error(error.message || 'Failed to send verification code');
     } finally {
       setLoading(false);
@@ -178,7 +182,7 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('verify-and-update-password', {
+      const { error } = await supabase.functions.invoke('verify-and-update-password', {
         body: {
           email: profile.email,
           otp,
@@ -186,24 +190,23 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
         },
       });
 
-      // console.log('[UserProfile] Password change response:', { data, error });
-
       if (error) {
-        console.error('[UserProfile] Edge Function Password Error:', error);
-
         let errorMessage = error.message;
         if (error instanceof Error && (error as any).context) {
           try {
             const body = await (error as any).context.json();
-            if (body && body.error) {
-              errorMessage = body.error;
-            }
-          } catch (e) {
-            console.error('[UserProfile] Failed to parse password error body:', e);
-          }
+            if (body && body.error) errorMessage = body.error;
+          } catch (e) { }
         }
-
         throw new Error(errorMessage);
+      }
+
+      // Success! Clear force flag if necessary
+      if (profile?.force_password_change) {
+        await supabase
+          .from('profiles')
+          .update({ force_password_change: false })
+          .eq('id', profile.id);
       }
 
       toast.success('Password changed successfully');
@@ -211,30 +214,24 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
       setOtp('');
       setNewPassword('');
       setConfirmPassword('');
+      setShowPasswordFields(false);
     } catch (error: any) {
-      console.error('[UserProfile] Error in handleChangePassword:', error);
       toast.error(error.message || 'Failed to change password');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    let timer: any;
-    if (otpCooldown > 0) {
-      timer = setTimeout(() => setOtpCooldown(prev => prev - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [otpCooldown]);
-
   const getRoleLabel = (role: string) => {
     const labels: Record<string, string> = {
       super_admin: 'Super Admin',
       general_admin: 'General Admin',
       workplace_supervisor: 'Workspace Supervisor',
+      workspace_supervisor: 'Workspace Supervisor',
       facility_supervisor: 'Facility Supervisor',
       department_head: 'Department Head',
       staff: 'Staff',
+      intern: 'Intern',
     };
     return labels[role] || role;
   };
@@ -322,39 +319,56 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
               <Briefcase className="h-4 w-4" />
               Roles & Specialties
             </h3>
-            <p className="text-xs text-muted-foreground">
-              Assigned by your department head or administrator
-            </p>
 
             {roles.length > 0 ? (
-              <div className="space-y-3">
-                {roles.map((role, index) => (
-                  <div key={index} className="p-3 border rounded-lg bg-muted/30 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary">{getRoleLabel(role.role)}</Badge>
-                    </div>
-                    {role.workspace && (
-                      <p className="text-sm text-muted-foreground">
-                        <span className="font-medium">Workspace:</span> {role.workspace.name}
-                      </p>
-                    )}
-                    {role.facility && (
-                      <p className="text-sm text-muted-foreground">
-                        <span className="font-medium">Facility:</span> {role.facility.name}
-                      </p>
-                    )}
-                    {role.department && (
-                      <p className="text-sm text-muted-foreground">
-                        <span className="font-medium">Department:</span> {role.department.name}
-                      </p>
-                    )}
-                    {role.specialty && (
-                      <p className="text-sm text-muted-foreground">
-                        <span className="font-medium">Specialty:</span> {role.specialty.name}
-                      </p>
-                    )}
-                  </div>
-                ))}
+              <div className="border rounded-lg overflow-hidden border-border bg-muted/20">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-muted/50 border-b border-border">
+                    <tr>
+                      <th className="px-4 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Role</th>
+                      <th className="px-4 py-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Workspace / Facility / Department</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {roles.map((role, index) => (
+                      <tr key={index} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3 align-top whitespace-nowrap">
+                          <Badge variant="secondary" className="font-medium text-[11px] h-5 py-0 px-2 leading-none">
+                            {getRoleLabel(role.role)}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="space-y-1">
+                            {role.workspace && (
+                              <p className="text-xs text-foreground flex items-center gap-1.5">
+                                <span className="text-muted-foreground font-normal min-w-[70px]">Workspace:</span>
+                                <span className="font-medium truncate">{role.workspace.name}</span>
+                              </p>
+                            )}
+                            {role.facility && (
+                              <p className="text-xs text-foreground flex items-center gap-1.5">
+                                <span className="text-muted-foreground font-normal min-w-[70px]">Facility:</span>
+                                <span className="font-medium truncate">{role.facility.name}</span>
+                              </p>
+                            )}
+                            {role.department && (
+                              <p className="text-xs text-foreground flex items-center gap-1.5">
+                                <span className="text-muted-foreground font-normal min-w-[70px]">Department:</span>
+                                <span className="font-medium truncate">{role.department.name}</span>
+                              </p>
+                            )}
+                            {role.specialty && (
+                              <p className="text-xs text-secondary-foreground flex items-center gap-1.5">
+                                <span className="text-muted-foreground font-normal min-w-[70px]">Specialty:</span>
+                                <span className="font-medium truncate">{role.specialty.name}</span>
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No roles assigned yet</p>
@@ -363,81 +377,102 @@ const UserProfile = ({ collapsed = false }: UserProfileProps) => {
 
           <Separator />
 
-          {/* Change Password */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-foreground">Change Password</h3>
-
-            <div className="space-y-2">
-              <Label htmlFor="newPassword">New Password</Label>
-              <Input
-                id="newPassword"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password (min 6 characters)"
-                disabled={loading}
-              />
+          {/* Change Password Section */}
+          <div className="space-y-4" ref={passwordSectionRef}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Lock className="h-4 w-4" />
+                Change Password
+              </h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPasswordFields(!showPasswordFields)}
+                className="h-8 gap-1"
+              >
+                {showPasswordFields ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                {showPasswordFields ? 'Cancel' : 'Change Password'}
+              </Button>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password"
-                disabled={loading || isOtpSent}
-              />
-            </div>
-
-            {isOtpSent && (
-              <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                <Label htmlFor="otp">Verification Code</Label>
-                <Input
-                  id="otp"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  placeholder="Enter 6-digit code"
-                  className="text-center tracking-widest font-mono text-lg"
-                  maxLength={6}
-                  disabled={loading}
-                />
-                <p className="text-xs text-muted-foreground text-center">
-                  Sent to {profile?.email}
-                </p>
-                <div className="flex justify-center">
-                  <Button
-                    variant="link"
-                    size="sm"
-                    onClick={handleSendOTP}
-                    disabled={loading || otpCooldown > 0}
-                    className="text-xs"
-                  >
-                    {otpCooldown > 0 ? `Resend in ${otpCooldown}s` : "Resend code"}
-                  </Button>
+            {showPasswordFields && (
+              <div className="space-y-4 p-4 border rounded-lg bg-accent/5 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Min 6 characters"
+                    disabled={loading || isOtpSent}
+                  />
                 </div>
-              </div>
-            )}
 
-            {!isOtpSent ? (
-              <Button
-                onClick={handleSendOTP}
-                disabled={loading}
-                className="w-full"
-              >
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Send Verification Code
-              </Button>
-            ) : (
-              <Button
-                onClick={handleChangePassword}
-                disabled={loading || !otp}
-                className="w-full"
-              >
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Verify & Change Password
-              </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    disabled={loading || isOtpSent}
+                  />
+                </div>
+
+                {isOtpSent && (
+                  <div className="space-y-3 pt-2">
+                    <Separator className="opacity-50" />
+                    <div className="space-y-2">
+                      <Label htmlFor="otp">Verification Code</Label>
+                      <Input
+                        id="otp"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value)}
+                        placeholder="Enter 6-digit code"
+                        className="text-center tracking-widest font-mono text-lg"
+                        maxLength={6}
+                        disabled={loading}
+                      />
+                      <div className="flex items-center justify-between px-1">
+                        <p className="text-[10px] text-muted-foreground">
+                          Code sent to your email
+                        </p>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          onClick={handleSendOTP}
+                          disabled={loading || otpCooldown > 0}
+                          className="h-auto p-0 text-[10px]"
+                        >
+                          {otpCooldown > 0 ? `Resend in ${otpCooldown}s` : "Resend code"}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!isOtpSent ? (
+                  <Button
+                    onClick={handleSendOTP}
+                    disabled={loading}
+                    className="w-full"
+                  >
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Send Verification Code
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleChangePassword}
+                    disabled={loading || !otp}
+                    className="w-full"
+                  >
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Verify & Change Password
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </div>
