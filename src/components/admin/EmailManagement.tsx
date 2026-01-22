@@ -142,7 +142,7 @@ export function EmailManagement() {
       vacation: { label: 'Vacation', className: 'bg-blue-500/20 text-blue-400' },
       task: { label: 'Task', className: 'bg-green-500/20 text-green-400' },
       schedule: { label: 'Schedule', className: 'bg-yellow-500/20 text-yellow-400' },
-      training: { label: 'Training', className: 'bg-cyan-500/20 text-cyan-400' },
+      training: { label: 'Training', className: 'bg-brand-purple/20 text-brand-purple dark:text-indigo-300' },
     };
     const config = types[type] || { label: type, className: 'bg-gray-500/20 text-gray-400' };
     return <Badge className={config.className}>{config.label}</Badge>;

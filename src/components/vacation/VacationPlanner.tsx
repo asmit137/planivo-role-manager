@@ -154,7 +154,8 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, email')
-        .in('id', userIds);
+        .in('id', userIds)
+        .eq('is_active', true);
 
       if (profilesError) throw profilesError;
 
@@ -163,13 +164,15 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
       return roles
         .map(role => {
           const profile = profilesArray.find(p => p.id === role.user_id);
+          if (!profile) return null;
+
           return {
             user_id: role.user_id,
             role: role.role,
-            profiles: profile || { id: role.user_id, full_name: 'Unknown User', email: 'No email' }
+            profiles: profile
           };
         })
-        .filter(item => item.profiles !== null)
+        .filter((item): item is DepartmentStaffMember => item !== null)
         .sort((a, b) => {
           if (a.role === 'department_head' && b.role !== 'department_head') return -1;
           if (b.role === 'department_head' && a.role !== 'department_head') return 1;

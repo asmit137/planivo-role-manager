@@ -140,7 +140,7 @@ export function RealTimeActivityMonitor() {
       profiles: 'text-purple-400',
       user_roles: 'text-orange-400',
       organizations: 'text-blue-400',
-      workspaces: 'text-cyan-400',
+      workspaces: 'text-brand-purple dark:text-indigo-300',
       facilities: 'text-green-400',
       departments: 'text-teal-400',
       tasks: 'text-yellow-400',

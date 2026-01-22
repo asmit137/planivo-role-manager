@@ -170,7 +170,13 @@ const DepartmentHeadDashboard = () => {
             description="Manage staff schedules and shifts"
           />
         )}
-        {!['staff', 'vacation', 'tasks', 'messaging', 'notifications', 'scheduling'].includes(activeTab || '') && (
+        {activeTab === 'training' && (
+          <PageHeader
+            title="Meeting & Training"
+            description="Create and manage meetings and training sessions"
+          />
+        )}
+        {!['staff', 'vacation', 'tasks', 'messaging', 'notifications', 'scheduling', 'training'].includes(activeTab || '') && (
           <PageHeader
             title="Department Overview"
             description="Manage your department"
@@ -178,7 +184,7 @@ const DepartmentHeadDashboard = () => {
         )}
 
         <div className="space-y-4">
-          {!['staff', 'vacation', 'tasks', 'messaging', 'notifications', 'scheduling'].includes(activeTab || '') && (
+          {!['staff', 'vacation', 'tasks', 'messaging', 'notifications', 'scheduling', 'training'].includes(activeTab || '') && (
             <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
               <div className="rounded-lg border bg-card p-4 sm:p-6">
                 <div className="flex items-center justify-between">

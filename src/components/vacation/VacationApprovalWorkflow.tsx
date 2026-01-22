@@ -688,8 +688,8 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                   </div>
 
                   {plan.notes && (
-                    <div className="bg-cyan-500/5 p-4 rounded-xl border border-cyan-500/10 shadow-sm">
-                      <p className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2">Notes</p>
+                    <div className="bg-brand-purple/5 p-4 rounded-xl border border-brand-purple/10 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-wider text-brand-purple dark:text-indigo-300 mb-2">Notes</p>
                       <p className="text-sm leading-relaxed opacity-90">{plan.notes}</p>
                     </div>
                   )}
@@ -704,10 +704,10 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                         {plan.vacation_splits.map((split: any, index: number) => (
                           <div
                             key={split.id}
-                            className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-background dark:bg-[#0d1b1f] rounded-xl border border-border border-l-4 border-l-cyan-500 shadow-sm gap-2 transition-all hover:shadow-md"
+                            className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-background dark:bg-[#0d1b1f] rounded-xl border border-border border-l-4 border-l-brand-purple shadow-sm gap-2 transition-all hover:shadow-md"
                           >
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-black uppercase tracking-widest text-cyan-600 dark:text-cyan-400">Segment {index + 1}</span>
+                              <span className="text-xs font-black uppercase tracking-widest text-brand-purple dark:text-indigo-300">Segment {index + 1}</span>
                             </div>
                             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                               <span className="text-sm font-bold flex items-center gap-1.5">
@@ -716,7 +716,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                                 <span className="text-foreground">{format(new Date(split.end_date), 'MMM dd, yyyy')}</span>
                               </span>
                               <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-cyan-500/10 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 rounded-md border border-cyan-500/20">
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-brand-purple/10 dark:bg-brand-purple/20 text-brand-purple dark:text-indigo-300 rounded-md border border-brand-purple/20">
                                   {split.days} days
                                 </span>
                                 {split.status && split.status !== 'pending' && (
@@ -826,7 +826,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                           className={cn(
                             "flex items-start gap-3 p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer hover:shadow-md",
                             isSelected
-                              ? "bg-background dark:bg-[#0d1b1f] border-cyan-500/50 shadow-sm border-l-4 border-l-cyan-500"
+                              ? "bg-background dark:bg-[#0d1b1f] border-brand-purple/50 shadow-sm border-l-4 border-l-brand-purple"
                               : "bg-muted/30 border-transparent border-l-4 border-l-muted grayscale-[0.8] opacity-60"
                           )}
                           onClick={() => toggleSplitSelection(split.id)}
@@ -836,7 +836,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                               checked={isSelected}
                               onCheckedChange={() => toggleSplitSelection(split.id)}
                               id={`split-${split.id}`}
-                              className="h-5 w-5 data-[state=checked]:bg-cyan-600 data-[state=checked]:border-cyan-600"
+                              className="h-5 w-5 data-[state=checked]:bg-brand-purple data-[state=checked]:border-brand-purple"
                               onClick={(e) => e.stopPropagation()}
                             />
                           </div>
@@ -846,13 +846,13 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                                 htmlFor={`split-${split.id}`}
                                 className={cn(
                                   "text-[10px] font-black uppercase tracking-widest cursor-pointer transition-colors",
-                                  isSelected ? "text-cyan-700 dark:text-cyan-400" : "text-muted-foreground"
+                                  isSelected ? "text-brand-purple dark:text-indigo-300" : "text-muted-foreground"
                                 )}
                               >
                                 Segment {index + 1}
                               </label>
                               {isSelected ? (
-                                <span className="text-[10px] font-black uppercase tracking-tighter text-cyan-600 bg-cyan-500/10 px-2 py-0.5 rounded-full shrink-0">
+                                <span className="text-[10px] font-black uppercase tracking-tighter text-brand-purple bg-brand-purple/10 px-2 py-0.5 rounded-full shrink-0">
                                   Approved
                                 </span>
                               ) : (
@@ -971,7 +971,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                       hasConflict
                         ? "border-warning/50 bg-warning/5 shadow-sm border-l-4 border-l-warning"
                         : isSelected
-                          ? "border-cyan-500/30 bg-background dark:bg-[#0d1b1f] shadow-sm border-l-4 border-l-cyan-500"
+                          ? "border-brand-purple/30 bg-background dark:bg-[#0d1b1f] shadow-sm border-l-4 border-l-brand-purple"
                           : "border-transparent bg-muted/30 grayscale-[0.8] opacity-60 border-l-4 border-l-muted"
                     )}
                     onClick={() => toggleSplitSelection(split.id)}
@@ -982,7 +982,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                           checked={isSelected}
                           onCheckedChange={() => toggleSplitSelection(split.id)}
                           id={`conflict-split-${split.id}`}
-                          className="h-5 w-5 data-[state=checked]:bg-cyan-600 data-[state=checked]:border-cyan-600"
+                          className="h-5 w-5 data-[state=checked]:bg-brand-purple data-[state=checked]:border-brand-purple"
                           onClick={(e) => e.stopPropagation()}
                         />
                       </div>
@@ -992,7 +992,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                             htmlFor={`conflict-split-${split.id}`}
                             className={cn(
                               "text-[10px] font-black uppercase tracking-widest cursor-pointer",
-                              isSelected ? (hasConflict ? "text-warning" : "text-cyan-700 dark:text-cyan-400") : "text-muted-foreground"
+                              isSelected ? (hasConflict ? "text-warning" : "text-brand-purple dark:text-indigo-300") : "text-muted-foreground"
                             )}
                           >
                             Segment {index + 1}
@@ -1009,7 +1009,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                               </Badge>
                             )}
                             {isSelected ? (
-                              <span className="text-[10px] font-black uppercase tracking-tighter text-cyan-600 bg-cyan-500/10 px-2 py-0.5 rounded-full">
+                              <span className="text-[10px] font-black uppercase tracking-tighter text-brand-purple bg-brand-purple/10 px-2 py-0.5 rounded-full">
                                 Approved
                               </span>
                             ) : (

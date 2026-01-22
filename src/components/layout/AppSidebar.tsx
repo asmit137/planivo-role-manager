@@ -57,6 +57,7 @@ import {
 } from '@/components/ui/sidebar';
 import { OrganizationSwitcher } from './OrganizationSwitcher';
 
+
 interface AppSidebarProps {
   hasAccess: (moduleKey: string) => boolean;
   signOut: () => void;
@@ -81,7 +82,7 @@ const moduleConfig = [
   { key: 'task_management', label: 'Tasks', icon: CheckSquare, path: '/dashboard?tab=tasks' },
   { key: 'training', label: 'Meeting & Training', icon: GraduationCap, path: '/dashboard?tab=training' },
   { key: 'messaging', label: 'Messages', icon: MessageSquare, path: '/dashboard?tab=messaging' },
-  { key: 'notifications', label: 'Notifications', icon: Bell, path: '/dashboard?tab=notifications' },
+  { key: 'notifications', label: 'Notifications', icon: Bell, path: '/dashboard?tab=notifications', alwaysShow: true },
   { key: 'emails', label: 'Broadcasts', icon: Mail, path: '/dashboard?tab=emails' },
 ];
 
@@ -112,7 +113,7 @@ function SidebarInnerContent({
 }: {
   hasAccess: (moduleKey: string) => boolean;
   signOut: () => void;
-  roleLabel: string;
+  roleLabel: React.ReactNode;
   visibleModules: typeof moduleConfig;
   visibleSystemModules: typeof systemModuleConfig;
   visibleDeveloperModules: typeof developerModuleConfig;
@@ -139,7 +140,7 @@ function SidebarInnerContent({
             <>
               <div>
                 <h1 className="text-xl font-display font-bold text-sidebar-foreground">Planivo</h1>
-                <p className="text-xs text-sidebar-foreground/60 mt-1">{roleLabel}</p>
+                <div className="text-xs text-sidebar-foreground/60 mt-1">{roleLabel}</div>
               </div>
               <SidebarTrigger />
             </>
@@ -340,6 +341,21 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
 
     if (primaryRole === 'workplace_supervisor') return 'Workspace Supervisor';
 
+    if (primaryRole === 'department_head') {
+      const departmentRole = roles?.find(r => r.role === 'department_head');
+      if (departmentRole?.department?.name) {
+        return (
+          <div className="flex flex-col">
+            <span>Department Head</span>
+            <span className="text-[10px] font-semibold opacity-90">
+              [{departmentRole.department.name.toUpperCase()}]
+            </span>
+          </div>
+        );
+      }
+      return 'Department Head';
+    }
+
     return primaryRole.split('_').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
@@ -375,6 +391,8 @@ export function AppSidebar({ hasAccess, signOut }: AppSidebarProps) {
       }
 
       // (Block removed: general_admin is now handled via isSuperAdmin logic above)
+
+
 
       return module.alwaysShow || hasAccess(module.key);
     });

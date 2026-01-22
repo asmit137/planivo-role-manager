@@ -142,7 +142,8 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
                         const { data: profiles } = await supabase
                             .from('profiles')
                             .select('id, full_name, email')
-                            .in('id', userIds);
+                            .in('id', userIds)
+                            .eq('is_active', true);
 
                         // Generate title
                         let displayTitle = convo.title;

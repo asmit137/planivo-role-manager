@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Hash, Lock } from 'lucide-react';
+import { Hash } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -20,7 +20,7 @@ export const CreateChannelModal = ({ open, onOpenChange }: CreateChannelModalPro
     const { data: roles } = useUserRole();
     const queryClient = useQueryClient();
     const [name, setName] = useState('');
-    const [isPrivate, setIsPrivate] = useState(false);
+
 
     const createChannelMutation = useMutation({
         mutationFn: async () => {
@@ -106,19 +106,7 @@ export const CreateChannelModal = ({ open, onOpenChange }: CreateChannelModalPro
                         </div>
                     </div>
 
-                    <div className="space-y-4 pt-2">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Lock className="h-4 w-4 text-zinc-400" />
-                                <span className="font-medium text-zinc-200">Private Channel</span>
-                            </div>
-                            {/* Switch component would go here, omitting for simplicity/available UI components */}
-                            <div className="h-5 w-9 bg-zinc-700 rounded-full cursor-not-allowed" />
-                        </div>
-                        <p className="text-xs text-zinc-400">
-                            Only selected members and roles will be able to view this channel. (Coming soon)
-                        </p>
-                    </div>
+
                 </div>
 
                 <DialogFooter className="bg-zinc-900 pt-4">

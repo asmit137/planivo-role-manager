@@ -86,7 +86,8 @@ const MessagingPanel = () => {
         const { data: allProfiles } = await supabase
           .from('profiles')
           .select('id, full_name, email')
-          .neq('id', user.id);
+          .neq('id', user.id)
+          .eq('is_active', true);
 
         return allProfiles || [];
       }
@@ -108,7 +109,8 @@ const MessagingPanel = () => {
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, full_name, email')
-        .in('id', userIds);
+        .in('id', userIds)
+        .eq('is_active', true);
       return profiles || [];
     },
     enabled: !!user && (open || newConvoOpen),

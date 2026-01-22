@@ -70,6 +70,7 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
           .from('profiles')
           .select('id, full_name, email')
           .in('id', userIds)
+          .eq('is_active', true)
           .order('full_name');
 
         if (error) throw error;
@@ -105,7 +106,8 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, email')
-        .in('id', userIds);
+        .in('id', userIds)
+        .eq('is_active', true);
 
       if (profilesError) throw profilesError;
 
@@ -516,6 +518,7 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
                               } else {
                                 setSelectedStaff([...selectedStaff, staff.user_id]);
                               }
+                              setStaffDropdownOpen(false);
                             }}
                           >
                             <Check
@@ -545,16 +548,7 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
                     <Badge key={staff.user_id} variant="secondary" className="gap-1.5 py-1">
                       {staff.profiles?.full_name}
                       <div className="flex items-center gap-1 border-l pl-1 ml-1 border-muted-foreground/30">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-4 w-4 text-primary hover:text-primary hover:bg-primary/20"
-                          onClick={() => handleMessageUser(staff.user_id)}
-                          disabled={isMessaging}
-                        >
-                          <MessageSquare className="h-2.5 w-2.5" />
-                        </Button>
+
                         <button
                           type="button"
                           onClick={() => setSelectedStaff(selectedStaff.filter((id) => id !== staff.user_id))}
@@ -601,18 +595,7 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
                     <p className="text-xs text-muted-foreground whitespace-nowrap">
                       By {task.creator_profile?.full_name || 'Unknown'}
                     </p>
-                    {task.created_by && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5 text-primary hover:text-primary hover:bg-primary/20"
-                        onClick={() => handleMessageUser(task.created_by)}
-                        disabled={isMessaging}
-                        title="Message Creator"
-                      >
-                        <MessageSquare className="h-3 w-3" />
-                      </Button>
-                    )}
+
                     {task.due_date && (
                       <span className="text-xs text-muted-foreground">
                         · Due: {format(new Date(task.due_date), 'PPP')}

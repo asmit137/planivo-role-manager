@@ -206,7 +206,7 @@ const TrainingEventCard = ({
       training: 'bg-blue-500/10 text-blue-700 border-blue-200',
       workshop: 'bg-purple-500/10 text-purple-700 border-purple-200',
       seminar: 'bg-green-500/10 text-green-700 border-green-200',
-      webinar: 'bg-cyan-500/10 text-cyan-700 border-cyan-200',
+      webinar: 'bg-brand-purple/10 text-brand-purple border-brand-purple/20',
       meeting: 'bg-orange-500/10 text-orange-700 border-orange-200',
       conference: 'bg-pink-500/10 text-pink-700 border-pink-200',
       other: 'bg-gray-500/10 text-gray-700 border-gray-200',

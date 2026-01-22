@@ -52,8 +52,9 @@ export const InteractiveStaffCalendar: React.FC<InteractiveStaffCalendarProps> =
     queryFn: async () => {
       const { data, error } = await supabase
         .from('user_roles')
-        .select(`user_id, role, profiles:user_id (id, full_name, email)`)
+        .select(`user_id, role, profiles:user_id!inner (id, full_name, email)`)
         .eq('department_id', departmentId)
+        .eq('profiles.is_active', true)
         .in('role', ['staff', 'department_head']);
 
       if (error) throw error;

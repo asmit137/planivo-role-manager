@@ -58,6 +58,7 @@ export const ModuleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [moduleData]);
 
   const hasAccess = (moduleKey: string): boolean => {
+    if (moduleKey === 'notifications') return true;
     return modules.some((m) => m.module_key === moduleKey && m.can_view);
   };
 
