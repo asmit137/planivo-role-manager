@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -29,7 +30,7 @@ const StaffDashboard = () => {
   useRealtimeSubscription({ table: 'shift_assignments', invalidateQueries: ['my-schedule'] });
   useRealtimeSubscription({ table: 'notifications', invalidateQueries: ['notifications'] });
 
-  const { data: stats } = useQuery({
+  const { data: stats, refetch: refetchStats } = useQuery({
     queryKey: ['staff-stats', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -77,6 +78,13 @@ const StaffDashboard = () => {
     },
     enabled: !!user?.id,
   });
+
+  // Re-fetch data when user clicks back to Dashboard (no active tab)
+  useEffect(() => {
+    if (!activeTab) {
+      refetchStats();
+    }
+  }, [activeTab, refetchStats]);
 
   return (
     <ErrorBoundary

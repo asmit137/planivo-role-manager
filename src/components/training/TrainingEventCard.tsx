@@ -113,18 +113,20 @@ const TrainingEventCard = ({
         throw new Error('This event has reached its maximum capacity');
       }
 
-      // Check vacation availability
-      const { data: availability, error: availabilityError } = await (supabase as any).rpc('check_staff_availability', {
-        _staff_id: user.id,
-        _start_time: event.start_datetime,
-        _end_time: event.end_datetime
-      });
+      // Check vacation availability (only for physical or hybrid events)
+      if (event.location_type !== 'online') {
+        const { data: availability, error: availabilityError } = await (supabase as any).rpc('check_staff_availability', {
+          _staff_id: user.id,
+          _start_time: event.start_datetime,
+          _end_time: event.end_datetime
+        });
 
-      if (availabilityError) throw availabilityError;
+        if (availabilityError) throw availabilityError;
 
-      const availabilityData = availability as any;
-      if (availabilityData && availabilityData.length > 0 && !availabilityData[0].is_available) {
-        throw new Error(availabilityData[0].conflict_reason || 'You are on vacation during this event.');
+        const availabilityData = availability as any;
+        if (availabilityData && availabilityData.length > 0 && !availabilityData[0].is_available) {
+          throw new Error(availabilityData[0].conflict_reason || 'You are on vacation during this event.');
+        }
       }
 
       const { error } = await supabase
@@ -178,19 +180,20 @@ const TrainingEventCard = ({
 
   const deleteEventMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase
-        .from('training_events')
-        .delete()
-        .eq('id', event.id);
+      const { data, error } = await supabase.functions.invoke('cancel-training-event', {
+        body: { eventId: event.id }
+      });
+
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
-      toast.success('Event deleted successfully');
+      toast.success('Event cancelled and notifications sent');
       queryClient.invalidateQueries({ queryKey: ['training-events'] });
       queryClient.invalidateQueries({ queryKey: ['training-events-calendar'] });
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to delete event');
+      toast.error(error.message || 'Failed to cancel event');
     },
   });
 

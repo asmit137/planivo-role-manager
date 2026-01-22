@@ -9,6 +9,7 @@ import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
 import { useSecurityProtection } from "@/hooks/useSecurityProtection";
+import { usePresence } from "@/hooks/usePresence";
 import Auth from "./pages/Auth";
 import Bootstrap from "./pages/Bootstrap";
 import Landing from "./pages/Landing";
@@ -38,6 +39,12 @@ const SecurityWrapper = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Presence wrapper component
+const PresenceWrapper = ({ children }: { children: React.ReactNode }) => {
+  usePresence();
+  return <>{children}</>;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
@@ -48,32 +55,34 @@ const App = () => (
           <NetworkStatusIndicator />
           <BrowserRouter>
             <AuthProvider>
-              <OrganizationProvider>
-                <ModuleProvider>
-                  <Routes>
-                    <Route path="/" element={<Landing />} />
-                    <Route path="/auth" element={<Auth />} />
-                    <Route path="/bootstrap" element={<Bootstrap />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/reset-password" element={<ResetPassword />} />
-                    <Route path="/meeting" element={<MeetingRoom />} />
-                    <Route path="/schedule-display" element={<ScheduleDisplay />} />
+              <PresenceWrapper>
+                <OrganizationProvider>
+                  <ModuleProvider>
+                    <Routes>
+                      <Route path="/" element={<Landing />} />
+                      <Route path="/auth" element={<Auth />} />
+                      <Route path="/bootstrap" element={<Bootstrap />} />
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/reset-password" element={<ResetPassword />} />
+                      <Route path="/meeting" element={<MeetingRoom />} />
+                      <Route path="/schedule-display" element={<ScheduleDisplay />} />
 
-                    {/* Policy Pages */}
-                    <Route path="/policies/terms" element={<TermsOfService />} />
-                    <Route path="/policies/privacy" element={<PrivacyPolicy />} />
-                    <Route path="/policies/cookies" element={<CookiePolicy />} />
-                    <Route path="/contact-us" element={<ContactUs />} />
+                      {/* Policy Pages */}
+                      <Route path="/policies/terms" element={<TermsOfService />} />
+                      <Route path="/policies/privacy" element={<PrivacyPolicy />} />
+                      <Route path="/policies/cookies" element={<CookiePolicy />} />
+                      <Route path="/contact-us" element={<ContactUs />} />
 
-                    {/* Checkout Pages */}
-                    <Route path="/checkout/success" element={<CheckoutSuccess />} />
-                    <Route path="/checkout/cancel" element={<CheckoutCancel />} />
+                      {/* Checkout Pages */}
+                      <Route path="/checkout/success" element={<CheckoutSuccess />} />
+                      <Route path="/checkout/cancel" element={<CheckoutCancel />} />
 
-                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </ModuleProvider>
-              </OrganizationProvider>
+                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </ModuleProvider>
+                </OrganizationProvider>
+              </PresenceWrapper>
             </AuthProvider>
           </BrowserRouter>
         </SecurityWrapper>

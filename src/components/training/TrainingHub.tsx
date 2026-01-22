@@ -105,7 +105,6 @@ const TrainingHub = ({ departmentId }: TrainingHubProps) => {
           <TabsContent value="my-registrations">
             <TrainingEventList
               showOnlyRegistered={true}
-              showOnlyUpcoming={true}
               onSelectEvent={setSelectedEventId}
             />
           </TabsContent>

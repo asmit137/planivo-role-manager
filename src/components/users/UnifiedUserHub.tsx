@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { UserPlus, RefreshCw, Pencil, Trash2, FileSpreadsheet, Lock, Filter, XCircle } from 'lucide-react';
+import { UserPlus, RefreshCw, Pencil, Trash2, FileSpreadsheet, Lock, Filter, XCircle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -374,6 +374,10 @@ const UnifiedUserHub = ({
       setDeleteUserId(null);
     },
     onError: async (error: any) => {
+      // Don't close the dialog automatically on error so user can see it if we display it in dialog, 
+      // but usually toast is enough. User might want to try again.
+      // However, the current logic resets deleteUserId in handleConfirm usually.
+      // I'll keep it open on error so they can try again if it was a transient error.
       let errorMessage = 'Failed to remove user';
 
       // Attempt to extract verbose error from Edge Function response
@@ -407,11 +411,8 @@ const UnifiedUserHub = ({
   const handleDeleteConfirm = () => {
     if (deleteUserId) {
       deleteUserMutation.mutate(deleteUserId);
-      setDeleteUserId(null);
     }
   };
-
-
 
   // Define columns based on permissions and scope
   const columns: Column<any>[] = [
@@ -707,12 +708,20 @@ const UnifiedUserHub = ({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-              <AlertDialogCancel className="w-full sm:w-auto mt-0">Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={deleteUserMutation.isPending} className="w-full sm:w-auto mt-0">Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDeleteConfirm}
+                disabled={deleteUserMutation.isPending}
                 className="w-full sm:w-auto bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                {isSuperAdmin ? 'Delete Permanently' : 'Remove'}
+                {deleteUserMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  isSuperAdmin ? 'Delete Permanently' : 'Remove'
+                )}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

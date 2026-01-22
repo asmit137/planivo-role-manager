@@ -210,9 +210,9 @@ const TaskHub = () => {
                 </TabsTrigger>
               </>
             )}
-            <TabsTrigger value="my-tasks" title={isSuperAdmin ? 'Global Task Progress' : 'My Tasks'}>
+            <TabsTrigger value="my-tasks" title={isSuperAdmin ? 'Global Task Progress' : managerRole?.role === 'department_head' ? 'Dept & My Tasks' : 'My Tasks'}>
               <CheckSquare className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">{isSuperAdmin ? 'Global Progress' : 'My Tasks'}</span>
+              <span className="hidden sm:inline">{isSuperAdmin ? 'Global Progress' : managerRole?.role === 'department_head' ? 'Dept & My Tasks' : 'My Tasks'}</span>
             </TabsTrigger>
           </ResponsiveTabsList>
 
@@ -224,7 +224,7 @@ const TaskHub = () => {
                     key={`mgr-${preSelectedStaff.join(',')}`} // Force re-render if selection changes
                     scopeType={scopeInfo.scopeType}
                     scopeId={scopeInfo.scopeId}
-                    hideTaskList={false}
+                    hideTaskList={true}
                     initialSelectedStaffIds={preSelectedStaff}
                   />
                 ) : (

@@ -481,7 +481,7 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-vacation-plans'] });
       queryClient.invalidateQueries({ queryKey: ['admin-leave-balances'] });
-      queryClient.invalidateQueries({ queryKey: ['staff-leave-balances'] });
+      queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
       toast.success(`Vacation plan ${approvalAction === 'approve' ? 'approved' : 'rejected'}`);
       setShowApprovalDialog(false);
       setShowConflictDialog(false);

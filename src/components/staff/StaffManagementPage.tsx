@@ -6,6 +6,7 @@ import { DataTable, Column } from '@/components/shared/DataTable';
 import { Users, Search, Mail, Building2, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useState } from 'react';
+import { StaffDetailsDialog } from './StaffDetailsDialog';
 
 interface StaffMember {
     id: string;
@@ -69,6 +70,13 @@ const StaffManagementPage = () => {
     });
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+    const handleRowClick = (member: StaffMember) => {
+        setSelectedStaffId(member.id);
+        setIsDetailsOpen(true);
+    };
 
     const filteredStaff = staffMembers?.filter(member =>
         member.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -130,7 +138,11 @@ const StaffManagementPage = () => {
                 {/* Mobile Card List */}
                 <div className="block sm:hidden divide-y divide-border/60 max-h-[500px] overflow-y-auto custom-scrollbar">
                     {filteredStaff?.map((member) => (
-                        <div key={member.id} className="p-4 space-y-3 bg-card/50">
+                        <div
+                            key={member.id}
+                            className="p-4 space-y-3 bg-card/50 active:bg-accent/50 transition-colors cursor-pointer"
+                            onClick={() => handleRowClick(member)}
+                        >
                             <div className="flex justify-between items-start gap-2">
                                 <div className="space-y-1 min-w-0">
                                     <h4 className="font-semibold text-sm truncate">{member.full_name}</h4>
@@ -170,6 +182,7 @@ const StaffManagementPage = () => {
                         error={staffError as Error}
                         maxHeight={500}
                         enableStickyHeader={true}
+                        onRowClick={handleRowClick}
                         emptyState={{
                             title: 'No staff members found',
                             description: 'There are no staff members in the system yet.',
@@ -177,6 +190,12 @@ const StaffManagementPage = () => {
                     />
                 </div>
             </CardContent>
+
+            <StaffDetailsDialog
+                staffId={selectedStaffId}
+                open={isDetailsOpen}
+                onOpenChange={setIsDetailsOpen}
+            />
         </Card>
     );
 };

@@ -250,27 +250,6 @@ export const ShiftCalendarView: React.FC<ShiftCalendarViewProps> = ({ department
         </CardContent>
       </Card>
 
-      {/* Legend */}
-      <Card>
-        <CardHeader className="p-3 sm:pb-2">
-          <CardTitle className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-muted-foreground">Shift Legend</CardTitle>
-        </CardHeader>
-        <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-          <div className="flex flex-wrap gap-1.5 sm:gap-3">
-            {schedules?.flatMap((schedule: any) =>
-              schedule.shifts?.map((shift: any) => (
-                <div key={shift.id} className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md bg-muted/50 border">
-                  <div
-                    className="w-2 h-2 sm:w-3 sm:h-3 rounded-full"
-                    style={{ backgroundColor: shift.color }}
-                  />
-                  <span className="text-[10px] sm:text-xs font-medium truncate max-w-[100px] sm:max-w-none">{shift.name}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Shift Assignment Dialog */}
       <ShiftAssignmentDialog

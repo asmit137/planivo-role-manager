@@ -75,25 +75,23 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
         queryKey: ['all-staff-tasks', scopeType, scopeId, assigneeId],
         queryFn: async () => {
             // 1. Build query for TASKS based on scope
-            let query = supabase.from('tasks').select('id, title, description, priority, due_date, status, created_by');
-
-            if (scopeType === 'organization') {
-                query = query.eq('organization_id', scopeId);
-            } else if (scopeType === 'workspace') {
-                query = query.eq('workspace_id', scopeId);
-            } else if (scopeType === 'facility') {
-                query = query.eq('facility_id', scopeId);
-            } else if (scopeType === 'department') {
-                query = query.eq('department_id', scopeId);
-            }
+            const query = (supabase
+                .from('tasks')
+                .select('id, title, description, priority, due_date, status, created_by') as any)
+                .eq(
+                    scopeType === 'organization' ? 'organization_id' :
+                        scopeType === 'workspace' ? 'workspace_id' :
+                            scopeType === 'facility' ? 'facility_id' : 'department_id',
+                    scopeId
+                );
 
             const { data: tasks, error: taskError } = await query;
             if (taskError) throw taskError;
 
             if (!tasks || tasks.length === 0) return [];
 
-            const taskIds = tasks.map(t => t.id);
-            const creatorIds = [...new Set(tasks.map(t => t.created_by))];
+            const taskIds = tasks.map((t: any) => t.id) as string[];
+            const creatorIds = [...new Set(tasks.map((t: any) => t.created_by))].filter(Boolean) as string[];
 
             // 2. Fetch Assignments
             let assignQuery = supabase
@@ -319,13 +317,13 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
                                             </div>
 
                                             {/* Body: Assigned + Creator */}
-                                            <div className="flex justify-between items-center text-xs">
+                                            <div className="flex flex-col gap-0.5 text-xs">
                                                 <div className="flex items-center gap-1 text-muted-foreground">
                                                     <span className="text-muted-foreground">To:</span>
                                                     <span className="text-blue-500 font-medium">{safeProfileName(item.assignee)}</span>
                                                 </div>
                                                 <div className="flex items-center gap-1 text-muted-foreground">
-                                                    <span>From: {item.creator_name}</span>
+                                                    <span>Created by: {item.creator_name}</span>
                                                 </div>
                                             </div>
 
@@ -413,8 +411,8 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
                                 </DialogDescription>
                             </div>
                             <Badge className={cn(
-                                selectedAssignment?.status === 'completed' ? 'bg-green-500' :
-                                    selectedAssignment?.status === 'in_progress' ? 'bg-blue-500' : 'bg-slate-500'
+                                selectedAssignment?.status === 'completed' ? 'bg-green-500 hover:bg-green-600' :
+                                    selectedAssignment?.status === 'in_progress' ? 'bg-blue-500 hover:bg-blue-600' : 'bg-secondary hover:bg-secondary/80'
                             )}>
                                 <span className="uppercase text-[10px]">{selectedAssignment?.status}</span>
                             </Badge>
@@ -435,12 +433,22 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
 
                         <div className="grid grid-cols-2 gap-6">
                             <div className="space-y-1">
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Created At</p>
+                                <div className="flex items-center gap-2 text-sm">
+                                    <Clock className="h-4 w-4 text-muted-foreground" />
+                                    <span>{selectedAssignment?.created_at ? format(new Date(selectedAssignment.created_at), 'PPP') : 'Unknown'}</span>
+                                </div>
+                            </div>
+                            <div className="space-y-1">
                                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Due Date</p>
                                 <div className="flex items-center gap-2 text-sm">
                                     <Clock className="h-4 w-4 text-primary" />
                                     <span>{selectedAssignment?.task_due_date ? format(new Date(selectedAssignment.task_due_date), 'PPP') : 'No due date'}</span>
                                 </div>
                             </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-6">
                             <div className="space-y-1">
                                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Priority</p>
                                 <Badge variant="outline" className={cn(getPriorityColor(selectedAssignment?.task_priority || ''))}>
