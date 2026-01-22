@@ -7,6 +7,7 @@ import { LoadingState } from '@/components/layout/LoadingState';
 import { Calendar } from 'lucide-react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
 export function LeaveBalanceView() {
     const { user } = useAuth();
@@ -30,6 +31,11 @@ export function LeaveBalanceView() {
             return data;
         },
         enabled: !!user?.id,
+    });
+
+    useRealtimeSubscription({
+        table: 'leave_balances',
+        invalidateQueries: ['leave-balances'],
     });
 
     if (isSuperAdmin || isOrgAdmin) {

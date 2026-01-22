@@ -54,17 +54,17 @@ const MessagingPanel = () => {
   // Real-time subscriptions for live updates
   useRealtimeSubscription({
     table: 'messages',
-    invalidateQueries: ['conversation-messages', 'user-conversations'],
+    invalidateQueries: ['messages', 'conversations'],
   });
 
   useRealtimeSubscription({
     table: 'conversations',
-    invalidateQueries: ['user-conversations'],
+    invalidateQueries: ['conversations'],
   });
 
   useRealtimeSubscription({
     table: 'conversation_participants',
-    invalidateQueries: ['user-conversations', 'conversation-messages'],
+    invalidateQueries: ['conversations', 'messages'],
   });
 
   // Fetch workspace users
@@ -299,36 +299,10 @@ const MessagingPanel = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['messages'] });
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      setMessageInput('');
+      queryClient.invalidateQueries({ queryKey: ['messages', selectedConversation] });
+      queryClient.invalidateQueries({ queryKey: ['conversations', user?.id] });
     },
   });
-
-  // Real-time message subscription
-  useEffect(() => {
-    if (!selectedConversation) return;
-
-    const channel = supabase
-      .channel(`messages-${selectedConversation}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${selectedConversation}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['messages', selectedConversation] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedConversation, queryClient]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -336,11 +310,14 @@ const MessagingPanel = () => {
   }, [messages]);
 
   const handleSendMessage = () => {
-    if (!messageInput.trim() || !selectedConversation) return;
+    if (!messageInput.trim() || !selectedConversation || sendMessageMutation.isPending) return;
+
+    const content = messageInput.trim();
+    setMessageInput(''); // Clear immediately for better UX
 
     sendMessageMutation.mutate({
       conversationId: selectedConversation,
-      content: messageInput.trim(),
+      content,
     });
   };
 
@@ -622,7 +599,8 @@ const MessagingPanel = () => {
                   <div className="space-y-6">
                     {messages.map((message, idx) => {
                       const isOwn = message.sender_id === user?.id;
-                      const showSenderName = !isOwn && (idx === 0 || messages[idx - 1].sender_id !== message.sender_id);
+                      const isNewSender = idx === 0 || messages[idx - 1].sender_id !== message.sender_id;
+                      const showSenderName = !isOwn && isNewSender;
 
                       return (
                         <div
@@ -630,16 +608,21 @@ const MessagingPanel = () => {
                           className={cn(
                             "flex gap-3",
                             isOwn ? "flex-row-reverse" : "flex-row",
-                            "animate-in slide-in-from-bottom-2 duration-300"
+                            "animate-in slide-in-from-bottom-2 duration-300",
+                            !isNewSender && (isOwn ? "mr-11" : "ml-11") // Add offset for consecutive messages
                           )}
                         >
-                          {!isOwn && (
-                            <Avatar className="h-8 w-8 mt-1 border border-white/10 self-end">
-                              <AvatarFallback className="text-[10px] bg-zinc-800">
-                                {message.sender?.full_name?.[0] || '?'}
-                              </AvatarFallback>
-                            </Avatar>
+                          {/* Avatar Area - Fixed width to maintain alignment */}
+                          {isNewSender && (
+                            <div className="flex-shrink-0">
+                              <Avatar className="h-8 w-8 mt-1 border border-white/10 self-end">
+                                <AvatarFallback className="text-[10px] bg-zinc-800">
+                                  {message.sender?.full_name?.[0] || '?'}
+                                </AvatarFallback>
+                              </Avatar>
+                            </div>
                           )}
+
                           <div className={cn(
                             "flex flex-col gap-1.5 max-w-[75%]",
                             isOwn ? "items-end" : "items-start"
@@ -682,9 +665,12 @@ const MessagingPanel = () => {
                       size="icon"
                       onClick={handleSendMessage}
                       disabled={!messageInput.trim() || sendMessageMutation.isPending}
-                      className="absolute right-2 h-10 w-10 rounded-lg bg-primary hover:bg-primary/90 text-white shadow-xl z-20 transition-all active:scale-95"
+                      className={cn(
+                        "absolute right-2 h-10 w-10 rounded-lg bg-primary hover:bg-primary/90 text-white shadow-xl z-20 transition-all",
+                        sendMessageMutation.isPending ? "opacity-50 cursor-not-allowed scale-95" : "active:scale-95"
+                      )}
                     >
-                      <Send className="h-4 w-4" />
+                      <Send className={cn("h-4 w-4", sendMessageMutation.isPending && "animate-pulse")} />
                     </Button>
                   </div>
                 </div>

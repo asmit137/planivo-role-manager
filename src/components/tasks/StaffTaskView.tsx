@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { format, isToday, isThisWeek, addDays, addMonths, subMonths, startOfMonth, endOfMonth, parseISO, isWithinInterval, startOfToday, endOfDay } from 'date-fns';
-import { CheckCircle2, Clock, PlayCircle, Eye, MessageSquare, Trash2, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, PlayCircle, Eye, MessageSquare, Trash2, XCircle, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -38,13 +39,14 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMessaging, setIsMessaging] = useState(false);
   const [dateFilter, setDateFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data: userRoles } = useQuery({
     queryKey: ['user-roles-global', user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from('user_roles')
-        .select('role')
+        .select('role, department_id')
         .eq('user_id', user?.id);
       return data || [];
     },
@@ -52,11 +54,12 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
   });
 
   const isSuperAdmin = userRoles?.some(r => r.role === 'super_admin');
+  const departmentHeadRole = userRoles?.find(r => r.role === 'department_head');
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'bg-secondary';
+        return 'bg-secondary hover:bg-secondary/80';
       case 'in_progress':
         return 'bg-primary';
       case 'completed':
@@ -84,12 +87,14 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
     queryFn: async () => {
       // Re-fetch roles if not yet available to avoid race condition
       let currentIsSuperAdmin = isSuperAdmin;
+      let currentDeptHeadRole = departmentHeadRole;
       if (user && userRoles === undefined) {
         const { data: roles } = await supabase
           .from('user_roles')
-          .select('role')
+          .select('role, department_id')
           .eq('user_id', user.id);
         currentIsSuperAdmin = roles?.some(r => r.role === 'super_admin') || false;
+        currentDeptHeadRole = roles?.find(r => r.role === 'department_head');
       }
 
       let query = supabase
@@ -98,7 +103,20 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
         .order('created_at', { ascending: false });
 
       if (!currentIsSuperAdmin) {
-        query = query.eq('assigned_to', user?.id);
+        if (currentDeptHeadRole && scopeType === 'department' && scopeId) {
+          // Fetch department staff IDs
+          const { data: staff } = await supabase
+            .from('user_roles')
+            .select('user_id')
+            .eq('department_id', scopeId);
+
+          const staffIds = staff?.map(s => s.user_id) || [];
+          const allTargetIds = [...new Set([...staffIds, user?.id])].filter(Boolean);
+
+          query = query.in('assigned_to', allTargetIds);
+        } else {
+          query = query.eq('assigned_to', user?.id);
+        }
       } else if (scopeType === 'organization' && scopeId) {
         query = query.eq('tasks.organization_id', scopeId);
       }
@@ -149,6 +167,14 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
     const today = startOfToday();
 
     assignments?.forEach(assignment => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesTitle = assignment.tasks.title.toLowerCase().includes(query);
+        const matchesAssignee = assignment.assigned_to_profile?.full_name?.toLowerCase().includes(query);
+        if (!matchesTitle && !matchesAssignee) return;
+      }
+
       if (!assignment.tasks.due_date && dateFilter !== 'all') return;
 
       if (dateFilter !== 'all' && assignment.tasks.due_date) {
@@ -212,12 +238,22 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
         .eq('id', id);
       if (error) throw error;
 
-      // Also update theparent task status if completed
+      // Also update the parent task status if completed, but only if ALL assignments are completed
       if (status === 'completed' && selectedAssignment?.task_id) {
-        await supabase
-          .from('tasks')
-          .update({ status: 'completed' })
-          .eq('id', selectedAssignment.task_id);
+        const { data: otherAssignments } = await supabase
+          .from('task_assignments')
+          .select('id, status')
+          .eq('task_id', selectedAssignment.task_id)
+          .neq('id', id); // exclude current one being updated
+
+        const allDone = !otherAssignments || otherAssignments.every(a => a.status === 'completed');
+
+        if (allDone) {
+          await supabase
+            .from('tasks')
+            .update({ status: 'completed' })
+            .eq('id', selectedAssignment.task_id);
+        }
       }
     },
     onSuccess: () => {
@@ -376,21 +412,32 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end items-center gap-2 mb-2">
-        <span className="text-sm font-medium text-muted-foreground italic">Filter tasks by due date:</span>
-        <Select value={dateFilter} onValueChange={setDateFilter}>
-          <SelectTrigger className="w-[180px] h-9">
-            <SelectValue placeholder="Filter by date" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Tasks</SelectItem>
-            <SelectItem value="today">Today</SelectItem>
-            <SelectItem value="week">This Week</SelectItem>
-            <SelectItem value="15days">Next 15 Days</SelectItem>
-            <SelectItem value="month">Next 1 Month</SelectItem>
-            <SelectItem value="last_month">Last Month</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search tasks or staff..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 h-9"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-muted-foreground italic whitespace-nowrap">Filter tasks by due date:</span>
+          <Select value={dateFilter} onValueChange={setDateFilter}>
+            <SelectTrigger className="w-[180px] h-9">
+              <SelectValue placeholder="Filter by date" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Tasks</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">This Week</SelectItem>
+              <SelectItem value="15days">Next 15 Days</SelectItem>
+              <SelectItem value="month">Next 1 Month</SelectItem>
+              <SelectItem value="last_month">Last Month</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -399,7 +446,7 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
             <div className="flex items-center justify-between font-semibold p-2 bg-muted rounded-t-lg">
               <span>{kanbanColumns[colKey].title}</span>
             </div>
-            <div className="flex flex-col gap-3 min-h-[200px] bg-muted/30 p-2 rounded-b-lg">
+            <div className="flex flex-col gap-3 h-[calc(100vh-280px)] bg-muted/30 p-2 rounded-b-lg overflow-y-auto scrollbar-thin scrollbar-thumb-muted">
               {kanbanColumns[colKey].items.map((item) => (
                 <div key={item.id} className="bg-card p-3 rounded-md border shadow-sm space-y-2">
                   <div className="flex justify-between items-start gap-2">
@@ -408,36 +455,19 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
                       {item.tasks.priority}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-0.5">
                     {item.assigned_to_profile && (
                       <p className="text-xs font-semibold text-primary/80">
                         Assigned: {item.assigned_to_profile.full_name}
                       </p>
                     )}
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-[10px] text-muted-foreground whitespace-nowrap">
-                        By {item.tasks.creator_name}
-                      </p>
-                      {item.tasks.created_by && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5 text-primary hover:text-primary hover:bg-primary/20"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMessageUser(item.tasks.created_by);
-                          }}
-                          disabled={isMessaging}
-                          title="Message Creator"
-                        >
-                          <MessageSquare className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Created by: {item.tasks.creator_name}
+                    </p>
                   </div>
                   {item.tasks.due_date && (
                     <p className="text-[10px] text-muted-foreground">
-                      Due: {format(new Date(item.tasks.due_date), 'MMM dd')}
+                      Due Date: {format(new Date(item.tasks.due_date), 'MMM dd')}
                     </p>
                   )}
                   <div className="flex justify-end pt-1 gap-1">
@@ -521,7 +551,7 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
                   <DialogDescription>
                     Created by: {selectedAssignment?.tasks.creator_name}
                   </DialogDescription>
-                  {selectedAssignment?.tasks.created_by && (
+                  {selectedAssignment?.tasks.created_by && selectedAssignment.tasks.created_by !== user?.id && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -554,15 +584,26 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <p className="text-sm font-semibold">Due Date</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Created At</p>
+                <p className="text-sm">
+                  {selectedAssignment?.tasks.created_at
+                    ? format(new Date(selectedAssignment.tasks.created_at), 'PPP')
+                    : 'Unknown'}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Due Date</p>
+                <p className="text-sm">
                   {selectedAssignment?.tasks.due_date
                     ? format(new Date(selectedAssignment.tasks.due_date), 'PPP')
                     : 'No due date'}
                 </p>
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <p className="text-sm font-semibold">Priority</p>
+                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Priority</p>
                 <Badge variant="outline" className={cn(getPriorityColor(selectedAssignment?.tasks.priority || ''))}>
                   {selectedAssignment?.tasks.priority}
                 </Badge>
@@ -579,16 +620,18 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
                   <div className="flex items-center gap-1">
 
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 gap-2 text-primary hover:text-primary hover:bg-primary/10 border-primary/20"
-                      onClick={() => handleMessageUser(selectedAssignment.assigned_to)}
-                      disabled={isMessaging}
-                    >
-                      <MessageSquare className="h-3.5 w-3.5" />
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Message</span>
-                    </Button>
+                    {selectedAssignment.assigned_to !== user?.id && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-2 text-primary hover:text-primary hover:bg-primary/10 border-primary/20"
+                        onClick={() => handleMessageUser(selectedAssignment.assigned_to)}
+                        disabled={isMessaging}
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Message</span>
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>

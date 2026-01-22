@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
+import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { CalendarIcon, Plus, Check, ChevronsUpDown, XCircle, MessageSquare } from 'lucide-react';
@@ -36,9 +37,14 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState<Date>();
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
-  const [selectedStaff, setSelectedStaff] = useState<string[]>(initialSelectedStaffIds || []);
+  const [selectedStaff, setSelectedStaff] = useState<string[]>(
+    (initialSelectedStaffIds || []).filter(id => id !== user?.id)
+  );
   const [staffSearch, setStaffSearch] = useState('');
   const [staffDropdownOpen, setStaffDropdownOpen] = useState(false);
+  const [isSelfAssigned, setIsSelfAssigned] = useState(
+    initialSelectedStaffIds?.includes(user?.id || '') || false
+  );
 
   // Real-time subscriptions for live updates
   useRealtimeSubscription({
@@ -113,15 +119,18 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
 
       const profilesArray = profiles || [];
 
-      return roles.map(role => ({
-        user_id: role.user_id,
-        role: role.role || 'staff',
-        profiles: profilesArray.find(p => p.id === role.user_id) || {
-          id: role.user_id,
-          full_name: 'Unknown User',
-          email: 'No email'
-        }
-      }));
+      return roles
+        .map(role => {
+          const profile = profilesArray.find(p => p.id === role.user_id);
+          if (!profile) return null;
+
+          return {
+            user_id: role.user_id,
+            role: role.role || 'staff',
+            profiles: profile
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null && item.user_id !== user?.id);
     },
   });
 
@@ -254,6 +263,7 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
     setDueDate(undefined);
     setPriority('medium');
     setSelectedStaff([]);
+    setIsSelfAssigned(false);
   };
 
   const handleMessageUser = async (targetUserId: string) => {
@@ -347,7 +357,12 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
       return;
     }
 
-    if (selectedStaff.length === 0) {
+    if (!dueDate) {
+      toast.error('Please select a due date');
+      return;
+    }
+
+    if (selectedStaff.length === 0 && !isSelfAssigned) {
       toast.error('Please assign at least one staff member');
       return;
     }
@@ -357,7 +372,9 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
       description,
       due_date: dueDate ? format(dueDate, 'yyyy-MM-dd') : null,
       priority,
-      assignees: selectedStaff,
+      assignees: isSelfAssigned
+        ? [...new Set([...selectedStaff, user!.id])]
+        : selectedStaff,
     });
   };
 
@@ -403,7 +420,7 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Due Date</Label>
+                <Label>Due Date *</Label>
                 <Popover modal={true}>
                   <PopoverTrigger asChild>
                     <Button
@@ -450,7 +467,17 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label>Assign To *</Label>
+                <div className="flex items-center gap-4">
+                  <Label>Assign To *</Label>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="assign-self"
+                      checked={isSelfAssigned}
+                      onCheckedChange={setIsSelfAssigned}
+                    />
+                    <Label htmlFor="assign-self" className="text-xs font-normal cursor-pointer">Assign to Self</Label>
+                  </div>
+                </div>
                 {availableStaff && availableStaff.length > 0 && (
                   <Button
                     type="button"
@@ -593,12 +620,12 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
                   </div>
                   <div className="flex items-center gap-2 mb-2">
                     <p className="text-xs text-muted-foreground whitespace-nowrap">
-                      By {task.creator_profile?.full_name || 'Unknown'}
+                      Created by: {task.creator_profile?.full_name || 'Unknown'}
                     </p>
 
                     {task.due_date && (
                       <span className="text-xs text-muted-foreground">
-                        · Due: {format(new Date(task.due_date), 'PPP')}
+                        · Due Date: {format(new Date(task.due_date), 'PPP')}
                       </span>
                     )}
                   </div>

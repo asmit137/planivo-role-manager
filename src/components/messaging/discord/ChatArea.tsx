@@ -446,8 +446,8 @@ export const ChatArea = ({ channelId, onMobileMenuToggle, sidebarOpen }: ChatAre
                                                 ? 'bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-3xl rounded-tr-sm'
                                                 : 'bg-muted/80 backdrop-blur-sm text-foreground rounded-3xl rounded-tl-sm hover:bg-muted'
                                             }
-                                            ${isSequence && isOwnMessage ? 'rounded-tr-3xl mr-10' : ''}
-                                            ${isSequence && !isOwnMessage ? 'rounded-tl-3xl ml-10' : ''}
+                                            ${isSequence && isOwnMessage ? 'rounded-tr-3xl' : ''}
+                                            ${isSequence && !isOwnMessage ? 'rounded-tl-3xl' : ''}
                                         `}>
                                             <div className="text-[15px] leading-relaxed break-words">
                                                 {(() => {

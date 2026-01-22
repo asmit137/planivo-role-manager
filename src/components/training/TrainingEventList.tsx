@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -106,7 +106,11 @@ const TrainingEventList = ({
           .eq('target_type', 'department');
 
         const eventIds = targetEvents?.map(te => te.event_id) || [];
-        query = query.or(`id.in.(${eventIds.length > 0 ? eventIds.join(',') : '00000000-0000-0000-0000-000000000000'}),created_by.eq.${user?.id},responsible_user_id.eq.${user?.id}`);
+        const targetedIdsString = eventIds.length > 0 ? eventIds.join(',') : '00000000-0000-0000-0000-000000000000';
+
+        // Include events targeted at the department, events created by/responsible for the user, 
+        // OR events with "open" registration type which are accessible to everyone in the organization.
+        query = query.or(`id.in.(${targetedIdsString}),created_by.eq.${user?.id},responsible_user_id.eq.${user?.id},registration_type.eq.open`);
       }
 
       if (showOnlyPublished) {
@@ -139,6 +143,42 @@ const TrainingEventList = ({
     enabled: (isSuperAdmin || !!userOrgId) || !!user,
   });
 
+  const filteredEvents = useMemo(() => {
+    const filtered = (events || []).filter(event => {
+      // 1. Search Query Filter
+      const matchesSearch =
+        event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (event.description?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+
+      // 2. Type Filter
+      const matchesType = eventTypeFilter === 'all' || event.event_type === eventTypeFilter;
+
+      // 3. Upcoming Filter (Client-side strict check)
+      let matchesUpcoming = true;
+      if (showOnlyUpcoming) {
+        // Strictly hide anything that has already started to match user expectation
+        const eventStartDate = parseISO(event.start_datetime);
+        matchesUpcoming = isAfter(eventStartDate, new Date());
+      }
+
+      return matchesSearch && matchesType && matchesUpcoming;
+    });
+
+    // Sort: Upcoming/Ongoing (Ascending) -> Completed (Descending)
+    const now = new Date().getTime();
+
+    const activeDetails = filtered.filter(e => new Date(e.end_datetime).getTime() >= now);
+    const completedDetails = filtered.filter(e => new Date(e.end_datetime).getTime() < now);
+
+    // Sort active by start_datetime ascending (soonest first)
+    activeDetails.sort((a, b) => new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime());
+
+    // Sort completed by start_datetime descending (most recent first)
+    completedDetails.sort((a, b) => new Date(b.start_datetime).getTime() - new Date(a.start_datetime).getTime());
+
+    return [...activeDetails, ...completedDetails];
+  }, [events, searchQuery, eventTypeFilter, showOnlyUpcoming]);
+
   if (isLoading) {
     return <LoadingState message="Loading training events..." />;
   }
@@ -152,26 +192,6 @@ const TrainingEventList = ({
       </Card>
     );
   }
-
-  const filteredEvents = (events || []).filter(event => {
-    // 1. Search Query Filter
-    const matchesSearch =
-      event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (event.description?.toLowerCase() || '').includes(searchQuery.toLowerCase());
-
-    // 2. Type Filter
-    const matchesType = eventTypeFilter === 'all' || event.event_type === eventTypeFilter;
-
-    // 3. Upcoming Filter (Client-side strict check)
-    let matchesUpcoming = true;
-    if (showOnlyUpcoming) {
-      // Strictly hide anything that has already started to match user expectation
-      const eventStartDate = parseISO(event.start_datetime);
-      matchesUpcoming = isAfter(eventStartDate, new Date());
-    }
-
-    return matchesSearch && matchesType && matchesUpcoming;
-  });
 
   const handleEditEvent = (eventId: string) => {
     setEditingEventId(eventId);

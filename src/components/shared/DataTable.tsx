@@ -21,6 +21,7 @@ interface DataTableProps<T> {
   isLoading?: boolean;
   error?: Error | null;
   onRetry?: () => void;
+  onRowClick?: (row: T) => void;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
@@ -43,6 +44,7 @@ export function DataTable<T>({
   isLoading,
   error,
   onRetry,
+  onRowClick,
   searchValue,
   onSearchChange,
   searchPlaceholder = 'Search...',
@@ -116,7 +118,13 @@ export function DataTable<T>({
           </TableHeader>
           <TableBody>
             {data.map((row, index) => (
-              <TableRow key={index}>
+              <TableRow
+                key={index}
+                onClick={() => onRetry ? undefined : onRowClick?.(row)}
+                className={cn(
+                  onRowClick && "cursor-pointer hover:bg-muted/50 transition-colors"
+                )}
+              >
                 {columns.map((column) => (
                   <TableCell key={column.key} className="whitespace-nowrap">
                     {column.cell(row)}

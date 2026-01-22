@@ -67,10 +67,17 @@ const VacationConflictDashboard = ({ scopeType = 'all', scopeId }: ConflictDashb
 
       if (splitsError) throw splitsError;
 
-      // Determine approval level based on user role
-      const isSuper = user?.email?.includes('admin') || true; // Fallback or context check needed
-      // Actually, we should probably pass the level from props or detect it
-      const currentLevel = scopeType === 'workspace' ? 3 : scopeType === 'facility' ? 2 : 1;
+      // Fetch user role to determine approval level
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user?.id);
+
+      const isSuper = roles?.some(r => r.role === 'super_admin' || r.role === 'organization_admin');
+      const isWorkplace = roles?.some(r => r.role === 'workplace_supervisor' || r.role === 'general_admin');
+      const isFacility = roles?.some(r => r.role === 'facility_supervisor');
+
+      const currentLevel = isSuper ? 3 : isWorkplace ? 3 : isFacility ? 2 : 1;
 
       // Add approval record with rejection
       const { error: approvalError } = await supabase

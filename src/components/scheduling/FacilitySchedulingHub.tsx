@@ -60,6 +60,14 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
   // Use the effective facility ID (prop or selected)
   const facilityId = propFacilityId || selectedFacilityId;
 
+  // Reset selection when organization changes
+  useEffect(() => {
+    if (!propWorkspaceId) {
+      setSelectedWorkspaceId(undefined);
+      setSelectedFacilityId(undefined);
+    }
+  }, [organization?.id, propWorkspaceId]);
+
   // Fetch workspaces for the active organization
   const { data: workspaces, isLoading: workspacesLoading } = useQuery({
     queryKey: ['workspaces', organization?.id],

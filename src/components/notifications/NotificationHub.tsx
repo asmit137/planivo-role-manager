@@ -115,18 +115,6 @@ const NotificationHub = () => {
               <CardDescription className="text-xs sm:text-sm">View and manage your notifications</CardDescription>
             </div>
             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-              {notifications && notifications.length > 0 && (
-                <Button
-                  variant="destructive-outline"
-                  size="sm"
-                  onClick={() => deleteAllNotificationsMutation.mutate()}
-                  disabled={deleteAllNotificationsMutation.isPending}
-                  className="flex-1 sm:flex-none min-h-[40px]"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Clear All
-                </Button>
-              )}
               {unreadCount > 0 && (
                 <Button
                   variant="outline"

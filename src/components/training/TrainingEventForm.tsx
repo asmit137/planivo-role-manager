@@ -290,6 +290,16 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
     }
   }, [eventId, departmentId, form]);
 
+  // Set organization for new events once it's available
+  useEffect(() => {
+    if (!eventId && !form.getValues('organization_id')) {
+      const orgId = organizationId || selectedOrganizationId || userOrganization?.id;
+      if (orgId) {
+        form.setValue('organization_id', orgId);
+      }
+    }
+  }, [eventId, organizationId, selectedOrganizationId, userOrganization, form]);
+
   // Load existing targets when editing
   useEffect(() => {
     if (existingTargets) {
@@ -488,6 +498,46 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
             .from('training_event_targets')
             .insert(targets);
           if (targetError) throw targetError;
+        }
+
+        // Auto-registration for mandatory/invite_only events
+        const allTargetUserIds = [...selectedUsers];
+
+        // Fetch users in targeted departments to ensure they are also auto-registered
+        if (selectedDepartments.length > 0) {
+          const { data: deptUserRoles, error: deptError } = await supabase
+            .from('user_roles')
+            .select('user_id')
+            .in('department_id', selectedDepartments);
+
+          if (deptError) {
+            console.error('Error fetching department users for auto-reg:', deptError);
+          } else if (deptUserRoles) {
+            deptUserRoles.forEach(role => {
+              if (!allTargetUserIds.includes(role.user_id)) {
+                allTargetUserIds.push(role.user_id);
+              }
+            });
+          }
+        }
+
+        if (allTargetUserIds.length > 0) {
+          const registrations = allTargetUserIds.map(userId => ({
+            event_id: createdEventId!,
+            user_id: userId,
+            status: 'registered' as const,
+            registered_at: new Date().toISOString()
+          }));
+
+          // Use upsert to avoid duplicate registrations if they already exist
+          const { error: regError } = await supabase
+            .from('training_registrations')
+            .upsert(registrations, { onConflict: 'event_id,user_id' });
+
+          if (regError) {
+            console.error('Auto-registration error:', regError);
+            throw new Error(`Failed to auto-register users: ${regError.message}`);
+          }
         }
       }
 

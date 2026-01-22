@@ -139,11 +139,11 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
                             .eq('conversation_id', convo.id);
 
                         const userIds = participants?.map(p => p.user_id) || [];
-                        const { data: profiles } = await supabase
+                        const { data: profiles } = await (supabase
                             .from('profiles')
-                            .select('id, full_name, email')
+                            .select('id, full_name, email, last_seen')
                             .in('id', userIds)
-                            .eq('is_active', true);
+                            .eq('is_active', true) as any);
 
                         // Generate title
                         let displayTitle = convo.title;
@@ -198,6 +198,13 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
     });
 
     const getInitials = (name?: string) => name?.substring(0, 2).toUpperCase() || '??';
+
+    const isUserOnline = (lastSeen?: string) => {
+        if (!lastSeen) return false;
+        const lastSeenDate = new Date(lastSeen);
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        return lastSeenDate > fiveMinutesAgo;
+    };
 
     return (
         <div className="flex flex-col h-full bg-muted/10 text-muted-foreground border-r">
@@ -281,17 +288,19 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
                                 <div className="relative mr-3 flex-shrink-0">
                                     <Avatar className="h-8 w-8 ring-2 ring-background ring-offset-2 ring-offset-transparent group-hover:ring-muted transition-all">
                                         <AvatarFallback className={`text-[10px] font-bold ${selectedChannelId === dm.id ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                                            {dm.is_group ? <MessageSquare className="h-3.5 w-3.5" /> : getInitials(dm.title || 'U')}
+                                            {dm.is_group ? <MessageSquare className="h-3.5 w-3.5" /> : getInitials(dm.displayTitle)}
                                         </AvatarFallback>
                                     </Avatar>
-                                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-background"></span>
+                                    {!dm.is_group && (
+                                        <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background ${isUserOnline(dm.participants?.find((p: any) => p.id !== user.id)?.last_seen) ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                                    )}
                                 </div>
                                 <div className="flex-1 truncate text-left">
                                     <span className={`block truncate leading-tight ${dm.isUnread ? 'font-bold text-foreground' : 'font-medium'}`}>
                                         {dm.displayTitle || dm.title || (dm.is_group ? 'Group Chat' : 'User')}
                                     </span>
                                     <span className="block truncate text-[10px] text-muted-foreground/60 mt-0.5 font-medium">
-                                        Active now
+                                        {!dm.is_group && isUserOnline(dm.participants?.find((p: any) => p.id !== user.id)?.last_seen) ? 'Active now' : 'Offline'}
                                     </span>
                                 </div>
                                 {dm.isUnread && (
@@ -319,7 +328,7 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
                         #{user?.id?.substring(0, 4)}
                     </span>
                 </div>
-                <ThemeToggleSimple />
+
             </div>
 
             <CreateChannelModal open={isCreateChannelOpen} onOpenChange={setIsCreateChannelOpen} />
