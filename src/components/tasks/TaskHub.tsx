@@ -70,7 +70,8 @@ const TaskHub = () => {
     queryFn: async () => {
       if (!scopeInfo) return [];
 
-      let query = (supabase.from('user_roles').select('user_id, role, profiles:user_id(id, full_name, email)') as any);
+      let query = (supabase.from('user_roles').select('user_id, role, profiles!inner(id, full_name, email)') as any)
+        .eq('profiles.is_active', true);
 
       if (scopeInfo.scopeType === 'organization') {
         query = query.eq('organization_id', scopeInfo.scopeId);
@@ -234,92 +235,101 @@ const TaskHub = () => {
               </TabsContent>
 
               <TabsContent value="staff">
-                <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search staff by name or email..."
-                        className="pl-8"
-                        value={staffSearch}
-                        onChange={(e) => setStaffSearch(e.target.value)}
-                      />
-                    </div>
-                    {staffSearch && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setStaffSearch('')}
-                        className="h-10 text-muted-foreground hover:bg-secondary transition-colors gap-2"
-                      >
-                        <XCircle className="h-4 w-4" />
-                        <span className="text-xs font-semibold uppercase tracking-wider">Clear Search</span>
-                      </Button>
-                    )}
-                  </div>
-
-                  {staffLoading ? (
-                    <LoadingState message="Fetching staff members..." />
-                  ) : scopeInfo ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredStaff.map((staff: any) => (
-                        <Card key={staff.user_id} className="overflow-hidden hover:shadow-md transition-shadow">
-                          <CardContent className="p-4 flex flex-col justify-between gap-4 h-full">
-                            <div className="flex items-start justify-between">
-                              <div className="space-y-1">
-                                <p className="font-semibold text-sm leading-none">{staff.profiles?.full_name || 'Unknown User'}</p>
-                                <p className="text-xs text-muted-foreground">{staff.profiles?.email}</p>
-                                <Badge variant="outline" className="text-[10px] uppercase font-bold px-1.5 py-0">
-                                  {staff.role?.replace('_', ' ')}
-                                </Badge>
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 border-primary/20"
-                                title="Message Staff"
-                                onClick={() => handleMessageUser(staff.user_id)}
-                                disabled={isMessaging}
-                              >
-                                <MessageSquare className="h-4 w-4" />
-                              </Button>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 mt-auto">
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                className="w-full gap-1.5 text-xs h-9 font-medium"
-                                onClick={() => setViewingStaffId(staff.user_id)}
-                              >
-                                <ListTodo className="h-3.5 w-3.5" />
-                                View Tasks
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="default"
-                                className="w-full gap-1.5 text-xs h-9 font-medium"
-                                onClick={() => handleAssignTask(staff.user_id)}
-                              >
-                                <PlusCircle className="h-3.5 w-3.5" />
-                                Assign New Task
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                      {filteredStaff.length === 0 && (
-                        <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed rounded-lg">
-                          No staff members found.
-                        </div>
+                {viewingStaffId && scopeInfo ? (
+                  <AllStaffTasksView
+                    scopeType={scopeInfo.scopeType}
+                    scopeId={scopeInfo.scopeId}
+                    assigneeId={viewingStaffId}
+                    onBack={() => setViewingStaffId(null)}
+                  />
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search staff by name or email..."
+                          className="pl-8"
+                          value={staffSearch}
+                          onChange={(e) => setStaffSearch(e.target.value)}
+                        />
+                      </div>
+                      {staffSearch && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setStaffSearch('')}
+                          className="h-10 text-muted-foreground hover:bg-secondary transition-colors gap-2"
+                        >
+                          <XCircle className="h-4 w-4" />
+                          <span className="text-xs font-semibold uppercase tracking-wider">Clear Search</span>
+                        </Button>
                       )}
                     </div>
-                  ) : (
-                    <Card className="p-12 text-center text-muted-foreground border-2 border-dashed">
-                      {isSuperAdmin ? "Please select an organization from the sidebar to view staff." : "No scope assigned for staff list."}
-                    </Card>
-                  )}
-                </div>
+
+                    {staffLoading ? (
+                      <LoadingState message="Fetching staff members..." />
+                    ) : scopeInfo ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredStaff.map((staff: any) => (
+                          <Card key={staff.user_id} className="overflow-hidden hover:shadow-md transition-shadow">
+                            <CardContent className="p-4 flex flex-col justify-between gap-4 h-full">
+                              <div className="flex items-start justify-between">
+                                <div className="space-y-1">
+                                  <p className="font-semibold text-sm leading-none">{staff.profiles?.full_name || 'Unknown User'}</p>
+                                  <p className="text-xs text-muted-foreground">{staff.profiles?.email}</p>
+                                  <Badge variant="outline" className="text-[10px] uppercase font-bold px-1.5 py-0">
+                                    {staff.role?.replace('_', ' ')}
+                                  </Badge>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 border-primary/20"
+                                  title="Message Staff"
+                                  onClick={() => handleMessageUser(staff.user_id)}
+                                  disabled={isMessaging}
+                                >
+                                  <MessageSquare className="h-4 w-4" />
+                                </Button>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 mt-auto">
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="w-full gap-1.5 text-xs h-9 font-medium"
+                                  onClick={() => setViewingStaffId(staff.user_id)}
+                                >
+                                  <ListTodo className="h-3.5 w-3.5" />
+                                  View Tasks
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  className="w-full gap-1.5 text-xs h-9 font-medium"
+                                  onClick={() => handleAssignTask(staff.user_id)}
+                                >
+                                  <PlusCircle className="h-3.5 w-3.5" />
+                                  Assign New Task
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                        {filteredStaff.length === 0 && (
+                          <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed rounded-lg">
+                            No staff members found.
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <Card className="p-12 text-center text-muted-foreground border-2 border-dashed">
+                        {isSuperAdmin ? "Please select an organization from the sidebar to view staff." : "No scope assigned for staff list."}
+                      </Card>
+                    )}
+                  </div>
+                )}
               </TabsContent>
             </>
           )}

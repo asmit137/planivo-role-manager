@@ -118,7 +118,7 @@ export function SecurityDashboard() {
       super_admin: 'bg-purple-500/20 text-purple-400',
       organization_admin: 'bg-indigo-500/20 text-indigo-400',
       general_admin: 'bg-blue-500/20 text-blue-400',
-      workplace_supervisor: 'bg-cyan-500/20 text-cyan-400',
+      workplace_supervisor: 'bg-brand-purple/20 text-brand-purple dark:text-indigo-300',
       facility_supervisor: 'bg-teal-500/20 text-teal-400',
       department_head: 'bg-green-500/20 text-green-400',
       staff: 'bg-gray-500/20 text-gray-400',

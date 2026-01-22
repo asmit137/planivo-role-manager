@@ -17,6 +17,9 @@ export interface UserRole {
     id: string;
     name: string;
   };
+  department?: {
+    name: string;
+  };
 }
 
 export const useUserRole = () => {
@@ -31,7 +34,8 @@ export const useUserRole = () => {
         .from('user_roles')
         .select(`
           *,
-          custom_role:custom_roles(id, name)
+          custom_role:custom_roles(id, name),
+          department:departments!fk_user_roles_department(name)
         `)
         .eq('user_id', user.id);
 

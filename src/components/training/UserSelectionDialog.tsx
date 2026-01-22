@@ -143,7 +143,8 @@ const UserSelectionDialog = ({
         const { data: profiles, error: profileError } = await supabase
           .from('profiles')
           .select('id, full_name, email, phone')
-          .in('id', userIds);
+          .in('id', userIds)
+          .eq('is_active', true);
 
         if (profileError) throw profileError;
 

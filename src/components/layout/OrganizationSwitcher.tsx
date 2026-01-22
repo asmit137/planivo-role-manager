@@ -20,7 +20,7 @@ export const OrganizationSwitcher: React.FC = () => {
 
     const isSuperAdmin = roles?.some(r => r.role === 'super_admin' || r.role === 'general_admin');
 
-    if (!isSuperAdmin || organizations.length === 0) return null;
+    if (!isSuperAdmin) return null;
 
     return (
         <div className={cn(
@@ -57,21 +57,29 @@ export const OrganizationSwitcher: React.FC = () => {
                         </div>
                     </SelectTrigger>
                     <SelectContent className="bg-sidebar-accent border-sidebar-border">
-                        <SelectItem
-                            value="all"
-                            className="focus:bg-primary focus:text-primary-foreground cursor-pointer font-semibold border-b"
-                        >
-                            All Organizations
-                        </SelectItem>
-                        {organizations.map((org) => (
-                            <SelectItem
-                                key={org.id}
-                                value={org.id}
-                                className="focus:bg-primary focus:text-primary-foreground cursor-pointer"
-                            >
-                                {org.name}
-                            </SelectItem>
-                        ))}
+                        {organizations.length > 0 ? (
+                            <>
+                                <SelectItem
+                                    value="all"
+                                    className="focus:bg-primary focus:text-primary-foreground cursor-pointer font-semibold border-b"
+                                >
+                                    All Organizations
+                                </SelectItem>
+                                {organizations.map((org) => (
+                                    <SelectItem
+                                        key={org.id}
+                                        value={org.id}
+                                        className="focus:bg-primary focus:text-primary-foreground cursor-pointer"
+                                    >
+                                        {org.name}
+                                    </SelectItem>
+                                ))}
+                            </>
+                        ) : (
+                            <div className="p-2 text-xs text-muted-foreground text-center">
+                                No organizations found
+                            </div>
+                        )}
                     </SelectContent>
                 </Select>
             </div>

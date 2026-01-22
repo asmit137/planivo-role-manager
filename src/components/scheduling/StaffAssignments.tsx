@@ -56,9 +56,10 @@ export const StaffAssignments: React.FC<StaffAssignmentsProps> = ({ departmentId
         .select(`
           user_id,
           role,
-          profiles:user_id (id, full_name, email)
+          profiles:user_id!inner (id, full_name, email)
         `)
         .eq('department_id', departmentId)
+        .eq('profiles.is_active', true)
         .in('role', ['staff', 'department_head']);
 
       if (error) throw error;
@@ -107,8 +108,8 @@ export const StaffAssignments: React.FC<StaffAssignmentsProps> = ({ departmentId
         .gte('end_date', selectedDate);
 
       if (error) throw error;
-      return data?.filter((v: any) => 
-        v.vacation_plan?.status === 'approved' || 
+      return data?.filter((v: any) =>
+        v.vacation_plan?.status === 'approved' ||
         v.vacation_plan?.status?.includes('pending')
       ) || [];
     },
@@ -170,9 +171,9 @@ export const StaffAssignments: React.FC<StaffAssignmentsProps> = ({ departmentId
   // Get available dates from schedule
   const availableDates = selectedSchedule
     ? eachDayOfInterval({
-        start: parseISO(selectedSchedule.start_date),
-        end: parseISO(selectedSchedule.end_date),
-      })
+      start: parseISO(selectedSchedule.start_date),
+      end: parseISO(selectedSchedule.end_date),
+    })
     : [];
 
   // Check if staff has vacation conflict
@@ -235,8 +236,8 @@ export const StaffAssignments: React.FC<StaffAssignmentsProps> = ({ departmentId
 
             <div className="space-y-2">
               <Label>Shift</Label>
-              <Select 
-                value={selectedShiftId} 
+              <Select
+                value={selectedShiftId}
                 onValueChange={setSelectedShiftId}
                 disabled={!selectedScheduleId}
               >
@@ -247,9 +248,9 @@ export const StaffAssignments: React.FC<StaffAssignmentsProps> = ({ departmentId
                   {selectedSchedule?.shifts?.map((shift: any) => (
                     <SelectItem key={shift.id} value={shift.id}>
                       <div className="flex items-center gap-2">
-                        <div 
-                          className="w-3 h-3 rounded" 
-                          style={{ backgroundColor: shift.color }} 
+                        <div
+                          className="w-3 h-3 rounded"
+                          style={{ backgroundColor: shift.color }}
                         />
                         {shift.name} ({shift.start_time?.slice(0, 5)} - {shift.end_time?.slice(0, 5)})
                       </div>
@@ -261,8 +262,8 @@ export const StaffAssignments: React.FC<StaffAssignmentsProps> = ({ departmentId
 
             <div className="space-y-2">
               <Label>Date</Label>
-              <Select 
-                value={selectedDate} 
+              <Select
+                value={selectedDate}
                 onValueChange={setSelectedDate}
                 disabled={!selectedShiftId}
               >
@@ -288,15 +289,15 @@ export const StaffAssignments: React.FC<StaffAssignmentsProps> = ({ departmentId
           <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <div 
-                  className="w-4 h-4 rounded" 
-                  style={{ backgroundColor: selectedShift.color }} 
+                <div
+                  className="w-4 h-4 rounded"
+                  style={{ backgroundColor: selectedShift.color }}
                 />
                 {selectedShift.name}
               </CardTitle>
               <CardDescription className="mt-1">
-                {format(parseISO(selectedDate), 'EEEE, MMMM d, yyyy')} • 
-                {selectedShift.start_time?.slice(0, 5)} - {selectedShift.end_time?.slice(0, 5)} • 
+                {format(parseISO(selectedDate), 'EEEE, MMMM d, yyyy')} •
+                {selectedShift.start_time?.slice(0, 5)} - {selectedShift.end_time?.slice(0, 5)} •
                 Required: {selectedShift.required_staff} staff
               </CardDescription>
             </div>
@@ -320,16 +321,15 @@ export const StaffAssignments: React.FC<StaffAssignmentsProps> = ({ departmentId
                     {staff?.map((member: any) => {
                       const profile = member.profiles;
                       if (!profile?.id) return null;
-                      
+
                       const hasConflict = hasVacationConflict(profile.id);
                       const isAssigned = isAlreadyAssigned(profile.id);
 
                       return (
                         <div
                           key={member.user_id}
-                          className={`flex items-center justify-between p-3 border rounded-lg ${
-                            isAssigned ? 'opacity-50 bg-muted/50' : ''
-                          }`}
+                          className={`flex items-center justify-between p-3 border rounded-lg ${isAssigned ? 'opacity-50 bg-muted/50' : ''
+                            }`}
                         >
                           <div className="flex items-center gap-3">
                             <Checkbox

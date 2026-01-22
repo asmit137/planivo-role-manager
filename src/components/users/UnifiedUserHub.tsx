@@ -231,6 +231,14 @@ const UnifiedUserHub = ({
 
   // Secondary filters (dropdowns)
   const filteredProfiles = (users || []).filter((user: any) => {
+    // Filter out Department Heads from the list if we are in Department scope
+    // This ensures Department Heads don't see themselves or other DHs in the "Staff" list
+    if (detectedScope === 'department') {
+      if (user.roles.some((r: any) => r.role === 'department_head')) {
+        return false;
+      }
+    }
+
     // Apply workspace filter
     if (filterWorkspace && filterWorkspace !== 'all') {
       if (!user.roles.some((r: any) => r.workspace_id === filterWorkspace)) {

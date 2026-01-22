@@ -383,7 +383,7 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="h-7 px-4 bg-cyan-400 hover:bg-cyan-500 text-slate-900 font-bold text-xs rounded-full transition-all duration-200 shadow-sm"
+                                                        className="h-7 px-4 bg-brand-purple hover:bg-brand-purple/90 text-white font-bold text-xs rounded-full transition-all duration-200 shadow-sm"
                                                         onClick={() => {
                                                             setSelectedAssignment(item);
                                                             setIsDetailsOpen(true);

@@ -311,8 +311,8 @@ const VacationPlansList = ({ departmentId, scopeType = 'department', scopeId, st
                     </div>
 
                     {plan.notes && (
-                      <div className="bg-cyan-500/5 p-4 rounded-xl border border-cyan-500/10 shadow-sm">
-                        <p className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 mb-2">Notes</p>
+                      <div className="bg-brand-purple/5 p-4 rounded-xl border border-brand-purple/10 shadow-sm">
+                        <p className="text-xs font-bold uppercase tracking-wider text-brand-purple dark:text-indigo-300 mb-2">Notes</p>
                         <p className="text-sm leading-relaxed opacity-90">{plan.notes}</p>
                       </div>
                     )}
