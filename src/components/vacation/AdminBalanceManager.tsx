@@ -4,10 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LoadingState } from '@/components/layout/LoadingState';
 import { toast } from 'sonner';
-import { Save, UserPlus, RefreshCcw, Pencil, AlertCircle, Settings2, Users, XCircle } from 'lucide-react';
+import { RefreshCcw, AlertCircle, Settings2, Users, XCircle, Pencil } from 'lucide-react';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import {
     AlertDialog,
@@ -23,6 +22,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { RoleDefaultCard } from './RoleDefaultCard';
+import { StaffOverrideCard } from './StaffOverrideCard';
 
 export function AdminBalanceManager() {
     const { organization: currentOrganization } = useOrganization();
@@ -252,135 +253,17 @@ export function AdminBalanceManager() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="rounded-md border overflow-x-auto hidden lg:block">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>System Role</TableHead>
-                                            {staffWithBalances?.types.map(type => (
-                                                <TableHead key={type.id} className="min-w-[150px]">{type.name}</TableHead>
-                                            ))}
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {appRoles.map((role: string) => (
-                                            <TableRow key={role}>
-                                                <TableCell className="font-semibold capitalize">
-                                                    {role.replace('_', ' ')}
-                                                </TableCell>
-                                                {staffWithBalances?.types.map(type => {
-                                                    const roleDefault = staffWithBalances.defaults.find(
-                                                        (d: any) => d.role === role && d.vacation_type_id === type.id
-                                                    ) as any;
-                                                    const isEditing = editingRoleDefault === `${role}-${type.id}`;
-
-                                                    return (
-                                                        <TableCell key={type.id}>
-                                                            <div className="flex items-center gap-2">
-                                                                <Input
-                                                                    type="number"
-                                                                    className="w-20"
-                                                                    defaultValue={roleDefault?.default_days || 0}
-                                                                    disabled={!isEditing}
-                                                                    autoFocus={isEditing}
-                                                                    onBlur={(e) => {
-                                                                        setEditingRoleDefault(null);
-                                                                        const val = parseInt(e.target.value);
-                                                                        if (val < 0) {
-                                                                            toast.error("Default cannot be negative");
-                                                                            return;
-                                                                        }
-                                                                        if (val !== (roleDefault?.default_days || 0)) {
-                                                                            setPendingDefaultUpdate({
-                                                                                role,
-                                                                                typeId: type.id,
-                                                                                default_days: val,
-                                                                                typeName: type.name
-                                                                            });
-                                                                        }
-                                                                    }}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === 'Enter') e.currentTarget.blur();
-                                                                        if (e.key === 'Escape') setEditingRoleDefault(null);
-                                                                    }}
-                                                                />
-                                                                {!isEditing && (
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8"
-                                                                        onClick={() => setEditingRoleDefault(`${role}-${type.id}`)}
-                                                                    >
-                                                                        <Pencil className="h-4 w-4" />
-                                                                    </Button>
-                                                                )}
-                                                            </div>
-                                                        </TableCell>
-                                                    );
-                                                })}
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-
-                            {/* Mobile/Tablet Role Cards */}
-                            <div className="lg:hidden space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {appRoles.map((role: string) => (
-                                    <div key={role} className="border rounded-xl p-4 bg-muted/20 space-y-3">
-                                        <div className="flex items-center justify-between border-b pb-2">
-                                            <h3 className="font-bold capitalize text-primary">
-                                                {role.replace('_', ' ')}
-                                            </h3>
-                                            <Badge variant="outline" className="text-[10px]">Role Default</Badge>
-                                        </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            {staffWithBalances?.types.map(type => {
-                                                const roleDefault = staffWithBalances.defaults.find(
-                                                    (d: any) => d.role === role && d.vacation_type_id === type.id
-                                                ) as any;
-                                                const isEditing = editingRoleDefault === `${role}-${type.id}`;
-
-                                                return (
-                                                    <div key={type.id} className="flex flex-col gap-1.5 p-2 rounded-lg bg-background border border-border/50">
-                                                        <span className="text-xs font-medium text-muted-foreground">{type.name}</span>
-                                                        <div className="flex items-center gap-2">
-                                                            <Input
-                                                                type="number"
-                                                                className="h-8 w-full"
-                                                                defaultValue={roleDefault?.default_days || 0}
-                                                                disabled={!isEditing}
-                                                                onBlur={(e) => {
-                                                                    setEditingRoleDefault(null);
-                                                                    const val = parseInt(e.target.value);
-                                                                    if (val < 0) {
-                                                                        toast.error("Default cannot be negative");
-                                                                        return;
-                                                                    }
-                                                                    if (val !== (roleDefault?.default_days || 0)) {
-                                                                        setPendingDefaultUpdate({
-                                                                            role,
-                                                                            typeId: type.id,
-                                                                            default_days: val,
-                                                                            typeName: type.name
-                                                                        });
-                                                                    }
-                                                                }}
-                                                            />
-                                                            <Button
-                                                                variant={isEditing ? "default" : "ghost"}
-                                                                size="icon"
-                                                                className="h-8 w-8 shrink-0"
-                                                                onClick={() => setEditingRoleDefault(isEditing ? null : `${role}-${type.id}`)}
-                                                            >
-                                                                {isEditing ? <Save className="h-4 w-4" /> : <Pencil className="h-3.5 w-3.5" />}
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
+                                    <RoleDefaultCard
+                                        key={role}
+                                        role={role}
+                                        leaveTypes={staffWithBalances?.types || []}
+                                        defaults={staffWithBalances?.defaults || []}
+                                        editingId={editingRoleDefault}
+                                        setEditingId={setEditingRoleDefault}
+                                        onUpdate={(data) => setPendingDefaultUpdate(data)}
+                                    />
                                 ))}
                             </div>
                         </CardContent>
@@ -439,206 +322,40 @@ export function AdminBalanceManager() {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="rounded-md border overflow-x-auto hidden xl:block">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Staff Member</TableHead>
-                                            {staffWithBalances?.types.map(type => (
-                                                <TableHead key={type.id} className="min-w-[160px]">{type.name}</TableHead>
-                                            ))}
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {filteredStaff.map((member: any) => (
-                                            <TableRow key={`${member.user_id}-${member.role}`}>
-                                                <TableCell className="font-medium">
-                                                    <div>
-                                                        <p className="flex items-center gap-2">
-                                                            {member.profiles?.full_name}
-                                                            <Badge variant="outline" className="text-[10px] capitalize">
-                                                                {member.role?.replace('_', ' ')}
-                                                            </Badge>
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground">{member.profiles?.email}</p>
-                                                    </div>
-                                                </TableCell>
-                                                {staffWithBalances?.types.map(type => {
-                                                    const individualBalance = staffWithBalances.balances.find(
-                                                        b => b.staff_id === member.user_id && b.vacation_type_id === type.id
-                                                    );
-
-                                                    const roleDefault = staffWithBalances.defaults.find(
-                                                        (d: any) => d.role === member.role && d.vacation_type_id === type.id
-                                                    ) as any;
-
-                                                    const isLocalUpdating = updating === `${member.user_id}-${type.id}`;
-                                                    const isCustom = !!individualBalance;
-                                                    const displayValue = individualBalance ? individualBalance.accrued : (roleDefault?.default_days || 0);
-
-                                                    return (
-                                                        <TableCell key={type.id}>
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="relative">
-                                                                    <Input
-                                                                        key={`${member.user_id}-${type.id}-${displayValue}-${resetCounter}`}
-                                                                        type="number"
-                                                                        className={cn(
-                                                                            "w-20",
-                                                                            !isCustom && "text-muted-foreground italic border-dashed"
-                                                                        )}
-                                                                        defaultValue={displayValue}
-                                                                        disabled={editingCell !== `${member.user_id}-${type.id}` && !isLocalUpdating}
-                                                                        onBlur={(e) => {
-                                                                            setEditingCell(null);
-                                                                            const val = parseInt(e.target.value);
-                                                                            if (val < 0) {
-                                                                                toast.error("Balance cannot be negative");
-                                                                                e.target.value = displayValue.toString();
-                                                                                return;
-                                                                            }
-                                                                            if (val !== displayValue) {
-                                                                                setPendingUpdate({
-                                                                                    staffId: member.user_id,
-                                                                                    typeId: type.id,
-                                                                                    accrued: val,
-                                                                                    staffName: member.profiles?.full_name || 'Staff member',
-                                                                                    typeName: type.name
-                                                                                });
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                    {!isCustom && (
-                                                                        <span className="absolute -top-4 left-0 text-[10px] text-blue-500 font-medium">Auto</span>
-                                                                    )}
-                                                                </div>
-                                                                {editingCell !== `${member.user_id}-${type.id}` && !isLocalUpdating && (
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8"
-                                                                        onClick={() => setEditingCell(`${member.user_id}-${type.id}`)}
-                                                                    >
-                                                                        <Pencil className="h-4 w-4" />
-                                                                    </Button>
-                                                                )}
-                                                                {isLocalUpdating && <RefreshCcw className="h-4 w-4 animate-spin text-muted-foreground" />}
-                                                            </div>
-                                                            {individualBalance && (
-                                                                <p className="text-[10px] text-muted-foreground mt-1">
-                                                                    Rem: {individualBalance.balance} / Used: {individualBalance.used}
-                                                                </p>
-                                                            )}
-                                                        </TableCell>
-                                                    );
-                                                })}
-                                            </TableRow>
-                                        ))}
-                                        {filteredStaff.length === 0 && (
-                                            <TableRow>
-                                                <TableCell colSpan={staffWithBalances?.types.length + 1} className="h-24 text-center">
-                                                    No staff found matching search criteria.
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </div>
-
-                            {/* Mobile/Tablet Staff Cards */}
-                            <div className="xl:hidden space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {filteredStaff.map((member: any) => (
-                                    <div key={`${member.user_id}-${member.role}`} className="border rounded-xl p-4 bg-muted/20 space-y-3">
-                                        <div className="flex items-start justify-between border-b pb-2">
-                                            <div className="min-w-0">
-                                                <p className="font-bold truncate text-primary">
-                                                    {member.profiles?.full_name}
-                                                </p>
-                                                <p className="text-[10px] text-muted-foreground truncate">
-                                                    {member.profiles?.email}
-                                                </p>
-                                            </div>
-                                            <Badge variant="secondary" className="text-[10px] capitalize shrink-0">
-                                                {member.role?.replace('_', ' ')}
-                                            </Badge>
-                                        </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            {staffWithBalances?.types.map(type => {
-                                                const individualBalance = staffWithBalances.balances.find(
-                                                    b => b.staff_id === member.user_id && b.vacation_type_id === type.id
-                                                );
-
-                                                const roleDefault = staffWithBalances.defaults.find(
-                                                    (d: any) => d.role === member.role && d.vacation_type_id === type.id
-                                                ) as any;
-
-                                                const isLocalUpdating = updating === `${member.user_id}-${type.id}`;
-                                                const isCustom = !!individualBalance;
-                                                const displayValue = individualBalance ? individualBalance.accrued : (roleDefault?.default_days || 0);
-                                                const isEditing = editingCell === `${member.user_id}-${type.id}`;
-
-                                                return (
-                                                    <div key={type.id} className="flex flex-col gap-1.5 p-3 rounded-lg bg-background border border-border/50 shadow-sm">
-                                                        <div className="flex justify-between items-center">
-                                                            <span className="text-xs font-bold text-muted-foreground uppercase tracking-tight">{type.name}</span>
-                                                            {!isCustom && (
-                                                                <Badge variant="outline" className="text-[9px] h-4 px-1 text-blue-500 border-blue-500/30">Inherited</Badge>
-                                                            )}
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <Input
-                                                                type="number"
-                                                                className={cn(
-                                                                    "h-9 w-full font-semibold",
-                                                                    !isCustom && "text-muted-foreground italic"
-                                                                )}
-                                                                defaultValue={displayValue}
-                                                                disabled={!isEditing && !isLocalUpdating}
-                                                                onBlur={(e) => {
-                                                                    setEditingCell(null);
-                                                                    const val = parseInt(e.target.value);
-                                                                    if (val < 0) {
-                                                                        toast.error("Balance cannot be negative");
-                                                                        return;
-                                                                    }
-                                                                    if (val !== displayValue) {
-                                                                        setPendingUpdate({
-                                                                            staffId: member.user_id,
-                                                                            typeId: type.id,
-                                                                            accrued: val,
-                                                                            staffName: member.profiles?.full_name || 'Staff member',
-                                                                            typeName: type.name
-                                                                        });
-                                                                    }
-                                                                }}
-                                                            />
-                                                            <Button
-                                                                variant={isEditing ? "default" : "ghost"}
-                                                                size="icon"
-                                                                className="h-9 w-9 shrink-0"
-                                                                onClick={() => setEditingCell(isEditing ? null : `${member.user_id}-${type.id}`)}
-                                                            >
-                                                                {isEditing ? <Save className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-                                                            </Button>
-                                                        </div>
-                                                        {individualBalance && (
-                                                            <div className="flex justify-between items-center text-[10px] mt-1 text-muted-foreground bg-muted/30 px-2 py-1 rounded">
-                                                                <span>Used: <span className="font-bold text-foreground">{individualBalance.used}</span></span>
-                                                                <span>Rem: <span className="font-bold text-primary">{individualBalance.balance}</span></span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
+                                    <StaffOverrideCard
+                                        key={`${member.user_id}-${member.role}`}
+                                        member={member}
+                                        leaveTypes={staffWithBalances?.types || []}
+                                        balances={staffWithBalances?.balances || []}
+                                        defaults={staffWithBalances?.defaults || []}
+                                        editingId={editingCell}
+                                        setEditingId={setEditingCell}
+                                        updatingId={updating}
+                                        onUpdate={(data) => setPendingUpdate(data)}
+                                    />
                                 ))}
-                                {filteredStaff.length === 0 && (
-                                    <div className="text-center p-8 bg-muted/10 rounded-xl border-dashed border-2">
-                                        <p className="text-muted-foreground">No staff found matching search criteria.</p>
-                                    </div>
-                                )}
                             </div>
+
+                            {filteredStaff.length === 0 && (
+                                <div className="text-center p-12 bg-muted/10 rounded-2xl border-2 border-dashed border-border/50">
+                                    <div className="mx-auto w-12 h-12 rounded-full bg-muted/20 flex items-center justify-center mb-4 text-muted-foreground">
+                                        <Users className="h-6 w-6" />
+                                    </div>
+                                    <h3 className="font-semibold text-lg">No staff found</h3>
+                                    <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                                        Try adjusting your search terms or filters to find the staff members you're looking for.
+                                    </p>
+                                    <Button
+                                        variant="outline"
+                                        className="mt-6"
+                                        onClick={() => { setSearchTerm(''); setSelectedRoleFilter('all'); }}
+                                    >
+                                        Clear all filters
+                                    </Button>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>
