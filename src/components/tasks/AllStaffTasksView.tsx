@@ -115,18 +115,31 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
 
             if (assignError) throw assignError;
 
-            // 3. Fetch Creator Profiles
-            const { data: creators, error: creatorError } = await supabase
-                .from('profiles')
-                .select('id, full_name')
-                .in('id', creatorIds);
+            // 3. Fetch Creator Profiles & Assignee Roles
+            const [creatorProfiles, assigneeRoles] = await Promise.all([
+                supabase
+                    .from('profiles')
+                    .select('id, full_name')
+                    .in('id', creatorIds),
+                supabase
+                    .from('user_roles')
+                    .select('user_id, role')
+                    .in('user_id', taskAssignments.map(a => a.assigned_to))
+            ]);
 
-            if (creatorError) throw creatorError;
+            const creators = creatorProfiles.data || [];
+            const rolesMap = new Map();
+            (assigneeRoles.data || []).forEach(r => {
+                if (!rolesMap.has(r.user_id)) rolesMap.set(r.user_id, []);
+                rolesMap.get(r.user_id).push(r.role);
+            });
 
             // 4. Merge Data
             return (taskAssignments || []).map(assignment => {
                 const task = tasks.find(t => t.id === assignment.task_id);
                 const creator = creators?.find(c => c.id === task?.created_by);
+                const roles = rolesMap.get(assignment.assigned_to) || [];
+                const isDeptHead = roles.includes('department_head');
 
                 return {
                     ...assignment,
@@ -135,7 +148,8 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
                     task_priority: task?.priority,
                     task_due_date: task?.due_date,
                     assignee: assignment.profiles,
-                    creator_name: safeProfileName(creator)
+                    creator_name: safeProfileName(creator),
+                    is_dept_head: isDeptHead
                 };
             });
         },
@@ -304,13 +318,24 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
                                 </div>
                             ) : (
                                 col.items.map((item: any) => (
-                                    <Card key={item.id} className="bg-card border-border/50 hover:border-border transition-colors shadow-sm bg-card/60">
+                                    <Card
+                                        key={item.id}
+                                        className={cn(
+                                            "border-border/50 hover:border-border transition-colors shadow-sm",
+                                            item.assigned_to === user?.id ? "bg-brand-purple/[0.04] border-brand-purple/20" : "bg-card/60"
+                                        )}
+                                    >
                                         <CardContent className="p-4 space-y-3">
                                             {/* Header: Title + Priority */}
                                             <div className="flex justify-between items-start gap-3">
-                                                <h4 className="font-semibold text-sm line-clamp-2 leading-tight">
-                                                    {item.task_title}
-                                                </h4>
+                                                <div className="flex flex-col gap-1 flex-1">
+                                                    {item.assigned_to === user?.id && (
+                                                        <span className="text-[9px] w-fit bg-brand-purple/10 text-brand-purple px-1.5 rounded font-bold uppercase tracking-wider">Self Assigned</span>
+                                                    )}
+                                                    <h4 className="font-semibold text-sm line-clamp-2 leading-tight">
+                                                        {item.task_title}
+                                                    </h4>
+                                                </div>
                                                 <span className={getPriorityColor(item.task_priority)}>
                                                     {item.task_priority}
                                                 </span>
@@ -318,10 +343,17 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
 
                                             {/* Body: Assigned + Creator */}
                                             <div className="flex flex-col gap-0.5 text-xs">
-                                                <div className="flex items-center gap-1 text-muted-foreground">
-                                                    <span className="text-muted-foreground">To:</span>
-                                                    <span className="text-blue-500 font-medium">{safeProfileName(item.assignee)}</span>
-                                                </div>
+                                                {item.assigned_to === user?.id ? (
+                                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                                        <span className="text-muted-foreground">From:</span>
+                                                        <span className="text-blue-500 font-medium">{item.creator_name}</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                                        <span className="text-muted-foreground">To:</span>
+                                                        <span className="text-blue-500 font-medium">{safeProfileName(item.assignee)}</span>
+                                                    </div>
+                                                )}
                                                 <div className="flex items-center gap-1 text-muted-foreground">
                                                     <span>Created by: {item.creator_name}</span>
                                                 </div>
@@ -411,8 +443,8 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
                                 </DialogDescription>
                             </div>
                             <Badge className={cn(
-                                selectedAssignment?.status === 'completed' ? 'bg-green-500 hover:bg-green-600' :
-                                    selectedAssignment?.status === 'in_progress' ? 'bg-blue-500 hover:bg-blue-600' : 'bg-secondary hover:bg-secondary/80'
+                                selectedAssignment?.status === 'completed' ? 'bg-green-500' :
+                                    selectedAssignment?.status === 'in_progress' ? 'bg-blue-500' : 'bg-secondary'
                             )}>
                                 <span className="uppercase text-[10px]">{selectedAssignment?.status}</span>
                             </Badge>
@@ -459,15 +491,21 @@ const AllStaffTasksView = ({ scopeType, scopeId, assigneeId, onBack }: AllStaffT
 
                         <div className="grid grid-cols-2 gap-6">
                             <div className="space-y-1">
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Assigned To</p>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                    {selectedAssignment?.assigned_to === user?.id ? "Assigned By" : "Assigned To"}
+                                </p>
                                 <div className="flex items-center gap-2">
                                     <Avatar className="h-6 w-6">
                                         <AvatarFallback className="text-[10px]">
-                                            {selectedAssignment?.assignee?.full_name?.charAt(0)}
+                                            {selectedAssignment?.assigned_to === user?.id
+                                                ? selectedAssignment?.creator_name?.charAt(0)
+                                                : selectedAssignment?.assignee?.full_name?.charAt(0)}
                                         </AvatarFallback>
                                     </Avatar>
                                     <p className="text-sm font-medium text-blue-500">
-                                        {selectedAssignment?.assignee?.full_name}
+                                        {selectedAssignment?.assigned_to === user?.id
+                                            ? selectedAssignment?.creator_name
+                                            : selectedAssignment?.assignee?.full_name}
                                     </p>
                                 </div>
                             </div>

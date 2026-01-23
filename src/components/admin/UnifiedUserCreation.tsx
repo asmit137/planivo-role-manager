@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { Loader2, User, Building2, FolderTree, Stethoscope } from 'lucide-react';
@@ -696,43 +697,21 @@ const UnifiedUserCreation = ({
 
             <div className="space-y-2">
               <Label htmlFor="role">Role *</Label>
-              <Select value={role} onValueChange={handleRoleChange} required>
-                <SelectTrigger id="role">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableRoles.includes('organization_admin') && (
-                    <SelectItem value="organization_admin">Organization Admin</SelectItem>
-                  )}
-                  {availableRoles.includes('general_admin') && (
-                    <SelectItem value="general_admin">General Admin</SelectItem>
-                  )}
-                  {availableRoles.includes('workspace_supervisor') && (
-                    <SelectItem value="workspace_supervisor">Workspace Supervisor</SelectItem>
-                  )}
-                  {availableRoles.includes('facility_supervisor') && (
-                    <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
-                  )}
-                  {availableRoles.includes('department_head') && (
-                    <SelectItem value="department_head">Department Head</SelectItem>
-                  )}
-                  {availableRoles.includes('staff') && (
-                    <SelectItem value="staff">Staff</SelectItem>
-                  )}
-                  {availableRoles.includes('intern') && (
-                    <SelectItem value="intern">Intern</SelectItem>
-                  )}
-                  {/* Removed workplace_supervisor to prevent double entry */}
-                  {availableRoles.includes('custom') && customRoles?.map((cr) => (
-                    // Filter out custom roles that have the same name as built-in roles to prevent confusion
-                    !['staff', 'intern', 'department head', 'facility supervisor', 'workspace supervisor'].includes(cr.name.toLowerCase()) && (
-                      <SelectItem key={cr.id} value={cr.id}>
-                        {cr.name} (Custom)
-                      </SelectItem>
-                    )
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={[
+                  ...(availableRoles.includes('organization_admin') ? [{ value: 'organization_admin', label: 'Organization Admin' }] : []),
+                  ...(availableRoles.includes('general_admin') ? [{ value: 'general_admin', label: 'General Admin' }] : []),
+                  ...(availableRoles.includes('workspace_supervisor') ? [{ value: 'workspace_supervisor', label: 'Workspace Supervisor' }] : []),
+                  ...(availableRoles.includes('facility_supervisor') ? [{ value: 'facility_supervisor', label: 'Facility Supervisor' }] : []),
+                  ...(availableRoles.includes('department_head') ? [{ value: 'department_head', label: 'Department Head' }] : []),
+                  ...(availableRoles.includes('staff') ? [{ value: 'staff', label: 'Staff' }] : []),
+                  ...(availableRoles.includes('intern') ? [{ value: 'intern', label: 'Intern' }] : []),
+                  ...(availableRoles.includes('custom') ? (customRoles?.filter(cr => !['staff', 'intern', 'department head', 'facility supervisor', 'workspace supervisor'].includes(cr.name.toLowerCase())).map(cr => ({ value: cr.id, label: `${cr.name} (Custom)` })) || []) : [])
+                ]}
+                value={role}
+                onValueChange={handleRoleChange}
+                placeholder="Select a role"
+              />
               <p className="text-xs text-muted-foreground">
                 {role === 'organization_admin' && 'Organization-level access - manages workspaces, facilities, and users within an organization'}
                 {role === 'general_admin' && 'General admin access - manages the workspace'}
@@ -760,23 +739,13 @@ const UnifiedUserCreation = ({
                 {/* Organization - Required for almost all roles */}
                 <div className="space-y-2">
                   <Label htmlFor="organization" className="text-sm">Organization *</Label>
-                  <Select
+                  <SearchableSelect
+                    options={organizations?.map((org) => ({ value: org.id, label: org.name })) || []}
                     value={organizationId}
                     onValueChange={handleOrganizationChange}
-                    required
+                    placeholder="Select organization"
                     disabled={!!currentUserRole?.organization_id}
-                  >
-                    <SelectTrigger id="organization" className="h-10 text-sm">
-                      <SelectValue placeholder="Select organization" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {organizations?.map((org) => (
-                        <SelectItem key={org.id} value={org.id}>
-                          {org.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                   {currentUserRole?.organization_id && (
                     <p className="text-[10px] text-muted-foreground italic">Restricted to your current organization</p>
                   )}
@@ -786,29 +755,13 @@ const UnifiedUserCreation = ({
                 {['workspace_supervisor', 'workplace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern'].includes(role) && (
                   <div className="space-y-2">
                     <Label htmlFor="workspace">Workspace *</Label>
-                    <Select
+                    <SearchableSelect
+                      options={workspaces?.map((ws) => ({ value: ws.id, label: ws.name })) || []}
                       value={workspaceId}
                       onValueChange={handleWorkspaceChange}
-                      required
+                      placeholder={!organizationId ? "Select organization first" : "Select workspace"}
                       disabled={!organizationId || !!currentUserRole?.workspace_id}
-                    >
-                      <SelectTrigger id="workspace">
-                        <SelectValue placeholder={!organizationId ? "Select organization first" : "Select workspace"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {workspaces && workspaces.length > 0 ? (
-                          workspaces.map((ws) => (
-                            <SelectItem key={ws.id} value={ws.id}>
-                              {ws.name}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <div className="p-2 text-xs text-muted-foreground text-center">
-                            No workspaces available
-                          </div>
-                        )}
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
                 )}
 
@@ -816,29 +769,13 @@ const UnifiedUserCreation = ({
                 {['facility_supervisor', 'department_head', 'staff', 'intern'].includes(role) && (
                   <div className="space-y-2">
                     <Label htmlFor="facility">Facility *</Label>
-                    <Select
+                    <SearchableSelect
+                      options={facilities?.map((f) => ({ value: f.id, label: f.name })) || []}
                       value={facilityId}
                       onValueChange={handleFacilityChange}
-                      required
+                      placeholder={!workspaceId ? "Select workspace first" : "Select facility"}
                       disabled={!workspaceId || !!currentUserRole?.facility_id}
-                    >
-                      <SelectTrigger id="facility">
-                        <SelectValue placeholder={!workspaceId ? "Select workspace first" : "Select facility"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {facilities && facilities.length > 0 ? (
-                          facilities.map((f) => (
-                            <SelectItem key={f.id} value={f.id}>
-                              {f.name}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <div className="p-2 text-xs text-muted-foreground text-center">
-                            No facilities available
-                          </div>
-                        )}
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
                 )}
 
@@ -846,29 +783,13 @@ const UnifiedUserCreation = ({
                 {['department_head', 'staff', 'intern'].includes(role) && (
                   <div className="space-y-2">
                     <Label htmlFor="department">Department *</Label>
-                    <Select
+                    <SearchableSelect
+                      options={departments?.map((d) => ({ value: d.id, label: d.name })) || []}
                       value={departmentId}
                       onValueChange={handleDepartmentChange}
-                      required
+                      placeholder={!facilityId ? "Select facility first" : "Select department"}
                       disabled={!facilityId || !!currentUserRole?.department_id}
-                    >
-                      <SelectTrigger id="department">
-                        <SelectValue placeholder={!facilityId ? "Select facility first" : "Select department"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments && departments.length > 0 ? (
-                          departments.map((d) => (
-                            <SelectItem key={d.id} value={d.id}>
-                              {d.name}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <div className="p-2 text-xs text-muted-foreground text-center">
-                            No departments available
-                          </div>
-                        )}
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
                 )}
 
@@ -876,28 +797,13 @@ const UnifiedUserCreation = ({
                 {['staff', 'intern'].includes(role) && (
                   <div className="space-y-2">
                     <Label htmlFor="specialty">Specialty (Optional)</Label>
-                    <Select
+                    <SearchableSelect
+                      options={specialties?.map((s) => ({ value: s.id, label: s.name })) || []}
                       value={specialtyId}
                       onValueChange={setSpecialtyId}
+                      placeholder={!departmentId ? "Select department first" : "Select specialty"}
                       disabled={!departmentId}
-                    >
-                      <SelectTrigger id="specialty">
-                        <SelectValue placeholder={!departmentId ? "Select department first" : "Select specialty"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {specialties && specialties.length > 0 ? (
-                          specialties.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
-                              {s.name}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <div className="p-2 text-xs text-muted-foreground text-center">
-                            No specialties available
-                          </div>
-                        )}
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
                 )}
               </div>

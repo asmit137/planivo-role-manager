@@ -13,6 +13,7 @@ import { useAuth } from '@/lib/auth';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface Notification {
   id: string;
@@ -35,10 +36,11 @@ const NotificationBell = () => {
     queryFn: async () => {
       if (!user) return [];
 
-      const { data, error } = await supabase
-        .from('notifications')
+      const baseQuery: any = supabase.from('notifications' as any);
+      const { data, error } = await baseQuery
         .select('*')
         .eq('user_id', user.id)
+        .eq('is_dismissed', false)
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -84,19 +86,21 @@ const NotificationBell = () => {
     },
   });
 
-  const deleteAllNotificationsMutation = useMutation({
+  const dismissAllNotificationsMutation = useMutation({
     mutationFn: async () => {
       if (!user) return;
 
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('user_id', user.id);
+      const baseQuery: any = supabase.from('notifications' as any);
+      const { error } = await baseQuery
+        .update({ is_dismissed: true } as any)
+        .eq('user_id', user.id)
+        .eq('is_dismissed', false);
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      toast.success('Notifications cleared from bell');
     },
   });
 
@@ -109,7 +113,7 @@ const NotificationBell = () => {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'notifications',
           filter: `user_id=eq.${user.id}`,
@@ -163,8 +167,8 @@ const NotificationBell = () => {
               <Button
                 variant="destructive-ghost"
                 size="sm"
-                onClick={() => deleteAllNotificationsMutation.mutate()}
-                disabled={deleteAllNotificationsMutation.isPending}
+                onClick={() => dismissAllNotificationsMutation.mutate()}
+                disabled={dismissAllNotificationsMutation.isPending}
                 className="h-7 px-2 text-xs"
               >
                 Clear all

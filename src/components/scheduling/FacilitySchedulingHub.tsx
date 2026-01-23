@@ -9,8 +9,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Plus, ClipboardList, LayoutDashboard, Clock, Send, Trash2, Filter, Monitor, Edit, ArrowLeft, Building2, CalendarIcon } from 'lucide-react';
@@ -55,6 +66,8 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [filterDepartmentId, setFilterDepartmentId] = useState<string>('all');
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | undefined>(undefined);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<any>(null);
 
   // Use the effective facility ID (prop or selected)
@@ -359,6 +372,8 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['facility-schedules'] });
       toast.success('Schedule deleted');
+      setIsDeleteDialogOpen(false);
+      setScheduleToDelete(null);
     },
     onError: (error: unknown) => {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete schedule';
@@ -458,59 +473,29 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
               {workspacesLoading ? (
                 <div className="h-10 w-full animate-pulse rounded-md border border-input bg-muted" />
               ) : (
-                <Select
+                <SearchableSelect
+                  options={workspaces?.map((ws: any) => ({ value: ws.id, label: ws.name })) || []}
                   value={selectedWorkspaceId}
                   onValueChange={(value) => {
                     setSelectedWorkspaceId(value);
-                    setSelectedFacilityId(undefined); // Reset facility when workspace changes
+                    setSelectedFacilityId(undefined);
                   }}
+                  placeholder="Select a workspace..."
                   disabled={!!propWorkspaceId}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a workspace..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {workspaces && workspaces.length > 0 ? (
-                      workspaces.map((ws: any) => (
-                        <SelectItem key={ws.id} value={ws.id}>
-                          {ws.name}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-xs text-muted-foreground text-center">
-                        No workspaces available
-                      </div>
-                    )}
-                  </SelectContent>
-                </Select>
+                />
               )}
             </div>
 
             {/* Facility Selection */}
             <div className="space-y-2">
               <Label>Facility</Label>
-              <Select
+              <SearchableSelect
+                options={facilities?.map((f: any) => ({ value: f.id, label: f.name })) || []}
                 value={selectedFacilityId}
                 onValueChange={setSelectedFacilityId}
+                placeholder={!selectedWorkspaceId ? "Select workspace first" : "Select a facility..."}
                 disabled={!selectedWorkspaceId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={!selectedWorkspaceId ? "Select workspace first" : "Select a facility..."} />
-                </SelectTrigger>
-                <SelectContent>
-                  {facilities && facilities.length > 0 ? (
-                    facilities.map((f: any) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <div className="p-2 text-xs text-muted-foreground text-center">
-                      No facilities available
-                    </div>
-                  )}
-                </SelectContent>
-              </Select>
+              />
             </div>
           </div>
 
@@ -582,26 +567,16 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 {/* Department Filter */}
-                <Select value={filterDepartmentId} onValueChange={setFilterDepartmentId}>
-                  <SelectTrigger className="w-full sm:w-[180px] min-h-[44px]">
-                    <Filter className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="All Departments" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Departments</SelectItem>
-                    {departments && departments.length > 0 ? (
-                      departments.map((dept) => (
-                        <SelectItem key={dept.id} value={dept.id}>
-                          {dept.name}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-xs text-muted-foreground text-center">
-                        No departments found
-                      </div>
-                    )}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={[
+                    { value: 'all', label: 'All Departments' },
+                    ...(departments?.map((dept) => ({ value: dept.id, label: dept.name })) || [])
+                  ]}
+                  value={filterDepartmentId}
+                  onValueChange={setFilterDepartmentId}
+                  placeholder="All Departments"
+                  className="w-full sm:w-[200px]"
+                />
 
                 {/* Create/Edit Modal */}
                 <Dialog open={isCreateOpen} onOpenChange={(open) => {
@@ -623,24 +598,12 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
                       {/* Department Selection */}
                       <div className="space-y-2">
                         <Label>Department *</Label>
-                        <Select value={selectedDepartmentId} onValueChange={setSelectedDepartmentId}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select department" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {departments && departments.length > 0 ? (
-                              departments.map((dept) => (
-                                <SelectItem key={dept.id} value={dept.id}>
-                                  {dept.name}
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <div className="p-2 text-xs text-muted-foreground text-center">
-                                No departments available
-                              </div>
-                            )}
-                          </SelectContent>
-                        </Select>
+                        <SearchableSelect
+                          options={departments?.map((dept) => ({ value: dept.id, label: dept.name })) || []}
+                          value={selectedDepartmentId}
+                          onValueChange={setSelectedDepartmentId}
+                          placeholder="Select department"
+                        />
                       </div>
 
                       {/* Basic Info */}
@@ -891,18 +854,22 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
                                 <Send className="h-4 w-4 mr-1" />
                                 Publish
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => deleteSchedule.mutate(schedule.id)}
-                                disabled={deleteSchedule.isPending}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
                             </>
                           )}
+                          <Button
+                            size="icon"
+                            variant="destructive-ghost"
+                            className="h-8 w-8 bg-destructive/10 hover:bg-destructive/20"
+                            onClick={() => {
+                              setScheduleToDelete(schedule.id);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                            disabled={deleteSchedule.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                           {schedule.status === 'published' && (
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground mt-1">
                               Awaiting staff assignment by Department Head
                             </p>
                           )}
@@ -964,6 +931,28 @@ export const FacilitySchedulingHub: React.FC<FacilitySchedulingHubProps> = ({
           <ScheduleDisplaySettings facilityId={facilityId} />
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the schedule
+              and all its associated shifts and assignments.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setScheduleToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => scheduleToDelete && deleteSchedule.mutate(scheduleToDelete)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteSchedule.isPending ? 'Deleting...' : 'Delete Schedule'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ErrorBoundary>
   );
 };

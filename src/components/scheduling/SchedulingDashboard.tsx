@@ -1,6 +1,7 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ interface SchedulingDashboardProps {
 }
 
 export const SchedulingDashboard: React.FC<SchedulingDashboardProps> = ({ departmentId }) => {
+  const queryClient = useQueryClient();
   const [selectedGap, setSelectedGap] = React.useState<{ shift: any; date: Date } | null>(null);
   const today = new Date();
   const weekStart = startOfWeek(today);
@@ -60,6 +62,31 @@ export const SchedulingDashboard: React.FC<SchedulingDashboardProps> = ({ depart
       return count || 0;
     },
   });
+
+  // Mutation to cleanup expired schedules
+  const cleanupSchedulesMutation = useMutation({
+    mutationFn: async () => {
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      const { error } = await supabase
+        .from('schedules')
+        .update({ status: 'archived' })
+        .eq('department_id', departmentId)
+        .eq('status', 'published')
+        .lt('end_date', todayStr);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scheduling-dashboard'] });
+    }
+  });
+
+  // Auto-cleanup on mount
+  React.useEffect(() => {
+    if (departmentId) {
+      cleanupSchedulesMutation.mutate();
+    }
+  }, [departmentId]);
 
   if (isLoading) return <LoadingState message="Loading dashboard..." />;
 

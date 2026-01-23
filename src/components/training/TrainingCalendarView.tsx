@@ -1,15 +1,34 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { LoadingState } from '@/components/layout/LoadingState';
 import { format, startOfMonth, endOfMonth, isSameDay, isSameMonth } from 'date-fns';
-import { Calendar as CalendarIcon, Clock, MapPin, Video, Users } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, MapPin, Video, Users, Globe, Target, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -29,6 +48,7 @@ interface TrainingEvent {
   enable_video_conference: boolean;
   registration_type: string;
   responsible_user_id: string | null;
+  created_by: string | null;
 }
 
 const eventTypeColors: Record<EventType, string> = {
@@ -54,9 +74,12 @@ const eventTypeLabels: Record<EventType, string> = {
 const TrainingCalendarView = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('published');
+  const [selectedListEvent, setSelectedListEvent] = useState<TrainingEvent | null>(null);
 
   // Fetch events for current month range
   const { data: events, isLoading } = useQuery({
@@ -101,6 +124,64 @@ const TrainingCalendarView = () => {
     enabled: !!user,
   });
 
+  // Delete event mutation
+  const deleteEventMutation = useMutation({
+    mutationFn: async (eventId: string) => {
+      const { error } = await supabase
+        .from('training_events')
+        .delete()
+        .eq('id', eventId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['training-events-calendar'] });
+      toast.success('Event deleted successfully');
+      setSelectedListEvent(null);
+      setIsDeleteDialogOpen(false);
+    },
+    onError: (error) => {
+      console.error('Error deleting event:', error);
+      toast.error('Failed to delete event');
+    },
+  });
+
+  const handleDelete = () => {
+    if (selectedListEvent) {
+      deleteEventMutation.mutate(selectedListEvent.id);
+    }
+  };
+
+  // Fetch creator for the selected event
+  const { data: creatorProfile } = useQuery({
+    queryKey: ['event-creator', selectedListEvent?.created_by],
+    queryFn: async () => {
+      if (!selectedListEvent || !selectedListEvent.created_by) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', selectedListEvent.created_by)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedListEvent,
+  });
+
+  // Fetch total registrations for the selected event
+  const { data: totalRegistrationsCount } = useQuery({
+    queryKey: ['event-registrations-count', selectedListEvent?.id],
+    queryFn: async () => {
+      if (!selectedListEvent?.id) return 0;
+      const { count, error } = await supabase
+        .from('training_registrations')
+        .select('*', { count: 'exact', head: true })
+        .eq('event_id', selectedListEvent.id);
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: !!selectedListEvent,
+  });
+
   const getEventsForDay = (day: Date) => {
     if (!events) return [];
     return events.filter(event =>
@@ -124,32 +205,34 @@ const TrainingCalendarView = () => {
         </div>
 
         <div className="flex flex-col gap-2 w-full sm:w-auto">
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-full sm:w-[140px] h-7 sm:h-10 text-[9px] sm:text-sm">
-              <SelectValue placeholder="Event Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-[9px] sm:text-sm">All Types</SelectItem>
-              <SelectItem value="training" className="text-[9px] sm:text-sm">Training</SelectItem>
-              <SelectItem value="workshop" className="text-[9px] sm:text-sm">Workshop</SelectItem>
-              <SelectItem value="seminar" className="text-[9px] sm:text-sm">Seminar</SelectItem>
-              <SelectItem value="webinar" className="text-[9px] sm:text-sm">Webinar</SelectItem>
-              <SelectItem value="meeting" className="text-[9px] sm:text-sm">Meeting</SelectItem>
-              <SelectItem value="conference" className="text-[9px] sm:text-sm">Conference</SelectItem>
-              <SelectItem value="other" className="text-[9px] sm:text-sm">Other</SelectItem>
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            options={[
+              { value: 'all', label: 'All Types' },
+              { value: 'training', label: 'Training' },
+              { value: 'workshop', label: 'Workshop' },
+              { value: 'seminar', label: 'Seminar' },
+              { value: 'webinar', label: 'Webinar' },
+              { value: 'meeting', label: 'Meeting' },
+              { value: 'conference', label: 'Conference' },
+              { value: 'other', label: 'Other' },
+            ]}
+            value={filterType}
+            onValueChange={setFilterType}
+            placeholder="Event Type"
+            className="w-full sm:w-[150px]"
+          />
 
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-full sm:w-[140px] h-7 sm:h-10 text-[9px] sm:text-sm">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-[9px] sm:text-sm">All Status</SelectItem>
-              <SelectItem value="published" className="text-[9px] sm:text-sm">Published</SelectItem>
-              <SelectItem value="draft" className="text-[9px] sm:text-sm">Draft</SelectItem>
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            options={[
+              { value: 'all', label: 'All Status' },
+              { value: 'published', label: 'Published' },
+              { value: 'draft', label: 'Draft' },
+            ]}
+            value={filterStatus}
+            onValueChange={setFilterStatus}
+            placeholder="Status"
+            className="w-full sm:w-[150px]"
+          />
         </div>
       </div>
 
@@ -274,7 +357,14 @@ const TrainingCalendarView = () => {
         <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
           <div className="grid grid-cols-2 xs:grid-cols-3 sm:flex sm:flex-wrap gap-1.5 sm:gap-4">
             {Object.entries(eventTypeColors).map(([type, color]) => (
-              <div key={type} className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md bg-muted/50 border">
+              <div
+                key={type}
+                className={cn(
+                  "flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md border cursor-pointer transition-all hover:bg-muted font-medium",
+                  filterType === type ? "bg-primary/10 border-primary shadow-sm scale-105" : "bg-muted/50 border-transparent opacity-70 hover:opacity-100"
+                )}
+                onClick={() => setFilterType(filterType === type ? 'all' : type)}
+              >
                 <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
                 <span className="text-[9px] sm:text-xs capitalize font-medium truncate">{type}</span>
               </div>
@@ -303,18 +393,24 @@ const TrainingCalendarView = () => {
               events?.map(event => (
                 <div
                   key={event.id}
-                  className="flex items-start gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg border bg-muted/20 hover:bg-muted/50 transition-colors"
+                  className="flex items-start gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg border bg-muted/20 hover:bg-muted/50 transition-colors cursor-pointer group"
+                  onClick={() => setSelectedListEvent(event)}
                 >
                   <div
-                    className="w-1.5 sm:w-2 h-full min-h-[40px] rounded-full shrink-0"
+                    className="w-1.5 sm:w-2 h-full min-h-[40px] rounded-full shrink-0 transition-transform group-hover:scale-y-110"
                     style={{ backgroundColor: eventTypeColors[event.event_type] }}
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-semibold text-sm sm:text-base truncate">{event.title}</h4>
-                      <Badge variant="outline" className="shrink-0 text-[10px] h-5 sm:h-6">
-                        {eventTypeLabels[event.event_type]}
-                      </Badge>
+                      <h4 className="font-semibold text-sm sm:text-base truncate group-hover:text-primary transition-colors">{event.title}</h4>
+                      <div className="flex items-center gap-2">
+                        {(event.status === 'completed' || new Date(event.end_datetime) < new Date()) && (
+                          <Badge className="bg-slate-500 text-white bg-success text-[9px] h-4 sm:h-5 leading-none px-1.5 border-none">Completed</Badge>
+                        )}
+                        <Badge variant="outline" className="shrink-0 text-[10px] h-5 sm:h-6">
+                          {eventTypeLabels[event.event_type]}
+                        </Badge>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-[10px] sm:text-xs text-muted-foreground font-medium">
                       <span className="flex items-center gap-1">
@@ -344,6 +440,171 @@ const TrainingCalendarView = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Event Details Dialog */}
+      <Dialog open={!!selectedListEvent} onOpenChange={(open) => !open && setSelectedListEvent(null)}>
+        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-none shadow-2xl">
+          {selectedListEvent && (
+            <div className="relative">
+              {/* Header with Background Pattern */}
+              <div
+                className="h-32 sm:h-40 w-full relative p-6 flex flex-col justify-end"
+                style={{
+                  backgroundColor: eventTypeColors[selectedListEvent.event_type],
+                  backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)'
+                }}
+              >
+                <div className="absolute top-4 right-12 z-10 flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 bg-white/10 hover:bg-red-500/20 text-white border-white/20 hover:text-red-500 rounded-full backdrop-blur-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsDeleteDialogOpen(true);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  {(selectedListEvent.status === 'completed' || new Date(selectedListEvent.end_datetime) < new Date()) && (
+                    <Badge className="bg-white/20 backdrop-blur-md text-white border-white/30 text-[10px] uppercase font-bold tracking-tighter shadow-sm px-2 py-0.5">
+                      Completed
+                    </Badge>
+                  )}
+                  <Badge className="bg-white text-black border-none text-[10px] uppercase font-bold tracking-tighter shadow-sm px-2 py-0.5">
+                    {eventTypeLabels[selectedListEvent.event_type]}
+                  </Badge>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-white drop-shadow-md leading-tight">
+                  {selectedListEvent.title}
+                </h3>
+              </div>
+
+              <div className="p-6 space-y-6 bg-background">
+                {selectedListEvent.description && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Description</p>
+                    <p className="text-sm text-foreground/80 leading-relaxed italic border-l-2 pl-4 border-muted">
+                      {selectedListEvent.description}
+                    </p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2 p-3 rounded-xl bg-muted/30 border border-muted/50">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                      <Clock className="h-3 w-3" />
+                      Duration
+                    </p>
+                    <div className="space-y-1">
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase font-semibold">Start</p>
+                        <p className="text-xs font-bold">
+                          {format(new Date(selectedListEvent.start_datetime), 'MMM d, yyyy @ p')}
+                        </p>
+                      </div>
+                      <div className="pt-1 border-t border-muted/50">
+                        <p className="text-[10px] text-muted-foreground uppercase font-semibold">End</p>
+                        <p className="text-xs font-bold">
+                          {format(new Date(selectedListEvent.end_datetime), 'MMM d, yyyy @ p')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 p-3 rounded-xl bg-muted/30 border border-muted/50">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                      <Globe className="h-3 w-3" />
+                      Event Mode
+                    </p>
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold capitalize">{selectedListEvent.location_type}</p>
+                      <Badge variant="outline" className="text-[9px] h-4 py-0 font-medium">
+                        {selectedListEvent.location_type === 'online' ? 'Internet Required' : 'On-site presence'}
+                      </Badge>
+                      <p className="text-[10px] text-muted-foreground pt-1 italic">
+                        {selectedListEvent.enable_video_conference ? "Video conferencing enabled for this session." : "No virtual link available."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2 p-3 rounded-xl bg-muted/30 border border-muted/50">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                      <Users className="h-3 w-3" />
+                      Created By
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-full bg-brand-purple/10 flex items-center justify-center">
+                        <Users className="h-3 w-3 text-brand-purple" />
+                      </div>
+                      <p className="text-xs font-bold truncate">
+                        {creatorProfile?.full_name || "System Administrator"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 p-3 rounded-xl bg-muted/30 border border-muted/50">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                      <Target className="h-3 w-3" />
+                      Registration
+                    </p>
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-bold capitalize">{selectedListEvent.registration_type}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {selectedListEvent.max_participants ? `${selectedListEvent.max_participants} max seats` : "Unlimited capacity"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-dashed">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center -space-x-2">
+                      <div className="h-8 w-8 rounded-full border-2 border-background bg-emerald-500/10 flex items-center justify-center text-[10px] font-bold text-emerald-600">
+                        {totalRegistrationsCount}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase block leading-none">Registered</span>
+                      <span className="text-[9px] text-muted-foreground">Total Participants</span>
+                    </div>
+                  </div>
+
+                  {registrations?.includes(selectedListEvent.id) && (
+                    <Badge className="bg-emerald-500 text-white border-none text-[10px] px-3 py-1 font-bold uppercase tracking-widest">
+                      Registered
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the event
+              "{selectedListEvent?.title}" and remove all registration data associated with it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteEventMutation.isPending ? 'Deleting...' : 'Delete Event'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
