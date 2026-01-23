@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { format } from 'date-fns';
-import { CheckCircle2, XCircle, Calendar, User, FileText, Clock, AlertCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, Calendar, User, FileText, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { sendVacationStatusNotification } from '@/lib/vacationNotifications';
@@ -743,7 +743,11 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                       className="flex-1"
                       disabled={approvalMutation.isPending}
                     >
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      {approvalMutation.isPending && approvalAction === 'approve' && selectedPlan?.id === plan.id ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                      )}
                       Approve
                     </Button>
                     <Button
@@ -752,7 +756,11 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
                       className="flex-1"
                       disabled={approvalMutation.isPending}
                     >
-                      <XCircle className="h-4 w-4 mr-2" />
+                      {approvalMutation.isPending && approvalAction === 'reject' && selectedPlan?.id === plan.id ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mr-2" />
+                      )}
                       Reject
                     </Button>
                   </div>
@@ -921,7 +929,12 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
               variant={approvalAction === 'approve' ? 'default' : 'destructive'}
               className="px-8 font-bold"
             >
-              {approvalAction === 'approve' ? (
+              {approvalMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : approvalAction === 'approve' ? (
                 <>
                   <CheckCircle2 className="h-4 w-4 mr-2" />
                   Confirm Approval
@@ -1096,7 +1109,12 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
               onClick={confirmConflictApproval}
               disabled={approvalMutation.isPending || !conflictReason.trim() || selectedSplits.size === 0}
             >
-              {approvalMutation.isPending ? 'Processing...' : `Acknowledge & Approve ${selectedSplits.size} Segment(s)`}
+              {approvalMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : `Acknowledge & Approve ${selectedSplits.size} Segment(s)`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1200,7 +1218,12 @@ const VacationApprovalWorkflow = ({ approvalLevel, scopeType, scopeId }: Vacatio
               }}
               disabled={approvalMutation.isPending || !conflictReason.trim()}
             >
-              {approvalMutation.isPending ? 'Processing...' : 'Acknowledge & Approve'}
+              {approvalMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : 'Acknowledge & Approve'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"; // Using consistent version
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import nodemailer from "npm:nodemailer@6.9.10";
 
 const corsHeaders = {
@@ -12,16 +12,62 @@ interface CancelEventRequest {
     eventId: string;
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
+    // Handle CORS preflight
     if (req.method === 'OPTIONS') {
         return new Response(null, { headers: corsHeaders });
     }
 
     try {
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader) {
+            return new Response(
+                JSON.stringify({ error: 'No authorization header' }),
+                { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
+
         const supabaseClient = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         );
+
+        // Verify user session
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+
+        if (userError || !user) {
+            return new Response(
+                JSON.stringify({ error: 'Invalid token or unauthorized' }),
+                { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
+
+        // Authorization Check: Must be a management role
+        const { data: roles, error: rolesError } = await supabaseClient
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id);
+
+        if (rolesError) throw rolesError;
+
+        const authorizedRoles = [
+            'super_admin',
+            'organization_admin',
+            'general_admin',
+            'workplace_supervisor',
+            'facility_supervisor',
+            'department_head'
+        ];
+
+        const hasAccess = roles?.some((r: { role: string }) => authorizedRoles.includes(r.role));
+
+        if (!hasAccess) {
+            return new Response(
+                JSON.stringify({ error: 'Access denied. Management role required.' }),
+                { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
 
         const { eventId } = await req.json() as CancelEventRequest;
 
@@ -46,7 +92,7 @@ serve(async (req) => {
         // 2. Fetch registered users
         const { data: registrations, error: regError } = await supabaseClient
             .from('training_registrations')
-            .select('user_id, status, profiles:user_id(email, first_name, last_name)')
+            .select('user_id, status, profiles:user_id(email, full_name)')
             .eq('event_id', eventId)
             .eq('status', 'registered');
 
@@ -103,19 +149,28 @@ serve(async (req) => {
             console.warn("SMTP config missing, skipping emails.");
         }
 
-        // 4. Delete the event (Cascade will handle registrations, but we can be explicit if needed)
-        // Deleting the event is enough if cascade is set up, typically it is.
-        // If NO ACTION/RESTRICT on foreign key, we might need to delete registrations first.
-        // Assuming standard Supabase cascade or handling, but to be safe let's delete registrations first if cascade isn't guaranteed.
-        // Actually, usually RLS policies might block deletion if we don't own rows. But we are using Service Role key so we are fine.
+        // 4. Delete dependent records (training_event_targets)
+        // This table often has foreign key constraints that prevent event deletion.
+        const { error: targetsError } = await supabaseClient
+            .from('training_event_targets')
+            .delete()
+            .eq('event_id', eventId);
 
-        // Let's rely on event deletion. If it fails due to FK constraint, we'll know.
+        if (targetsError) {
+            console.error('Error deleting event targets:', targetsError);
+            throw new Error(`Failed to delete event targets: ${targetsError.message}`);
+        }
+
+        // 5. Delete the event
         const { error: deleteError } = await supabaseClient
             .from('training_events')
             .delete()
             .eq('id', eventId);
 
-        if (deleteError) throw deleteError;
+        if (deleteError) {
+            console.error('Error deleting event:', deleteError);
+            throw new Error(`Failed to delete event: ${deleteError.message}`);
+        }
 
         return new Response(
             JSON.stringify({ success: true, message: 'Event cancelled and notifications sent' }),
@@ -123,9 +178,16 @@ serve(async (req) => {
         );
 
     } catch (error) {
-        console.error('Error cancelling event:', error);
+        console.error('Error in cancel-training-event:', error);
+
+        // Detailed error for debugging
+        const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
+
         return new Response(
-            JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+            JSON.stringify({
+                error: errorMsg,
+                details: error instanceof Error ? error.stack : undefined
+            }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
     }

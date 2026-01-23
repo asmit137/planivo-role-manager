@@ -176,22 +176,41 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
 
     const dateRange = getDateRange();
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // Use start of day for cleaner comparison
 
     return vacations
-      .flatMap((vacation: any) => {
-        return vacation.vacation_splits
-          ?.map((split: any) => ({
-            ...vacation,
-            split,
-            splitStartDate: parseISO(split.start_date),
-            splitEndDate: parseISO(split.end_date),
-          })) || [];
+      .map((vacation: any) => {
+        // Find splits that are relevant (start after today or include today)
+        const relevantSplits = vacation.vacation_splits?.filter((split: any) => {
+          const start = parseISO(split.start_date);
+          const end = parseISO(split.end_date);
+
+          // Original logic: item.splitStartDate >= today
+          // Let's keep it consistent but apply it to the splits
+          const isUpcoming = start >= today || (today >= start && today <= end);
+          if (!dateRange) return isUpcoming;
+          return isUpcoming && (isWithinInterval(start, dateRange) || isWithinInterval(end, dateRange));
+        }) || [];
+
+        if (relevantSplits.length === 0) return null;
+
+        // Sort relevant splits by start date
+        const sortedSplits = [...relevantSplits].sort((a, b) =>
+          parseISO(a.start_date).getTime() - parseISO(b.start_date).getTime()
+        );
+
+        const splitStartDate = parseISO(sortedSplits[0].start_date);
+        const splitEndDate = parseISO(sortedSplits[sortedSplits.length - 1].end_date);
+        const displayDays = relevantSplits.reduce((sum: number, s: any) => sum + s.days, 0);
+
+        return {
+          ...vacation,
+          splitStartDate,
+          splitEndDate,
+          displayDays
+        };
       })
-      .filter((item: any) => {
-        const isUpcoming = item.splitStartDate >= today;
-        if (!dateRange) return isUpcoming;
-        return isUpcoming && isWithinInterval(item.splitStartDate, dateRange);
-      })
+      .filter(Boolean)
       .sort((a: any, b: any) => a.splitStartDate.getTime() - b.splitStartDate.getTime());
   };
 
@@ -529,7 +548,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
 
                 return (
                   <div
-                    key={`${item.id}-${item.split.id}-${index}`}
+                    key={`${item.id}-${index}`}
                     className={cn(
                       "flex flex-col rounded-lg border shadow-sm hover:shadow-md transition-all p-4 space-y-3",
                       isApproved && "bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800",
@@ -579,7 +598,7 @@ export default function VacationCalendarView({ departmentId }: VacationCalendarV
                           {format(item.splitStartDate, "MMM d")} - {format(item.splitEndDate, "MMM d, yyyy")}
                         </p>
                         <Badge variant="outline" className="text-xs">
-                          {item.split.days} day{item.split.days > 1 ? 's' : ''}
+                          {item.displayDays} day{item.displayDays > 1 ? 's' : ''}
                         </Badge>
                       </div>
                     </div>

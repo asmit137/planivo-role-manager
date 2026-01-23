@@ -13,7 +13,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { CalendarIcon, Plus, Check, ChevronsUpDown, XCircle, MessageSquare } from 'lucide-react';
+import { CalendarIcon, Plus, Check, ChevronsUpDown, XCircle, MessageSquare, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
@@ -592,8 +592,17 @@ const TaskManager = ({ scopeType, scopeId, hideTaskList, onSuccess, initialSelec
 
             <div className="flex flex-col sm:flex-row gap-2">
               <Button type="submit" disabled={createTaskMutation.isPending} className="w-full sm:w-auto min-h-[44px]">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Task
+                {createTaskMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating Task...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Task
+                  </>
+                )}
               </Button>
               <Button type="button" variant="outline" onClick={resetForm} className="w-full sm:w-auto min-h-[44px]">
                 Reset

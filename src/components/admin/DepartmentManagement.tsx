@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { FolderPlus, Plus, Users, Trash2, Pencil } from 'lucide-react';
+import { FolderPlus, Plus, Users, Trash2, Pencil, Loader2 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -348,7 +348,12 @@ const DepartmentManagement = () => {
                 </div>
 
                 <Button type="submit" className="w-full" disabled={createDepartmentMutation.isPending}>
-                  {createDepartmentMutation.isPending ? 'Creating...' : 'Add Department'}
+                  {createDepartmentMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : 'Add Department'}
                 </Button>
               </form>
             </DialogContent>
@@ -433,7 +438,11 @@ const DepartmentManagement = () => {
                             onClick={() => deleteDepartmentMutation.mutate(dept.id)}
                             disabled={deleteDepartmentMutation.isPending}
                           >
-                            <Trash2 className="h-3 w-3" />
+                            {deleteDepartmentMutation.isPending ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-3 w-3" />
+                            )}
                           </Button>
                         </div>
                       </TableCell>
@@ -467,7 +476,11 @@ const DepartmentManagement = () => {
                               onClick={() => deleteDepartmentMutation.mutate(sub.id)}
                               disabled={deleteDepartmentMutation.isPending}
                             >
-                              <Trash2 className="h-3 w-3" />
+                              {deleteDepartmentMutation.isPending ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3" />
+                              )}
                             </Button>
                           </div>
                         </TableCell>
@@ -502,7 +515,12 @@ const DepartmentManagement = () => {
               </div>
 
               <Button type="submit" className="w-full" disabled={createDepartmentMutation.isPending}>
-                {createDepartmentMutation.isPending ? 'Adding...' : 'Add Subdepartment'}
+                {createDepartmentMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : 'Add Subdepartment'}
               </Button>
             </form>
           </DialogContent>
@@ -555,7 +573,12 @@ const DepartmentManagement = () => {
                 </div>
 
                 <Button type="submit" className="w-full" disabled={updateDepartmentMutation.isPending}>
-                  {updateDepartmentMutation.isPending ? 'Updating...' : 'Update Department'}
+                  {updateDepartmentMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : 'Update Department'}
                 </Button>
               </form>
             )}
