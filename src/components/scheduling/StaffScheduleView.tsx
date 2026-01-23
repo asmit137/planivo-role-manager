@@ -9,7 +9,6 @@ import { Calendar, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isSameDay } from 'date-fns';
 import { LoadingState } from '@/components/layout/LoadingState';
 import { EmptyState } from '@/components/layout/EmptyState';
-import { PageHeader } from '@/components/layout/PageHeader';
 import { cn } from '@/lib/utils';
 
 interface StaffScheduleViewProps {
@@ -48,7 +47,7 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({ department
         .order('assignment_date', { ascending: true });
 
       if (error) throw error;
-      
+
       // Filter only published schedules
       return data?.filter((a: any) => a.shifts?.schedules?.status === 'published') || [];
     },
@@ -89,7 +88,7 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({ department
 
   // Get assignments for a specific day
   const getAssignmentsForDay = (day: Date) => {
-    return assignments?.filter((a: any) => 
+    return assignments?.filter((a: any) =>
       isSameDay(parseISO(a.assignment_date), day)
     ) || [];
   };
@@ -98,10 +97,6 @@ export const StaffScheduleView: React.FC<StaffScheduleViewProps> = ({ department
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="My Schedule"
-        description="View your assigned shifts and upcoming work schedule"
-      />
 
       {/* Week Navigation */}
       <Card>

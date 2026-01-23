@@ -236,6 +236,9 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status, notes }: any) => {
       const updateData: any = { status };
+      if (status === 'in_progress') {
+        updateData.started_at = new Date().toISOString();
+      }
       if (status === 'completed') {
         updateData.completed_at = new Date().toISOString();
       }
@@ -632,6 +635,25 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
+                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Start Date</p>
+                <p className="text-sm">
+                  {selectedAssignment?.started_at
+                    ? format(new Date(selectedAssignment.started_at), 'PPP')
+                    : 'Not started yet'}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Complete Date</p>
+                <p className="text-sm">
+                  {selectedAssignment?.completed_at
+                    ? format(new Date(selectedAssignment.completed_at), 'PPP')
+                    : 'Not completed yet'}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
                 <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Priority</p>
                 <Badge variant="outline" className={cn(getPriorityColor(selectedAssignment?.tasks.priority || ''))}>
                   {selectedAssignment?.tasks.priority}
@@ -670,14 +692,7 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
               </div>
             )}
 
-            {selectedAssignment?.completed_at && (
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-success">Completed At</p>
-                <p className="text-sm text-success">
-                  {format(new Date(selectedAssignment.completed_at), 'PPP p')}
-                </p>
-              </div>
-            )}
+
 
             <div className="space-y-2 border-t pt-4">
               <p className="text-sm font-semibold">Notes</p>
