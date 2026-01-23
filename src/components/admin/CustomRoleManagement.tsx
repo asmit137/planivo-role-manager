@@ -303,7 +303,7 @@ const CustomRoleManagement = () => {
 
                             <Separator />
 
-                            <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                            <div className="space-y-3 pb-4 max-h-[500px] overflow-y-auto">
                                 <Label className="mb-2 block text-sm font-semibold">Module Permissions</Label>
                                 <ScrollArea className="flex-1 pr-2 sm:pr-4">
                                     <div className="space-y-3 pb-4">
