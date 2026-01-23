@@ -19,6 +19,7 @@ import { SchedulingHub } from '@/components/scheduling/SchedulingHub';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 interface OrganizationScheduleMonitorProps {
   organizationId: string;
@@ -193,6 +194,8 @@ const OrganizationScheduleMonitor = ({ organizationId }: OrganizationScheduleMon
         return <Badge className="bg-emerald-500 text-white">Published</Badge>;
       case 'draft':
         return <Badge className="bg-amber-500 text-white">Draft</Badge>;
+      case 'archived':
+        return <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/20">Archived</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -240,43 +243,28 @@ const OrganizationScheduleMonitor = ({ organizationId }: OrganizationScheduleMon
             <div className="py-4 space-y-4">
               <div className="space-y-2">
                 <Label>Department to manage</Label>
-                <Select onValueChange={(value) => {
-                  setSelectedDepartmentId(value);
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a department..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(() => {
-                      const groups = allDepartments?.reduce((acc: any, dept: any) => {
-                        const facility = dept.facilityName;
-                        if (!acc[facility]) acc[facility] = [];
-                        acc[facility].push(dept);
-                        return acc;
-                      }, {});
-
-                      return Object.entries(groups || {}).map(([facility, departments]: [string, any]) => (
-                        <SelectGroup key={facility}>
-                          <SelectLabel className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted/30">
-                            {facility}
-                          </SelectLabel>
-                          {departments.map((dept: any) => (
-                            <SelectItem key={dept.id} value={dept.id}>
-                              <div className="flex items-center justify-between w-full gap-4">
-                                <span>{dept.name}</span>
-                                {dept.scheduleCount > 0 && (
-                                  <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-primary/10 text-primary">
-                                    {dept.scheduleCount} {dept.scheduleCount === 1 ? 'sch' : 'schs'}
-                                  </Badge>
-                                )}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      ));
-                    })()}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={selectedDepartmentId || ''}
+                  onValueChange={setSelectedDepartmentId}
+                  placeholder="Select a department..."
+                  options={allDepartments?.map((dept: any) => ({
+                    value: dept.id,
+                    label: `${dept.name} (${dept.facilityName})`,
+                    render: (
+                      <div className="flex items-center justify-between w-full gap-4">
+                        <div className="flex flex-col">
+                          <span className="font-medium">{dept.name}</span>
+                          <span className="text-[10px] text-muted-foreground">{dept.facilityName}</span>
+                        </div>
+                        {dept.scheduleCount > 0 && (
+                          <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-primary/10 text-primary">
+                            {dept.scheduleCount} {dept.scheduleCount === 1 ? 'sch' : 'schs'}
+                          </Badge>
+                        )}
+                      </div>
+                    )
+                  })) || []}
+                />
               </div>
               <div className="flex gap-2 justify-end pt-2">
                 <Button
@@ -411,46 +399,32 @@ const OrganizationScheduleMonitor = ({ organizationId }: OrganizationScheduleMon
                       className="pl-9 h-9"
                     />
                   </div>
-                  <Select value={filterDept} onValueChange={setFilterDept}>
-                    <SelectTrigger className="h-9 w-[150px]">
-                      <Filter className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="Filter Dept" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Departments</SelectItem>
-                      {(() => {
-                        const groups = allDepartments?.reduce((acc: any, dept: any) => {
-                          const facility = dept.facilityName;
-                          if (!acc[facility]) acc[facility] = [];
-                          acc[facility].push(dept);
-                          return acc;
-                        }, {});
-
-                        return Object.entries(groups || {}).map(([facility, departments]: [string, any]) => (
-                          <SelectGroup key={facility}>
-                            <SelectLabel className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted/30">
-                              {facility}
-                            </SelectLabel>
-                            {departments.map((dept: any) => (
-                              <SelectItem key={dept.id} value={dept.id}>
-                                <div className="flex flex-col items-start gap-0.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium text-sm">{dept.name}</span>
-                                    {dept.scheduleCount > 0 && (
-                                      <Badge variant="secondary" className="text-[9px] h-3.5 px-1 bg-primary/10 text-primary">
-                                        {dept.scheduleCount} {dept.scheduleCount === 1 ? 'sch' : 'schs'}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <span className="text-[10px] text-muted-foreground">{dept.facilityName}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        ));
-                      })()}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={filterDept}
+                    onValueChange={setFilterDept}
+                    className="h-9 w-[180px]"
+                    placeholder="Filter Dept"
+                    options={[
+                      { value: 'all', label: 'All Departments' },
+                      ...(allDepartments?.map((dept: any) => ({
+                        value: dept.id,
+                        label: `${dept.name} (${dept.facilityName})`,
+                        render: (
+                          <div className="flex flex-col items-start gap-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm">{dept.name}</span>
+                              {dept.scheduleCount > 0 && (
+                                <Badge variant="secondary" className="text-[9px] h-3.5 px-1 bg-primary/10 text-primary">
+                                  {dept.scheduleCount} {dept.scheduleCount === 1 ? 'sch' : 'schs'}
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground">{dept.facilityName}</span>
+                          </div>
+                        )
+                      })) || [])
+                    ]}
+                  />
                 </div>
               </div>
             </CardHeader>

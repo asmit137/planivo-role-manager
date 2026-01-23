@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Input } from '@/components/ui/input';
 import {
   Dialog,
@@ -61,9 +62,9 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
       case 'pending':
         return 'bg-secondary hover:bg-secondary/80';
       case 'in_progress':
-        return 'bg-primary';
+        return 'bg-primary hover:bg-primary/80';
       case 'completed':
-        return 'bg-success';
+        return 'bg-success hover:bg-success/80';
       default:
         return 'bg-muted';
     }
@@ -124,34 +125,44 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Fetch profiles separately
-      const tasksWithExtraInfo = await Promise.all(
-        (data || []).map(async (assignment) => {
-          const [creatorProfile, assignedProfile] = await Promise.all([
-            supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('id', assignment.tasks.created_by)
-              .single(),
-            supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('id', assignment.assigned_to)
-              .single()
-          ]);
+      const assigneeIds = [...new Set((data || []).map(a => a.assigned_to))];
+      const creatorIds = [...new Set((data || []).map(a => a.tasks.created_by))];
+      const allProfileIds = [...new Set([...assigneeIds, ...creatorIds])];
 
-          return {
-            ...assignment,
-            tasks: {
-              ...assignment.tasks,
-              creator_name: creatorProfile.data?.full_name || 'Unknown',
-            },
-            assigned_to_profile: assignedProfile.data,
-          };
-        })
-      );
+      const [profiles, rolesData] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', allProfileIds),
+        supabase
+          .from('user_roles')
+          .select('user_id, role')
+          .in('user_id', assigneeIds)
+      ]);
 
-      return tasksWithExtraInfo;
+      const profileMap = new Map((profiles.data || []).map(p => [p.id, p]));
+      const rolesMap = new Map();
+      (rolesData.data || []).forEach(r => {
+        if (!rolesMap.has(r.user_id)) rolesMap.set(r.user_id, []);
+        rolesMap.get(r.user_id).push(r.role);
+      });
+
+      return (data || []).map(assignment => {
+        const creatorProfile = profileMap.get(assignment.tasks.created_by);
+        const assignedProfile = profileMap.get(assignment.assigned_to);
+        const asigneeRoles = rolesMap.get(assignment.assigned_to) || [];
+        const isDeptHead = asigneeRoles.includes('department_head');
+
+        return {
+          ...assignment,
+          tasks: {
+            ...assignment.tasks,
+            creator_name: creatorProfile?.full_name || 'Unknown',
+          },
+          assigned_to_profile: assignedProfile,
+          is_dept_head: isDeptHead,
+        };
+      });
     },
     enabled: !!user,
   });
@@ -424,19 +435,20 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-muted-foreground italic whitespace-nowrap">Filter tasks by due date:</span>
-          <Select value={dateFilter} onValueChange={setDateFilter}>
-            <SelectTrigger className="w-[180px] h-9">
-              <SelectValue placeholder="Filter by date" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Tasks</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="week">This Week</SelectItem>
-              <SelectItem value="15days">Next 15 Days</SelectItem>
-              <SelectItem value="month">Next 1 Month</SelectItem>
-              <SelectItem value="last_month">Last Month</SelectItem>
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={dateFilter}
+            onValueChange={setDateFilter}
+            className="w-[180px] h-9"
+            placeholder="Filter by date"
+            options={[
+              { value: 'all', label: 'All Tasks' },
+              { value: 'today', label: 'Today' },
+              { value: 'week', label: 'This Week' },
+              { value: '15days', label: 'Next 15 Days' },
+              { value: 'month', label: 'Next 1 Month' },
+              { value: 'last_month', label: 'Last Month' }
+            ]}
+          />
         </div>
       </div>
 
@@ -448,18 +460,35 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
             </div>
             <div className="flex flex-col gap-3 h-[calc(100vh-280px)] bg-muted/30 p-2 rounded-b-lg overflow-y-auto scrollbar-thin scrollbar-thumb-muted">
               {kanbanColumns[colKey].items.map((item) => (
-                <div key={item.id} className="bg-card p-3 rounded-md border shadow-sm space-y-2">
+                <div
+                  key={item.id}
+                  className={cn(
+                    "p-3 rounded-md border shadow-sm space-y-2 transition-all",
+                    item.assigned_to === user?.id ? "bg-brand-purple/[0.04] border-brand-purple/25" : "bg-card border-border"
+                  )}
+                >
                   <div className="flex justify-between items-start gap-2">
-                    <p className="font-medium text-sm leading-tight">{item.tasks.title}</p>
+                    <div className="flex flex-col gap-1 flex-1">
+                      {item.assigned_to === user?.id && (
+                        <span className="text-[9px] w-fit bg-brand-purple/10 text-brand-purple px-1 rounded font-bold uppercase tracking-wider">Self Task</span>
+                      )}
+                      <p className="font-medium text-sm leading-tight">{item.tasks.title}</p>
+                    </div>
                     <span className={cn('text-[10px] font-bold uppercase shrink-0', getPriorityColor(item.tasks.priority))}>
                       {item.tasks.priority}
                     </span>
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    {item.assigned_to_profile && (
+                    {item.assigned_to === user?.id ? (
                       <p className="text-xs font-semibold text-primary/80">
-                        Assigned: {item.assigned_to_profile.full_name}
+                        Assigned by: {item.tasks.creator_name}
                       </p>
+                    ) : (
+                      item.assigned_to_profile && (
+                        <p className="text-xs font-semibold text-primary/80">
+                          To: {item.assigned_to_profile.full_name}
+                        </p>
+                      )
                     )}
                     <p className="text-[10px] text-muted-foreground">
                       Created by: {item.tasks.creator_name}
@@ -612,10 +641,14 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
 
             {selectedAssignment?.assigned_to_profile && (
               <div className="space-y-1">
-                <p className="text-sm font-semibold">Assigned To</p>
+                <p className="text-sm font-semibold">
+                  {selectedAssignment.assigned_to === user?.id ? "Assigned By" : "Assigned To"}
+                </p>
                 <div className="flex items-center gap-2">
                   <p className="text-sm text-primary">
-                    {selectedAssignment.assigned_to_profile.full_name}
+                    {selectedAssignment.assigned_to === user?.id
+                      ? selectedAssignment.tasks.creator_name
+                      : selectedAssignment.assigned_to_profile.full_name}
                   </p>
                   <div className="flex items-center gap-1">
 

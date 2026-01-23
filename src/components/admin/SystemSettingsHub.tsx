@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Settings, Video, Globe, Shield, Database, Save, RefreshCw, CheckCircle, AlertCircle } from "lucide-react";
+import { Video, Database, Save, CheckCircle, AlertCircle } from "lucide-react";
 
 export function SystemSettingsHub() {
   const queryClient = useQueryClient();
@@ -85,32 +85,6 @@ export function SystemSettingsHub() {
     },
   });
 
-  // Module definitions
-  const { data: modules } = useQuery({
-    queryKey: ['modules-settings'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('module_definitions')
-        .select('*')
-        .order('name');
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const toggleModuleMutation = useMutation({
-    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
-      const { error } = await supabase
-        .from('module_definitions')
-        .update({ is_active })
-        .eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['modules-settings'] });
-      toast.success('Module status updated');
-    },
-  });
 
   // Database statistics
   const { data: dbStats } = useQuery({
@@ -157,11 +131,6 @@ export function SystemSettingsHub() {
               <Video className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
               <span className="hidden sm:inline">Video Conferencing</span>
               <span className="sm:hidden">Video</span>
-            </TabsTrigger>
-            <TabsTrigger value="modules" className="min-h-[44px] px-3 text-sm">
-              <Settings className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
-              <span className="hidden sm:inline">Modules</span>
-              <span className="sm:hidden">Mod</span>
             </TabsTrigger>
             <TabsTrigger value="database" className="min-h-[44px] px-3 text-sm">
               <Database className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
@@ -255,47 +224,6 @@ export function SystemSettingsHub() {
           </Card>
         </TabsContent>
 
-        {/* Modules Configuration */}
-        <TabsContent value="modules">
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                System Modules
-              </CardTitle>
-              <CardDescription>
-                Enable or disable system modules globally
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {modules?.map(module => (
-                  <div
-                    key={module.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-muted/50 rounded-lg gap-4 transition-all hover:bg-muted"
-                  >
-                    <div className="flex items-start gap-3 flex-1">
-                      <div className={`p-2 rounded-lg shrink-0 ${module.is_active ? 'bg-primary/10' : 'bg-muted'}`}>
-                        <Settings className={`h-4 w-4 ${module.is_active ? 'text-primary' : 'text-muted-foreground'}`} />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="font-medium leading-none">{module.name}</p>
-                        <p className="text-sm text-muted-foreground line-clamp-2">{module.description || module.key}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pl-11 sm:pl-0">
-                      <Badge variant="outline" className="font-mono text-xs text-muted-foreground shrink-0">{module.key}</Badge>
-                      <Switch
-                        checked={module.is_active ?? true}
-                        onCheckedChange={(checked) => toggleModuleMutation.mutate({ id: module.id, is_active: checked })}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         {/* Database Statistics */}
         <TabsContent value="database">

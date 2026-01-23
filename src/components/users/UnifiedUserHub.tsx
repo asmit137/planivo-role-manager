@@ -20,6 +20,7 @@ import { useModuleContext } from '@/contexts/ModuleContext';
 import { DataTable, Column } from '@/components/shared/DataTable';
 import { ActionButton } from '@/components/shared/ActionButton';
 import UnifiedUserCreation from '@/components/admin/UnifiedUserCreation';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import BulkUserUpload from '@/components/admin/BulkUserUpload';
 import UserEditDialog from '@/components/admin/UserEditDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -798,49 +799,31 @@ const UnifiedUserHub = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2">
                       <div className="space-y-2 focus-within:text-primary">
                         <Label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground ml-1">WORKSPACE</Label>
-                        <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
-                          <SelectTrigger className="h-10 sm:h-11 border-input bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139] text-sm font-medium">
-                            <SelectValue placeholder="All Workspaces" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139]">
-                            <SelectItem value="all">All Workspaces</SelectItem>
-                            {workspaces && workspaces.length > 0 ? (
-                              workspaces.map((workspace) => (
-                                <SelectItem key={workspace.id} value={workspace.id}>
-                                  {workspace.name}
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <div className="p-2 text-xs text-muted-foreground text-center">
-                                No workspaces found
-                              </div>
-                            )}
-                          </SelectContent>
-                        </Select>
+                        <SearchableSelect
+                          options={[
+                            { value: 'all', label: 'All Workspaces' },
+                            ...(workspaces?.map((workspace) => ({ value: workspace.id, label: workspace.name })) || [])
+                          ]}
+                          value={filterWorkspace}
+                          onValueChange={setFilterWorkspace}
+                          placeholder="All Workspaces"
+                          disabled={!workspaces || workspaces.length === 0}
+                        />
                       </div>
 
                       {isSuperAdmin && (
                         <div className="space-y-2 focus-within:text-primary">
                           <Label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground ml-1">DEPARTMENT</Label>
-                          <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-                            <SelectTrigger className="h-10 sm:h-11 border-input bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139] text-sm font-medium">
-                              <SelectValue placeholder="All Departments" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139]">
-                              <SelectItem value="all">All Departments</SelectItem>
-                              {allDepartments && allDepartments.length > 0 ? (
-                                allDepartments.map((department) => (
-                                  <SelectItem key={department.id} value={department.id}>
-                                    {department.name}
-                                  </SelectItem>
-                                ))
-                              ) : (
-                                <div className="p-2 text-xs text-muted-foreground text-center">
-                                  No departments found
-                                </div>
-                              )}
-                            </SelectContent>
-                          </Select>
+                          <SearchableSelect
+                            options={[
+                              { value: 'all', label: 'All Departments' },
+                              ...(allDepartments?.map((department) => ({ value: department.id, label: department.name })) || [])
+                            ]}
+                            value={filterDepartment}
+                            onValueChange={setFilterDepartment}
+                            placeholder="All Departments"
+                            disabled={!allDepartments || allDepartments.length === 0}
+                          />
                         </div>
                       )}
                       {(filterWorkspace !== 'all' || filterDepartment !== 'all') && (
@@ -908,37 +891,31 @@ const UnifiedUserHub = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-2 sm:pb-0">
                     <div className="space-y-2 focus-within:text-primary">
                       <Label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground ml-1">WORKSPACE</Label>
-                      <Select value={filterWorkspace} onValueChange={setFilterWorkspace}>
-                        <SelectTrigger className="h-10 sm:h-11 border-input bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139] text-sm font-medium">
-                          <SelectValue placeholder="All Workspaces" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139]">
-                          <SelectItem value="all">All Workspaces</SelectItem>
-                          {workspaces?.map((workspace) => (
-                            <SelectItem key={workspace.id} value={workspace.id}>
-                              {workspace.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SearchableSelect
+                        options={[
+                          { value: 'all', label: 'All Workspaces' },
+                          ...(workspaces?.map((workspace) => ({ value: workspace.id, label: workspace.name })) || [])
+                        ]}
+                        value={filterWorkspace}
+                        onValueChange={setFilterWorkspace}
+                        placeholder="All Workspaces"
+                        disabled={!workspaces || workspaces.length === 0}
+                      />
                     </div>
 
                     {isSuperAdmin && (
                       <div className="space-y-2 focus-within:text-primary">
                         <Label className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground ml-1">DEPARTMENT</Label>
-                        <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-                          <SelectTrigger className="h-10 sm:h-11 border-input bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139] text-sm font-medium">
-                            <SelectValue placeholder="All Departments" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-background dark:bg-[#1A1F2C] dark:border-[#2D3139]">
-                            <SelectItem value="all">All Departments</SelectItem>
-                            {allDepartments?.map((department) => (
-                              <SelectItem key={department.id} value={department.id}>
-                                {department.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <SearchableSelect
+                          options={[
+                            { value: 'all', label: 'All Departments' },
+                            ...(allDepartments?.map((department) => ({ value: department.id, label: department.name })) || [])
+                          ]}
+                          value={filterDepartment}
+                          onValueChange={setFilterDepartment}
+                          placeholder="All Departments"
+                          disabled={!allDepartments || allDepartments.length === 0}
+                        />
                       </div>
                     )}
                     {(filterWorkspace !== 'all' || filterDepartment !== 'all') && (

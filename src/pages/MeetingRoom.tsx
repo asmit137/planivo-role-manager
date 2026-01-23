@@ -80,25 +80,8 @@ const MeetingRoom = () => {
     );
   }
 
-  if (!registration) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="max-w-md w-full">
-          <CardContent className="pt-6 text-center space-y-4">
-            <Video className="h-12 w-12 mx-auto text-destructive" />
-            <h2 className="text-xl font-semibold">Access Denied</h2>
-            <p className="text-muted-foreground">
-              You must be registered for this event to join the video meeting.
-            </p>
-            <Button onClick={() => navigate('/dashboard?tab=training')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Training
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // We allow access even if not registered, per user request "only details not register"
+  // JitsiMeetingRoom will still log attendance if they actually join.
 
   if (!event?.enable_video_conference) {
     return (

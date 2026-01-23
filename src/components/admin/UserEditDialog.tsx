@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -773,38 +774,26 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="department">Department</Label>
-                    <Select value={scopedDepartmentId} onValueChange={(val) => {
-                      setScopedDepartmentId(val);
-                      setScopedSpecialtyId('');
-                    }}>
-                      <SelectTrigger id="department">
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments?.map((dept) => (
-                          <SelectItem key={dept.id} value={dept.id}>
-                            {dept.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={departments?.map((dept) => ({ value: dept.id, label: dept.name })) || []}
+                      value={scopedDepartmentId}
+                      onValueChange={(val) => {
+                        setScopedDepartmentId(val);
+                        setScopedSpecialtyId('');
+                      }}
+                      placeholder="Select department"
+                    />
                   </div>
 
                   {scopedDepartmentId && scopedSpecialties && scopedSpecialties.length > 0 && (
                     <div className="space-y-2">
                       <Label htmlFor="specialty">Specialty</Label>
-                      <Select value={scopedSpecialtyId} onValueChange={setScopedSpecialtyId}>
-                        <SelectTrigger id="specialty">
-                          <SelectValue placeholder="Select specialty" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {scopedSpecialties.map((specialty) => (
-                            <SelectItem key={specialty.id} value={specialty.id}>
-                              {specialty.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SearchableSelect
+                        options={scopedSpecialties?.map((specialty) => ({ value: specialty.id, label: specialty.name })) || []}
+                        value={scopedSpecialtyId}
+                        onValueChange={setScopedSpecialtyId}
+                        placeholder="Select specialty"
+                      />
                     </div>
                   )}
                 </>
@@ -897,78 +886,46 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                                 {/* Facility Select for Editing */}
                                 <div className="space-y-2">
                                   <Label>Facility</Label>
-                                  <Select
+                                  <SearchableSelect
                                     value={editRoleFacilityId}
                                     onValueChange={(val) => {
                                       setEditRoleFacilityId(val);
                                       setEditRoleDepartmentId('');
                                       setEditRoleSpecialtyId('');
                                     }}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select facility" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {/* Show facilities from the same workspace OR all facilities if current one is not found (fallback) */}
-                                      {roleData.workspace_id && facilities?.filter(f => f.workspace_id === roleData.workspace_id).map((facility) => (
-                                        <SelectItem key={facility.id} value={facility.id}>
-                                          {facility.name}
-                                        </SelectItem>
-                                      ))}
-                                      {/* If no workspace assigned or fallback needed, show all (or filtered by admin access which is already done in fetching) */}
-                                      {(!roleData.workspace_id) && facilities?.map(facility => (
-                                        <SelectItem key={facility.id} value={facility.id}>
-                                          {facility.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
+                                    options={[
+                                      ...(roleData.workspace_id ? facilities?.filter(f => f.workspace_id === roleData.workspace_id).map((facility) => ({ value: facility.id, label: facility.name })) || [] : []),
+                                      ...(!roleData.workspace_id ? facilities?.map(facility => ({ value: facility.id, label: facility.name })) || [] : [])
+                                    ]}
+                                    placeholder="Select facility"
+                                  />
                                 </div>
 
                                 {/* Department Select (Depends on Edit Facility ID) */}
                                 {editRoleFacilityId && (
                                   <div className="space-y-2">
                                     <Label>Department</Label>
-                                    <Select
+                                    <SearchableSelect
                                       value={editRoleDepartmentId}
                                       onValueChange={(val) => {
                                         setEditRoleDepartmentId(val);
                                         setEditRoleSpecialtyId('');
                                       }}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select department" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {getEditFilteredDepartments(editRoleFacilityId).length > 0 ? (
-                                          getEditFilteredDepartments(editRoleFacilityId).map((dept) => (
-                                            <SelectItem key={dept.id} value={dept.id}>
-                                              {dept.name}
-                                            </SelectItem>
-                                          ))
-                                        ) : (
-                                          <SelectItem value="no-depts" disabled>No departments found</SelectItem>
-                                        )}
-                                      </SelectContent>
-                                    </Select>
+                                      options={getEditFilteredDepartments(editRoleFacilityId).map((dept) => ({ value: dept.id, label: dept.name })) || []}
+                                      placeholder="Select department"
+                                    />
                                   </div>
                                 )}
 
                                 {editRoleDepartmentId && editSpecialties && editSpecialties.length > 0 && (
                                   <div className="space-y-2">
                                     <Label>Specialty</Label>
-                                    <Select value={editRoleSpecialtyId} onValueChange={setEditRoleSpecialtyId}>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select specialty" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {editSpecialties.map((spec) => (
-                                          <SelectItem key={spec.id} value={spec.id}>
-                                            {spec.name}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
+                                    <SearchableSelect
+                                      value={editRoleSpecialtyId}
+                                      onValueChange={setEditRoleSpecialtyId}
+                                      options={editSpecialties?.map((spec) => ({ value: spec.id, label: spec.name })) || []}
+                                      placeholder="Select specialty"
+                                    />
                                   </div>
                                 )}
                               </div>
@@ -987,46 +944,22 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
 
                   <div className="space-y-2">
                     <Label htmlFor="new-role">Role *</Label>
-                    <Select value={newCustomRoleId || newRole} onValueChange={handleNewRoleChange} required>
-                      <SelectTrigger id="new-role">
-                        <SelectValue placeholder="Select a role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableRoles.includes('super_admin') && (
-                          <SelectItem value="super_admin">Super Admin</SelectItem>
-                        )}
-                        {availableRoles.includes('organization_admin') && (
-                          <SelectItem value="organization_admin">Organization Admin</SelectItem>
-                        )}
-                        {availableRoles.includes('general_admin') && (
-                          <SelectItem value="general_admin">General Admin</SelectItem>
-                        )}
-                        {/* Workplace Supervisor removed per user request */}
-                        {availableRoles.includes('workspace_supervisor') && (
-                          <SelectItem value="workspace_supervisor">Workspace Supervisor</SelectItem>
-                        )}
-                        {availableRoles.includes('facility_supervisor') && (
-                          <SelectItem value="facility_supervisor">Facility Supervisor</SelectItem>
-                        )}
-                        {availableRoles.includes('department_head') && (
-                          <SelectItem value="department_head">Department Head</SelectItem>
-                        )}
-                        {availableRoles.includes('staff') && (
-                          <SelectItem value="staff">Staff</SelectItem>
-                        )}
-                        {availableRoles.includes('intern') && (
-                          <SelectItem value="intern">Intern</SelectItem>
-                        )}
-                        {availableRoles.includes('custom') && customRoles?.filter(cr =>
-                          // Filter out custom roles that duplicate system role names
-                          !['intern', 'staff', 'admin'].includes(cr.name.toLowerCase())
-                        ).map((cr) => (
-                          <SelectItem key={cr.id} value={cr.id}>
-                            {cr.name} (Custom)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={newCustomRoleId || newRole}
+                      onValueChange={handleNewRoleChange}
+                      placeholder="Select a role"
+                      options={[
+                        ...(availableRoles.includes('super_admin') ? [{ value: 'super_admin', label: 'Super Admin' }] : []),
+                        ...(availableRoles.includes('organization_admin') ? [{ value: 'organization_admin', label: 'Organization Admin' }] : []),
+                        ...(availableRoles.includes('general_admin') ? [{ value: 'general_admin', label: 'General Admin' }] : []),
+                        ...(availableRoles.includes('workspace_supervisor') ? [{ value: 'workspace_supervisor', label: 'Workspace Supervisor' }] : []),
+                        ...(availableRoles.includes('facility_supervisor') ? [{ value: 'facility_supervisor', label: 'Facility Supervisor' }] : []),
+                        ...(availableRoles.includes('department_head') ? [{ value: 'department_head', label: 'Department Head' }] : []),
+                        ...(availableRoles.includes('staff') ? [{ value: 'staff', label: 'Staff' }] : []),
+                        ...(availableRoles.includes('intern') ? [{ value: 'intern', label: 'Intern' }] : []),
+                        ...(availableRoles.includes('custom') ? (customRoles?.filter(cr => !['intern', 'staff', 'admin'].includes(cr.name.toLowerCase())).map(cr => ({ value: cr.id, label: `${cr.name} (Custom)` })) || []) : [])
+                      ]}
+                    />
                     <p className="text-xs text-muted-foreground">
                       {newRole === 'organization_admin' && 'Organization-level access - manages workspaces, facilities, and users'}
                       {newRole === 'general_admin' && 'General admin access - manages the workspace'}
@@ -1048,7 +981,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
 
                       <div className="space-y-2">
                         <Label htmlFor="new-organization">Organization *</Label>
-                        <Select
+                        <SearchableSelect
                           value={newOrganizationId}
                           onValueChange={(val) => {
                             setNewOrganizationId(val);
@@ -1057,20 +990,10 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                             setNewDepartmentId('');
                             setNewSpecialtyId('');
                           }}
-                          required
+                          options={organizations?.map((org: any) => ({ value: org.id, label: org.name })) || []}
+                          placeholder="Select organization"
                           disabled={!!currentUserRole?.organization_id}
-                        >
-                          <SelectTrigger id="new-organization">
-                            <SelectValue placeholder="Select organization" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {organizations?.map((org: any) => (
-                              <SelectItem key={org.id} value={org.id}>
-                                {org.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        />
                         {currentUserRole?.organization_id && (
                           <p className="text-[10px] text-muted-foreground italic">Restricted to your current organization</p>
                         )}
@@ -1079,7 +1002,7 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                       {['workplace_supervisor', 'workspace_supervisor', 'facility_supervisor', 'department_head', 'staff', 'intern', 'custom'].includes(newRole) && (
                         <div className="space-y-2">
                           <Label htmlFor="new-workspace">Workspace *</Label>
-                          <Select
+                          <SearchableSelect
                             value={newWorkspaceId}
                             onValueChange={(val) => {
                               setNewWorkspaceId(val);
@@ -1087,91 +1010,55 @@ const UserEditDialog = ({ open, onOpenChange, user, onUserUpdate, mode = 'full' 
                               setNewDepartmentId('');
                               setNewSpecialtyId('');
                             }}
-                            required
+                            options={getFilteredWorkspaces().map((workspace) => ({ value: workspace.id, label: workspace.name })) || []}
+                            placeholder={!newOrganizationId ? "Select organization first" : "Select workspace"}
                             disabled={!newOrganizationId || !!currentUserRole?.workspace_id}
-                          >
-                            <SelectTrigger id="new-workspace">
-                              <SelectValue placeholder={!newOrganizationId ? "Select organization first" : "Select workspace"} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getFilteredWorkspaces().map((workspace) => (
-                                <SelectItem key={workspace.id} value={workspace.id}>
-                                  {workspace.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          />
                         </div>
                       )}
 
                       {['facility_supervisor', 'department_head', 'staff', 'intern', 'custom'].includes(newRole) && (
                         <div className="space-y-2">
                           <Label htmlFor="new-facility">Facility *</Label>
-                          <Select
+                          <SearchableSelect
                             value={newFacilityId}
                             onValueChange={(val) => {
                               setNewFacilityId(val);
                               setNewDepartmentId('');
                               setNewSpecialtyId('');
                             }}
-                            required
+                            options={getFilteredFacilities().map((facility) => ({ value: facility.id, label: facility.name })) || []}
+                            placeholder={!newWorkspaceId ? "Select workspace first" : "Select facility"}
                             disabled={!newWorkspaceId || !!currentUserRole?.facility_id}
-                          >
-                            <SelectTrigger id="new-facility">
-                              <SelectValue placeholder={!newWorkspaceId ? "Select workspace first" : "Select facility"} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getFilteredFacilities().map((facility) => (
-                                <SelectItem key={facility.id} value={facility.id}>
-                                  {facility.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          />
                         </div>
                       )}
 
                       {['department_head', 'staff', 'intern', 'custom'].includes(newRole) && (
                         <div className="space-y-2">
                           <Label htmlFor="new-department">Department *</Label>
-                          <Select
+                          <SearchableSelect
                             value={newDepartmentId}
                             onValueChange={(val) => {
                               setNewDepartmentId(val);
                               setNewSpecialtyId('');
                             }}
-                            required
+                            options={getFilteredDepartments().map((dept) => ({ value: dept.id, label: dept.name })) || []}
+                            placeholder={!newFacilityId ? "Select facility first" : "Select department"}
                             disabled={!newFacilityId || !!currentUserRole?.department_id}
-                          >
-                            <SelectTrigger id="new-department">
-                              <SelectValue placeholder={!newFacilityId ? "Select facility first" : "Select department"} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getFilteredDepartments().map((dept) => (
-                                <SelectItem key={dept.id} value={dept.id}>
-                                  {dept.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          />
                         </div>
                       )}
 
                       {['staff', 'intern', 'custom'].includes(newRole) && newDepartmentId && specialties && specialties.length > 0 && (
                         <div className="space-y-2">
                           <Label htmlFor="new-specialty">Specialty (Optional)</Label>
-                          <Select value={newSpecialtyId} onValueChange={setNewSpecialtyId}>
-                            <SelectTrigger id="new-specialty">
-                              <SelectValue placeholder="Select specialty" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {specialties.map((specialty) => (
-                                <SelectItem key={specialty.id} value={specialty.id}>
-                                  {specialty.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <SearchableSelect
+                            value={newSpecialtyId}
+                            onValueChange={setNewSpecialtyId}
+                            options={specialties?.map((specialty) => ({ value: specialty.id, label: specialty.name })) || []}
+                            placeholder="Select specialty"
+                          />
                         </div>
                       )}
                     </div>

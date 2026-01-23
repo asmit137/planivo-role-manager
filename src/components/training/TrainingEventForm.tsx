@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Switch } from '@/components/ui/switch';
 import { DateTimePicker } from '@/components/ui/date-time-picker';
@@ -658,22 +659,22 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Event Type *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select event type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="training">Training</SelectItem>
-                        <SelectItem value="workshop">Workshop</SelectItem>
-                        <SelectItem value="seminar">Seminar</SelectItem>
-                        <SelectItem value="webinar">Webinar</SelectItem>
-                        <SelectItem value="meeting">Meeting</SelectItem>
-                        <SelectItem value="conference">Conference</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={[
+                          { value: 'training', label: 'Training' },
+                          { value: 'workshop', label: 'Workshop' },
+                          { value: 'seminar', label: 'Seminar' },
+                          { value: 'webinar', label: 'Webinar' },
+                          { value: 'meeting', label: 'Meeting' },
+                          { value: 'conference', label: 'Conference' },
+                          { value: 'other', label: 'Other' },
+                        ]}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select event type"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -694,29 +695,14 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
                           {selectedOrgName || 'Loading organization...'}
                         </div>
                       ) : (
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select organization" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {availableOrganizations && availableOrganizations.length > 0 ? (
-                              availableOrganizations.map((org) => (
-                                <SelectItem key={org.id} value={org.id}>
-                                  {org.name}
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <div className="p-2 text-xs text-muted-foreground text-center">
-                                No organizations available
-                              </div>
-                            )}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <SearchableSelect
+                            options={availableOrganizations?.map(org => ({ value: org.id, label: org.name })) || []}
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            placeholder="Select organization"
+                          />
+                        </FormControl>
                       )}
                       <FormMessage />
                     </FormItem>
@@ -730,18 +716,18 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Location Type *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select location type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="online">Online</SelectItem>
-                        <SelectItem value="physical">Physical</SelectItem>
-                        <SelectItem value="hybrid">Hybrid</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={[
+                          { value: 'online', label: 'Online' },
+                          { value: 'physical', label: 'Physical' },
+                          { value: 'hybrid', label: 'Hybrid' },
+                        ]}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select location type"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -871,17 +857,17 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="draft">Draft (Not visible to users)</SelectItem>
-                        <SelectItem value="published">Published (Visible & Open for registration)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={[
+                          { value: 'draft', label: 'Draft (Not visible to users)' },
+                          { value: 'published', label: 'Published (Visible & Open for registration)' },
+                        ]}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select status"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -904,18 +890,16 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Registration Type *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select registration type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="open">Open Registration</SelectItem>
-                            <SelectItem value="mandatory">Mandatory Attendance</SelectItem>
-                            <SelectItem value="invite_only">Invite Only</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <SearchableSelect
+                          options={[
+                            { value: 'open', label: 'Open Registration' },
+                            { value: 'mandatory', label: 'Mandatory Attendance' },
+                            { value: 'invite_only', label: 'Invite Only' },
+                          ]}
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          placeholder="Select registration type"
+                        />
                         <FormDescription>
                           {field.value === 'open' && 'Anyone in the organization can register'}
                           {field.value === 'mandatory' && 'Selected departments/users must attend'}
@@ -935,35 +919,24 @@ const TrainingEventForm = ({ eventId, organizationId, departmentId, onSuccess }:
                           <UserCheck className="h-4 w-4" />
                           Event Coordinator
                         </FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value || undefined}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select coordinator (optional)" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {potentialCoordinators && potentialCoordinators.length > 0 ? (
-                              potentialCoordinators.map((coord: any) => (
-                                <SelectItem key={coord.id} value={coord.id}>
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 flex items-center gap-0.5 bg-primary/5 shrink-0">
-                                      <ShieldCheck className="h-2.5 w-2.5" />
-                                      {formatRole(coord.role, coord.custom_role_name)}
-                                    </Badge>
-                                    <span className="truncate">{coord.full_name}</span>
-                                  </div>
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <div className="p-2 text-xs text-muted-foreground text-center">
-                                No coordinators available
+                        <SearchableSelect
+                          options={potentialCoordinators?.map((coord: any) => ({
+                            value: coord.id,
+                            label: coord.full_name,
+                            render: (
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 flex items-center gap-0.5 bg-primary/5 shrink-0">
+                                  <ShieldCheck className="h-2.5 w-2.5" />
+                                  {formatRole(coord.role, coord.custom_role_name)}
+                                </Badge>
+                                <span className="truncate">{coord.full_name}</span>
                               </div>
-                            )}
-                          </SelectContent>
-                        </Select>
+                            )
+                          })) || []}
+                          value={field.value || undefined}
+                          onValueChange={field.onChange}
+                          placeholder="Select coordinator (optional)"
+                        />
                         <FormDescription>
                           Coordinator can manage attendance and registrations
                         </FormDescription>

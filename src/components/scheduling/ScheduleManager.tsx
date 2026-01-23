@@ -10,6 +10,16 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Plus, Edit, Trash2, Send, Clock, Users, Clipboard, Building2, CalendarIcon } from 'lucide-react';
@@ -39,6 +49,8 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<any>(null);
 
   // Form state
@@ -234,6 +246,8 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schedules'] });
       toast.success('Schedule deleted');
+      setIsDeleteDialogOpen(false);
+      setScheduleToDelete(null);
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to delete schedule');
@@ -289,7 +303,7 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
       case 'published':
         return <Badge className="bg-emerald-500 text-white">Published</Badge>;
       case 'archived':
-        return <Badge variant="outline">Archived</Badge>;
+        return <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/20">Archived</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -558,24 +572,26 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
                   {/* Actions */}
                   <div className="flex gap-2 pt-2">
                     {schedule.status === 'draft' && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => publishSchedule.mutate(schedule.id)}
-                        >
-                          <Send className="h-4 w-4 mr-1" />
-                          Publish
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive-ghost"
-                          onClick={() => deleteSchedule.mutate(schedule.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => publishSchedule.mutate(schedule.id)}
+                      >
+                        <Send className="h-4 w-4 mr-1" />
+                        Publish
+                      </Button>
                     )}
+                    <Button
+                      size="icon"
+                      variant="destructive-ghost"
+                      className="h-8 w-8 bg-destructive/10 hover:bg-destructive/20"
+                      onClick={() => {
+                        setScheduleToDelete(schedule.id);
+                        setIsDeleteDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -583,6 +599,28 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ departmentId }
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the schedule
+              and all its associated shifts and assignments.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setScheduleToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => scheduleToDelete && deleteSchedule.mutate(scheduleToDelete)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteSchedule.isPending ? 'Deleting...' : 'Delete Schedule'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

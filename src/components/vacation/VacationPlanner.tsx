@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, addDays, parseISO, isWithinInterval, eachDayOfInterval } from 'date-fns';
@@ -18,7 +19,7 @@ import { cn } from '@/lib/utils';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { sendVacationStatusNotification, sendVacationMessage } from '@/lib/vacationNotifications';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useUserRole } from '@/hooks/useUserRole';
+import { useUserRole, type AppRole } from '@/hooks/useUserRole';
 import { Badge } from '@/components/ui/badge';
 
 interface VacationSplit {
@@ -29,7 +30,7 @@ interface VacationSplit {
 
 interface DepartmentStaffMember {
   user_id: string;
-  role: string;
+  role: AppRole;
   profiles: {
     id: string;
     full_name: string;
@@ -168,7 +169,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
           return {
             user_id: role.user_id,
-            role: role.role,
+            role: role.role as AppRole,
             profiles: profile
           };
         })
@@ -223,7 +224,7 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
   const effectiveStaffList = useMemo(() => {
     const list = [...(departmentStaff || [])];
     if (isSupervisor && userProfile && !list.find(s => s.user_id === user?.id)) {
-      const primaryRole = userRoles?.find(r => r.user_id === user?.id)?.role || 'supervisor';
+      const primaryRole = (userRoles?.find(r => r.user_id === user?.id)?.role || 'facility_supervisor') as AppRole;
       list.push({
         user_id: user!.id,
         role: primaryRole,
@@ -731,28 +732,15 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
           {(isSuperAdmin || isSupervisor) && !departmentId && (
             <div>
               <Label>Select Department *</Label>
-              <Select
-                key={currentOrganization?.id || 'no-org'}
+              <SearchableSelect
+                options={uniqueDepartments?.map((dept: any) => ({
+                  value: dept.id,
+                  label: `${dept.name} ${dept.facilities?.name ? `(${dept.facilities.name})` : ''}`
+                })) || []}
                 value={selectedDepartment}
                 onValueChange={setSelectedDepartment}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {uniqueDepartments && uniqueDepartments.length > 0 ? (
-                    uniqueDepartments.map((dept: any) => (
-                      <SelectItem key={dept.id} value={dept.id}>
-                        {dept.name} {dept.facilities?.name && `(${dept.facilities.name})`}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <div className="p-2 text-xs text-muted-foreground text-center">
-                      No departments available
-                    </div>
-                  )}
-                </SelectContent>
-              </Select>
+                placeholder="Select a department"
+              />
             </div>
           )}
 
@@ -783,42 +771,29 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
               {selectionMode === 'single' ? (
                 <div>
                   <Label>Select Staff Member *</Label>
-                  <Select
-                    key={`${currentOrganization?.id}-staff`}
+                  <SearchableSelect
+                    options={effectiveStaffList?.map((staff) => ({
+                      value: staff.user_id,
+                      label: `${staff.profiles?.full_name || 'Unknown User'} (${staff.role})`
+                    })) || []}
                     value={selectedStaff}
                     onValueChange={setSelectedStaff}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select staff member" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {effectiveStaffList && effectiveStaffList.length > 0 ? (
-                        effectiveStaffList.map((staff) => (
-                          <SelectItem key={staff.user_id} value={staff.user_id}>
-                            {staff.profiles?.full_name || 'Unknown User'} ({staff.role})
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <div className="p-2 text-xs text-muted-foreground text-center">
-                          No staff members available
-                        </div>
-                      )}
-                    </SelectContent>
-                  </Select>
+                    placeholder="Select staff member"
+                  />
                 </div>
               ) : (
                 <div>
                   <Label>Select Role to Apply *</Label>
-                  <Select value={selectedRole} onValueChange={setSelectedRole}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="staff">All Staff</SelectItem>
-                      <SelectItem value="intern">All Interns</SelectItem>
-                      <SelectItem value="department_head">Department Heads</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    options={[
+                      { value: 'staff', label: 'All Staff' },
+                      { value: 'intern', label: 'All Interns' },
+                      { value: 'department_head', label: 'Department Heads' }
+                    ]}
+                    value={selectedRole}
+                    onValueChange={setSelectedRole}
+                    placeholder="Select role"
+                  />
                   <p className="text-xs text-muted-foreground mt-1 italic">
                     This will create a vacation request for all users in the selected department with this role.
                   </p>
@@ -829,28 +804,15 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
           <div>
             <Label>Vacation Type</Label>
-            <Select
-              key={`${currentOrganization?.id}-type`}
+            <SearchableSelect
+              options={uniqueVacationTypes?.map((type) => ({
+                value: type.id,
+                label: `${type.name} ${type.max_days ? `(Max: ${type.max_days} days)` : ''}`
+              })) || []}
               value={selectedVacationType}
               onValueChange={setSelectedVacationType}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select vacation type" />
-              </SelectTrigger>
-              <SelectContent>
-                {uniqueVacationTypes && uniqueVacationTypes.length > 0 ? (
-                  uniqueVacationTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id}>
-                      {type.name} {type.max_days && `(Max: ${type.max_days} days)`}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="p-2 text-xs text-muted-foreground text-center">
-                    No vacation types available
-                  </div>
-                )}
-              </SelectContent>
-            </Select>
+              placeholder="Select vacation type"
+            />
           </div>
 
           <div className="space-y-4">
