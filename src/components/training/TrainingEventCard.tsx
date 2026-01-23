@@ -408,7 +408,12 @@ const TrainingEventCard = ({
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     disabled={deleteEventMutation.isPending}
                   >
-                    {deleteEventMutation.isPending ? "Deleting..." : "Delete Event"}
+                    {deleteEventMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : "Delete Event"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

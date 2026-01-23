@@ -11,9 +11,9 @@ export const MobileHeader = () => {
 
   return (
     <header className="md:hidden sticky top-0 z-40 flex h-14 items-center gap-2 border-b bg-background px-3 safe-area-inset-top">
-      <Button 
-        variant="ghost" 
-        size="icon" 
+      <Button
+        variant="ghost"
+        size="icon"
         onClick={toggleSidebar}
         aria-label="Toggle menu"
         className="h-11 w-11 min-h-[44px] min-w-[44px] shrink-0"

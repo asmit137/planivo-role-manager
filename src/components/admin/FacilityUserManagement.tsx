@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Building2, Users, Plus, UserPlus, FolderTree, Trash2 } from 'lucide-react';
+import { Building2, Users, Plus, UserPlus, FolderTree, Trash2, Loader2 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -395,7 +395,12 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
                       />
                     </div>
                     <Button type="submit" className="w-full" disabled={createFacilityMutation.isPending}>
-                      {createFacilityMutation.isPending ? 'Creating...' : 'Create Facility'}
+                      {createFacilityMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating...
+                        </>
+                      ) : 'Create Facility'}
                     </Button>
                   </form>
                 </DialogContent>
@@ -430,7 +435,12 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
                         templateId: selectedDeptTemplateId
                       })}
                     >
-                      {addDeptMutation.isPending ? 'Adding...' : 'Add Department'}
+                      {addDeptMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Adding...
+                        </>
+                      ) : 'Add Department'}
                     </Button>
                   </div>
                 </DialogContent>
@@ -530,7 +540,11 @@ const FacilityUserManagement = ({ maxFacilities, currentFacilityCount }: Facilit
                                           }
                                         }}
                                       >
-                                        <Trash2 className="h-3 w-3" />
+                                        {deleteDeptMutation.isPending && selectedFacilityId === dept.id ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="h-3 w-3" />
+                                        )}
                                       </Button>
                                     </div>
                                   ))}

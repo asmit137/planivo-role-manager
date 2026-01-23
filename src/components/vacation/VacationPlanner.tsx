@@ -13,7 +13,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format, addDays, parseISO, isWithinInterval, eachDayOfInterval } from 'date-fns';
-import { CalendarIcon, Plus, Trash2, Info, AlertCircle, Users } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, Info, AlertCircle, Users, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
@@ -912,7 +912,12 @@ const VacationPlanner = ({ departmentId, maxSplits = 6, staffOnly = false }: Vac
 
           <div className="flex flex-col sm:flex-row gap-2">
             <Button type="submit" disabled={createPlanMutation.isPending} className="w-full sm:w-auto">
-              Create Plan
+              {createPlanMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : "Create Plan"}
             </Button>
             <Button type="button" variant="outline" onClick={resetForm} className="w-full sm:w-auto">
               Reset

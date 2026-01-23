@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Building, Trash2, Edit, ChevronDown, ChevronRight, User, Infinity, UserPlus } from 'lucide-react';
+import { Plus, Building, Trash2, Edit, ChevronDown, ChevronRight, User, Infinity, UserPlus, Loader2 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -606,7 +606,12 @@ const OrganizationManagement = () => {
                 </div>
 
                 <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? 'Creating...' : 'Create Organization'}
+                  {createMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : 'Create Organization'}
                 </Button>
               </form>
             </DialogContent>
@@ -699,7 +704,11 @@ const OrganizationManagement = () => {
                           }}
                           disabled={deleteMutation.isPending}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          {deleteMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -913,7 +922,12 @@ const OrganizationManagement = () => {
             </div>
 
             <Button type="submit" className="w-full" disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+              {updateMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : 'Save Changes'}
             </Button>
           </form>
         </DialogContent>
