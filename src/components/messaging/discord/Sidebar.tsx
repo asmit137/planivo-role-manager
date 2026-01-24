@@ -145,10 +145,18 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
                             .in('id', userIds)
                             .eq('is_active', true) as any);
 
+                        const others = profiles?.filter(p => p.id !== user.id) || [];
+
+                        // Hide DMs with inactive users (except real self-chats)
+                        if (!convo.is_group && others.length === 0) {
+                            if (userIds.length > 1) {
+                                return null;
+                            }
+                        }
+
                         // Generate title
                         let displayTitle = convo.title;
                         if (!displayTitle) {
-                            const others = profiles?.filter(p => p.id !== user.id) || [];
                             if (others.length === 0) displayTitle = 'Note to Self';
                             else displayTitle = others.map(p => p.full_name || p.email || 'Unknown User').join(', ');
                         }
@@ -164,7 +172,7 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
                             isUnread
                         };
                     })
-            );
+            ).then(results => results.filter(Boolean));
 
             // Deduplicate and sort
             const sortedByPriority = conversations.sort((a, b) => {
@@ -321,7 +329,7 @@ export const Sidebar = ({ selectedChannelId, onSelectChannel }: SidebarProps) =>
                     </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0 flex flex-col">
-                    <span className="text-sm font-semibold text-foreground truncate">
+                    <span className="text-sm font-semibold text-foreground truncate lowercase">
                         {user?.email?.split('@')[0]}
                     </span>
                     <span className="text-xs text-muted-foreground truncate">
