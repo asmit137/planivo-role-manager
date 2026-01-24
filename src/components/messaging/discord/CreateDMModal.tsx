@@ -255,7 +255,7 @@ export const CreateDMModal = ({ open, onOpenChange, onConversationCreated }: Cre
                                                     {wsUser.full_name || wsUser.email || wsUser.id.substring(0, 8)}
                                                 </p>
                                                 {wsUser.email && (
-                                                    <p className="text-xs text-zinc-500 truncate">{wsUser.email}</p>
+                                                    <p className="text-xs text-zinc-500 truncate lowercase">{wsUser.email}</p>
                                                 )}
                                             </div>
                                         </div>

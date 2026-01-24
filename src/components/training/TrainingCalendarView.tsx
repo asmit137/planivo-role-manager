@@ -430,7 +430,7 @@ const TrainingCalendarView = () => {
                         </span>
                       )}
                       {registrations?.includes(event.id) && (
-                        <Badge className="bg-emerald-500 text-white text-[9px] h-4 leading-none">Registered</Badge>
+                        <Badge className="bg-primary text-white text-[9px] h-4 leading-none">Registered</Badge>
                       )}
                     </div>
                   </div>
@@ -455,17 +455,6 @@ const TrainingCalendarView = () => {
                 }}
               >
                 <div className="absolute top-4 right-12 z-10 flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 bg-white/10 hover:bg-red-500/20 text-white border-white/20 hover:text-red-500 rounded-full backdrop-blur-sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsDeleteDialogOpen(true);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                   {(selectedListEvent.status === 'completed' || new Date(selectedListEvent.end_datetime) < new Date()) && (
                     <Badge className="bg-white/20 backdrop-blur-md text-white border-white/30 text-[10px] uppercase font-bold tracking-tighter shadow-sm px-2 py-0.5">
                       Completed
@@ -572,11 +561,24 @@ const TrainingCalendarView = () => {
                     </div>
                   </div>
 
-                  {registrations?.includes(selectedListEvent.id) && (
-                    <Badge className="bg-emerald-500 text-white border-none text-[10px] px-3 py-1 font-bold uppercase tracking-widest">
-                      Registered
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {registrations?.includes(selectedListEvent.id) && (
+                      <Badge className="bg-emerald-500 text-white border-none text-[10px] px-3 py-1 font-bold uppercase tracking-widest">
+                        Registered
+                      </Badge>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsDeleteDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -121,7 +121,7 @@ const StaffManagementPage = () => {
         {
             key: 'email',
             header: 'Email',
-            cell: (row) => row.email,
+            cell: (row) => <span className="lowercase">{row.email}</span>,
         },
         {
             key: 'status',
@@ -205,7 +205,7 @@ const StaffManagementPage = () => {
                             <div className="flex justify-between items-start gap-2">
                                 <div className="space-y-1 min-w-0">
                                     <h4 className="font-semibold text-sm truncate">{member.full_name}</h4>
-                                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground truncate">
+                                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground truncate lowercase">
                                         <Mail className="h-3 w-3" />
                                         {member.email}
                                     </div>

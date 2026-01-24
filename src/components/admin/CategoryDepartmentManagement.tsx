@@ -461,7 +461,7 @@ const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryD
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 shrink-0 mt-0.5 rounded-lg hover:bg-primary/5"
+                          className="h-8 w-8 shrink-0 mt-0.5 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors"
                           onClick={() => setExpandedCategory(isExpanded ? null : category.id)}
                         >
                           {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -509,14 +509,14 @@ const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryD
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors"
                           onClick={() => {
                             setEditingCategory({ ...category });
                             setOriginalCategory({ ...category });
                             setEditCategoryOpen(true);
                           }}
                         >
-                          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                          <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         {!category.is_system_default && (
                           <Button
@@ -565,13 +565,13 @@ const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryD
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7 sm:h-8 sm:w-8"
+                                    className="h-7 w-7 sm:h-8 sm:w-8 hover:bg-primary/10 hover:text-primary transition-colors"
                                     onClick={() => {
                                       setEditingDepartment({ ...dept });
                                       setEditDepartmentOpen(true);
                                     }}
                                   >
-                                    <Pencil className="h-3 w-3 text-muted-foreground" />
+                                    <Pencil className="h-3 w-3" />
                                   </Button>
                                   <Button
                                     variant="ghost"
@@ -594,13 +594,13 @@ const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryD
                                         <Button
                                           variant="ghost"
                                           size="icon"
-                                          className="h-6 w-6 sm:h-7 sm:w-7"
+                                          className="h-6 w-6 sm:h-7 sm:w-7 hover:bg-primary/10 hover:text-primary transition-colors"
                                           onClick={() => {
                                             setEditingDepartment({ ...sub });
                                             setEditDepartmentOpen(true);
                                           }}
                                         >
-                                          <Pencil className="h-3 w-3 text-muted-foreground" />
+                                          <Pencil className="h-3 w-3" />
                                         </Button>
                                         <Button
                                           variant="ghost"

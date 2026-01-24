@@ -425,7 +425,7 @@ const UnifiedUserHub = ({
     {
       key: 'email',
       header: 'Email',
-      cell: (row) => row.email,
+      cell: (row) => <span className="lowercase">{row.email}</span>,
     },
     {
       key: 'status',
@@ -580,7 +580,7 @@ const UnifiedUserHub = ({
           <div className="flex justify-between items-start mb-2 gap-2">
             <div className="space-y-0.5 min-w-0 flex-1">
               <h4 className="font-semibold text-sm sm:text-[15px] leading-tight truncate">{user.full_name}</h4>
-              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{user.email}</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground truncate lowercase">{user.email}</p>
             </div>
             <div className="shrink-0 pt-0.5">
               {hasEditPermission ? (
