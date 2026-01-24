@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { format, isToday, isThisWeek, addDays, addMonths, subMonths, startOfMonth, endOfMonth, parseISO, isWithinInterval, startOfToday, endOfDay } from 'date-fns';
-import { CheckCircle2, Clock, PlayCircle, Eye, MessageSquare, Trash2, XCircle, Search } from 'lucide-react';
+import { CheckCircle2, Clock, PlayCircle, Eye, MessageSquare, Trash2, XCircle, Search, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -41,6 +41,7 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
   const [isMessaging, setIsMessaging] = useState(false);
   const [dateFilter, setDateFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showMyTasksOnly, setShowMyTasksOnly] = useState(false);
 
   const { data: userRoles } = useQuery({
     queryKey: ['user-roles-global', user?.id],
@@ -185,6 +186,8 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
         const matchesAssignee = assignment.assigned_to_profile?.full_name?.toLowerCase().includes(query);
         if (!matchesTitle && !matchesAssignee) return;
       }
+
+      if (showMyTasksOnly && assignment.assigned_to !== user?.id) return;
 
       if (!assignment.tasks.due_date && dateFilter !== 'all') return;
 
@@ -436,22 +439,34 @@ const StaffTaskView = ({ scopeType, scopeId }: StaffTaskViewProps) => {
             className="pl-9 h-9"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground italic whitespace-nowrap">Filter tasks by due date:</span>
-          <SearchableSelect
-            value={dateFilter}
-            onValueChange={setDateFilter}
-            className="w-[180px] h-9"
-            placeholder="Filter by date"
-            options={[
-              { value: 'all', label: 'All Tasks' },
-              { value: 'today', label: 'Today' },
-              { value: 'week', label: 'This Week' },
-              { value: '15days', label: 'Next 15 Days' },
-              { value: 'month', label: 'Next 1 Month' },
-              { value: 'last_month', label: 'Last Month' }
-            ]}
-          />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+          <Button
+            variant={showMyTasksOnly ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowMyTasksOnly(!showMyTasksOnly)}
+            className="h-9 gap-2 w-full sm:w-auto"
+          >
+            <UserCheck className="h-4 w-4" />
+            <span className="sm:inline">My Tasks</span>
+          </Button>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-sm font-medium text-muted-foreground italic whitespace-nowrap hidden lg:inline">Filter by date:</span>
+            <SearchableSelect
+              value={dateFilter}
+              onValueChange={setDateFilter}
+              className="w-[180px] h-9"
+              placeholder="Filter by date"
+              options={[
+                { value: 'all', label: 'All Tasks' },
+                { value: 'today', label: 'Today' },
+                { value: 'week', label: 'This Week' },
+                { value: '15days', label: 'Next 15 Days' },
+                { value: 'month', label: 'Next 1 Month' },
+                { value: 'last_month', label: 'Last Month' }
+              ]}
+            />
+          </div>
         </div>
       </div>
 

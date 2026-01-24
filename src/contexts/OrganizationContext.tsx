@@ -23,7 +23,13 @@ const OrganizationContext = createContext<OrganizationContextType | undefined>(u
 export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { user } = useAuth();
     const { data: roles } = useUserRole();
-    const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
+    const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(() => {
+        // Initialize from localStorage if available
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('selectedOrganizationId');
+        }
+        return null;
+    });
 
     const isSuperAdmin = roles?.some(r => r.role === 'super_admin' || r.role === 'general_admin');
 
@@ -49,19 +55,35 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         enabled: !!user && !!isSuperAdmin,
     });
 
-    // Set default organization if none selected
+    // Handle persistence and default selection
     useEffect(() => {
-        if (organizations.length > 0 && !selectedOrganizationId) {
-            setSelectedOrganizationId(organizations[0].id);
+        if (organizations.length > 0) {
+            // Check if current selection is valid
+            const isValid = selectedOrganizationId === 'all' || organizations.some(o => o.id === selectedOrganizationId);
+
+            if (!selectedOrganizationId || !isValid) {
+                const firstOrgId = organizations[0].id;
+                setSelectedOrganizationId(firstOrgId);
+                localStorage.setItem('selectedOrganizationId', firstOrgId);
+            }
         }
     }, [organizations, selectedOrganizationId]);
+
+    const handleSetSelectedOrganizationId = (id: string | null) => {
+        setSelectedOrganizationId(id);
+        if (id) {
+            localStorage.setItem('selectedOrganizationId', id);
+        } else {
+            localStorage.removeItem('selectedOrganizationId');
+        }
+    };
 
     return (
         <OrganizationContext.Provider
             value={{
                 organizations,
                 selectedOrganizationId,
-                setSelectedOrganizationId,
+                setSelectedOrganizationId: handleSetSelectedOrganizationId,
                 organization: selectedOrganizationId === 'all'
                     ? { id: 'all', name: 'All Organizations', vacation_mode: 'full' } as Organization
                     : organizations.find(o => o.id === selectedOrganizationId),

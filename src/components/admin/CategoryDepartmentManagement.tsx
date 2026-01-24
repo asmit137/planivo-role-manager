@@ -24,6 +24,7 @@ const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryD
   const [createCategoryOpen, setCreateCategoryOpen] = useState(false);
   const [editCategoryOpen, setEditCategoryOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [originalCategory, setOriginalCategory] = useState<any>(null);
   const [categoryName, setCategoryName] = useState('');
   const [categoryDescription, setCategoryDescription] = useState('');
 
@@ -354,9 +355,19 @@ const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryD
     createCategoryMutation.mutate({ name: categoryName, description: categoryDescription });
   };
 
+  const hasChanges = editingCategory && originalCategory && (
+    editingCategory.name !== originalCategory.name ||
+    editingCategory.description !== originalCategory.description ||
+    editingCategory.is_active !== originalCategory.is_active
+  );
+
   const handleUpdateCategory = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCategory) return;
+    if (!hasChanges) {
+      toast.info("No changes to update");
+      return;
+    }
     updateCategoryMutation.mutate(editingCategory);
   };
 
@@ -501,6 +512,7 @@ const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryD
                           className="h-8 w-8"
                           onClick={() => {
                             setEditingCategory({ ...category });
+                            setOriginalCategory({ ...category });
                             setEditCategoryOpen(true);
                           }}
                         >
@@ -696,7 +708,7 @@ const CategoryDepartmentManagement = ({ organizationId, workspaceId }: CategoryD
                   />
                 </div>
 
-                <Button type="submit" className="w-full" disabled={updateCategoryMutation.isPending}>
+                <Button type="submit" className="w-full" disabled={updateCategoryMutation.isPending || !hasChanges}>
                   {updateCategoryMutation.isPending ? 'Updating...' : 'Update'}
                 </Button>
               </form>
