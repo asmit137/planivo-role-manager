@@ -406,7 +406,7 @@ const UserSelectionDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col px-4 sm:px-6 gap-3 sm:gap-4 overflow-hidden min-h-0">
+        <div className="flex-1 flex flex-col px-4 sm:px-6 pt-1 gap-3 sm:gap-4 overflow-hidden min-h-0">
 
           {/* Selected users preview */}
           {(selectedUserIds.length > 0 || selectedDepartmentIds.length > 0) && (
@@ -643,32 +643,6 @@ const UserSelectionDialog = ({
                             <p className="text-xs text-muted-foreground truncate">{dept.facility_name}</p>
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="link"
-                          className={cn(
-                            "hover:no-underline",
-                            users?.some(u => u.department_name === dept.name && selectedUserIds.includes(u.id))
-                              ? "text-destructive hover:text-destructive/80"
-                              : "text-primary"
-                          )}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addDepartmentMembers(dept.id);
-                          }}
-                        >
-                          {users?.filter(u => u.department_name === dept.name).every(id => selectedUserIds.includes(id.id)) && users?.some(u => u.department_name === dept.name) ? (
-                            <>
-                              <X className="h-4 w-4 mr-1" />
-                              Remove All Users
-                            </>
-                          ) : (
-                            <>
-                              <UserPlus className="h-4 w-4 mr-1" />
-                              Add All Users
-                            </>
-                          )}
-                        </Button>
                       </div>
                     ))
                   )}

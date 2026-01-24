@@ -6,6 +6,7 @@ import { DataTable, Column } from '@/components/shared/DataTable';
 import { Users, Search, Mail, Building2, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useState } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StaffDetailsDialog } from './StaffDetailsDialog';
 
 interface StaffMember {
@@ -16,6 +17,7 @@ interface StaffMember {
     department_id: string | null;
     department_name: string | null;
     role: string;
+    active_task_count: number;
 }
 
 const StaffManagementPage = () => {
@@ -49,6 +51,20 @@ const StaffManagementPage = () => {
 
             if (deptsError) throw deptsError;
 
+            // Get active task counts
+            const { data: assignments, error: assignmentsError } = await supabase
+                .from('task_assignments')
+                .select('assigned_to')
+                .in('assigned_to', userIds)
+                .in('status', ['pending', 'in_progress']);
+
+            if (assignmentsError) throw assignmentsError;
+
+            const taskCounts: Record<string, number> = {};
+            assignments?.forEach(a => {
+                taskCounts[a.assigned_to] = (taskCounts[a.assigned_to] || 0) + 1;
+            });
+
             // Combine the data
             const staffData: StaffMember[] = profiles?.map(profile => {
                 const userRole = userRoles?.find(ur => ur.user_id === profile.id);
@@ -62,6 +78,7 @@ const StaffManagementPage = () => {
                     department_id: userRole?.department_id || null,
                     department_name: department?.name || null,
                     role: userRole?.role || 'staff',
+                    active_task_count: taskCounts[profile.id] || 0
                 };
             }) || [];
 
@@ -72,17 +89,27 @@ const StaffManagementPage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+    const [workloadFilter, setWorkloadFilter] = useState<'all' | 'no_tasks' | 'overloaded'>('all');
 
     const handleRowClick = (member: StaffMember) => {
         setSelectedStaffId(member.id);
         setIsDetailsOpen(true);
     };
 
-    const filteredStaff = staffMembers?.filter(member =>
-        member.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (member.department_name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-    );
+    const filteredStaff = staffMembers?.filter(member => {
+        const matchesSearch = member.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (member.department_name?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+
+        let matchesWorkload = true;
+        if (workloadFilter === 'no_tasks') {
+            matchesWorkload = member.active_task_count === 0;
+        } else if (workloadFilter === 'overloaded') {
+            matchesWorkload = member.active_task_count >= 5;
+        }
+
+        return matchesSearch && matchesWorkload;
+    });
 
     // Define table columns
     const columns: Column<StaffMember>[] = [
@@ -105,6 +132,20 @@ const StaffManagementPage = () => {
                 </Badge>
             ),
         },
+        {
+            key: 'workload',
+            header: 'Active Tasks',
+            cell: (row) => (
+                <div className="flex items-center gap-2">
+                    <Badge variant={row.active_task_count >= 5 ? 'destructive' : 'outline'} className={row.active_task_count === 0 ? "bg-muted text-muted-foreground" : ""}>
+                        {row.active_task_count} Tasks
+                    </Badge>
+                    {row.active_task_count >= 5 && (
+                        <span className="text-[10px] text-destructive font-bold uppercase">Overloaded</span>
+                    )}
+                </div>
+            )
+        }
     ];
 
     return (
@@ -124,14 +165,32 @@ const StaffManagementPage = () => {
                     </div>
                 </div>
 
-                <div className="relative w-full sm:max-w-sm">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search by name, email, or department..."
-                        className="pl-9 h-10 bg-muted/50 border-border/60"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative w-full sm:max-w-sm">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search by name, email, or department..."
+                            className="pl-9 h-10 bg-muted/50 border-border/60"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="w-full sm:w-[200px]">
+                        <Select
+                            value={workloadFilter}
+                            onValueChange={(value) => setWorkloadFilter(value as any)}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Filter by Workload" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Workloads</SelectItem>
+                                <SelectItem value="no_tasks">No Active Tasks</SelectItem>
+                                <SelectItem value="overloaded">Overloaded (5+ Tasks)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent className="p-0 sm:p-6">
@@ -149,6 +208,11 @@ const StaffManagementPage = () => {
                                     <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground truncate">
                                         <Mail className="h-3 w-3" />
                                         {member.email}
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <Badge variant={member.active_task_count >= 5 ? 'destructive' : 'outline'} className={member.active_task_count === 0 ? "bg-muted text-muted-foreground h-5 text-[10px]" : "h-5 text-[10px]"}>
+                                            {member.active_task_count} Tasks
+                                        </Badge>
                                     </div>
                                 </div>
                                 <Badge variant={member.is_active ? 'default' : 'secondary'} className="text-[10px] h-5 shrink-0 px-1.5 font-normal">
@@ -185,7 +249,7 @@ const StaffManagementPage = () => {
                         onRowClick={handleRowClick}
                         emptyState={{
                             title: 'No staff members found',
-                            description: 'There are no staff members in the system yet.',
+                            description: 'There are no staff members fitting the current criteria.',
                         }}
                     />
                 </div>

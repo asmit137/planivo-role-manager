@@ -17,6 +17,7 @@ const CategoryManagement = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [originalCategory, setOriginalCategory] = useState<any>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const queryClient = useQueryClient();
@@ -123,14 +124,25 @@ const CategoryManagement = () => {
     createCategoryMutation.mutate({ name, description });
   };
 
+  const hasChanges = editingCategory && originalCategory && (
+    editingCategory.name !== originalCategory.name ||
+    editingCategory.description !== originalCategory.description ||
+    editingCategory.is_active !== originalCategory.is_active
+  );
+
   const handleEdit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCategory) return;
+    if (!hasChanges) {
+      toast.info("No changes to update");
+      return;
+    }
     updateCategoryMutation.mutate(editingCategory);
   };
 
   const openEditDialog = (category: any) => {
     setEditingCategory({ ...category });
+    setOriginalCategory({ ...category });
     setEditOpen(true);
   };
 
@@ -307,7 +319,7 @@ const CategoryManagement = () => {
                   />
                 </div>
 
-                <Button type="submit" className="w-full" disabled={updateCategoryMutation.isPending}>
+                <Button type="submit" className="w-full" disabled={updateCategoryMutation.isPending || !hasChanges}>
                   {updateCategoryMutation.isPending ? 'Updating...' : 'Update Category'}
                 </Button>
               </form>
