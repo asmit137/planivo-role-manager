@@ -44,7 +44,7 @@ export default function PrivacyPolicy() {
 
                         <h3>5. Contact Us</h3>
                         <p>
-                            If you have any questions about this Privacy Policy, please contact us at <a href="mailto:privacy@planivo.com" className="text-primary hover:underline">privacy@planivo.com</a>.
+                            If you have any questions about this Privacy Policy, please contact us at <a href="mailto:konshedo@gmail.com" className="text-primary hover:underline">konshedo@gmail.com</a>.
                         </p>
                     </div>
                 </div>

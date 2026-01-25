@@ -100,8 +100,8 @@ export default function ContactUs() {
                                     <div>
                                         <h3 className="font-semibold text-xl mb-1">Email Us</h3>
                                         <p className="text-muted-foreground mb-2">Our friendly team is here to help.</p>
-                                        <a href="mailto:sales@planivo.com" className="text-primary font-medium hover:underline text-lg">
-                                            sales@planivo.com
+                                        <a href="mailto:konshedo@gmail.com" className="text-primary font-medium hover:underline text-lg">
+                                            konshedo@gmail.com
                                         </a>
                                     </div>
                                 </div>
@@ -113,8 +113,8 @@ export default function ContactUs() {
                                     <div>
                                         <h3 className="font-semibold text-xl mb-1">Call Us</h3>
                                         <p className="text-muted-foreground mb-2">Mon-Fri from 9am to 6pm EST.</p>
-                                        <a href="tel:+1234567890" className="text-primary font-medium hover:underline text-lg">
-                                            +1 (555) 000-0000
+                                        <a href="tel:+966550555605" className="text-primary font-medium hover:underline text-lg">
+                                            +966 55 055 5605
                                         </a>
                                     </div>
                                 </div>
