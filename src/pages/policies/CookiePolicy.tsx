@@ -36,6 +36,11 @@ export default function CookiePolicy() {
                         <p>
                             If you'd like to delete cookies or instruct your web browser to delete or refuse cookies, please visit the help pages of your web browser. Please note, however, that if you delete cookies or refuse to accept them, you might not be able to use all of the features we offer.
                         </p>
+
+                        <h3>4. Contact Us</h3>
+                        <p>
+                            If you have any questions about our Cookie Policy, please contact us at <a href="mailto:konshedo@gmail.com" className="text-primary hover:underline">konshedo@gmail.com</a>.
+                        </p>
                     </div>
                 </div>
             </div>

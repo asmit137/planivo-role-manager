@@ -45,7 +45,7 @@ export default function TermsOfService() {
 
                         <h3>5. Contact Us</h3>
                         <p>
-                            If you have any questions about these Terms, please contact us at <a href="mailto:legal@planivo.com" className="text-primary hover:underline">legal@planivo.com</a>.
+                            If you have any questions about these Terms, please contact us at <a href="mailto:konshedo@gmail.com" className="text-primary hover:underline">konshedo@gmail.com</a>.
                         </p>
                     </div>
                 </div>

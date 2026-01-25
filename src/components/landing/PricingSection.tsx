@@ -6,262 +6,262 @@ import { Link } from "react-router-dom";
 import { CheckoutDialog } from "@/components/checkout/CheckoutDialog";
 
 interface Plan {
-  name: string;
-  slug: string;
-  description: string;
-  priceMonthly: number;
-  priceYearly: number;
-  features: string[];
-  isPopular?: boolean;
-  isEnterprise?: boolean;
+    name: string;
+    slug: string;
+    description: string;
+    priceMonthly: number;
+    priceYearly: number;
+    features: string[];
+    isPopular?: boolean;
+    isEnterprise?: boolean;
 }
 
 const plans: Plan[] = [
-  {
-    name: "Free",
-    slug: "free",
-    description: "Perfect for small teams getting started",
-    priceMonthly: 0,
-    priceYearly: 0,
-    features: [
-      "1 Workspace",
-      "2 Facilities",
-      "5 Users",
-      "Basic Scheduling",
-      "7-day Audit Logs",
-    ],
-  },
-  {
-    name: "Starter",
-    slug: "starter",
-    description: "For growing organizations",
-    priceMonthly: 29,
-    priceYearly: 290,
-    features: [
-      "3 Workspaces",
-      "10 Facilities",
-      "25 Users",
-      "Full Scheduling",
-      "Vacation Management",
-      "30-day Audit Logs",
-      "Email Support",
-    ],
-  },
-  {
-    name: "Professional",
-    slug: "professional",
-    description: "For established organizations",
-    priceMonthly: 79,
-    priceYearly: 790,
-    features: [
-      "10 Workspaces",
-      "50 Facilities",
-      "100 Users",
-      "Advanced Analytics",
-      "Task Management",
-      "Training Module",
-      "1-year Audit Logs",
-      "Priority Support",
-    ],
-    isPopular: true,
-  },
-  {
-    name: "Institution",
-    slug: "institution",
-    description: "For large institutions",
-    priceMonthly: 199,
-    priceYearly: 1990,
-    features: [
-      "25 Workspaces",
-      "150 Facilities",
-      "500 Users",
-      "All Features",
-      "Custom Integrations",
-      "Dedicated Support",
-      "Unlimited Audit Logs",
-    ],
-  },
-  {
-    name: "Enterprise",
-    slug: "enterprise",
-    description: "Custom solutions for enterprise",
-    priceMonthly: 0,
-    priceYearly: 0,
-    features: [
-      "Unlimited Everything",
-      "White-label Options",
-      "Custom Development",
-      "24/7 Dedicated Support",
-      "SLA Guarantee",
-      "On-premise Option",
-    ],
-    isEnterprise: true,
-  },
+    {
+        name: "Free",
+        slug: "free",
+        description: "Perfect for small teams getting started",
+        priceMonthly: 0,
+        priceYearly: 0,
+        features: [
+            "1 Workspace",
+            "2 Facilities",
+            "5 Users",
+            "Basic Scheduling",
+            "7-day Audit Logs",
+        ],
+    },
+    {
+        name: "Starter",
+        slug: "starter",
+        description: "For growing organizations",
+        priceMonthly: 29,
+        priceYearly: 290,
+        features: [
+            "3 Workspaces",
+            "10 Facilities",
+            "25 Users",
+            "Full Scheduling",
+            "Vacation Management",
+            "30-day Audit Logs",
+            "Email Support",
+        ],
+    },
+    {
+        name: "Professional",
+        slug: "professional",
+        description: "For established organizations",
+        priceMonthly: 79,
+        priceYearly: 790,
+        features: [
+            "10 Workspaces",
+            "50 Facilities",
+            "100 Users",
+            "Advanced Analytics",
+            "Task Management",
+            "Training Module",
+            "1-year Audit Logs",
+            "Priority Support",
+        ],
+        isPopular: true,
+    },
+    {
+        name: "Institution",
+        slug: "institution",
+        description: "For large institutions",
+        priceMonthly: 199,
+        priceYearly: 1990,
+        features: [
+            "25 Workspaces",
+            "150 Facilities",
+            "500 Users",
+            "All Features",
+            "Custom Integrations",
+            "Dedicated Support",
+            "Unlimited Audit Logs",
+        ],
+    },
+    {
+        name: "Enterprise",
+        slug: "enterprise",
+        description: "Custom solutions for enterprise",
+        priceMonthly: 0,
+        priceYearly: 0,
+        features: [
+            "Unlimited Everything",
+            "White-label Options",
+            "Custom Development",
+            "24/7 Dedicated Support",
+            "SLA Guarantee",
+            "On-premise Option",
+        ],
+        isEnterprise: true,
+    },
 ];
 
 export function PricingSection() {
-  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
+    const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+    const [checkoutOpen, setCheckoutOpen] = useState(false);
 
-  const getPrice = (plan: Plan) => {
-    if (plan.isEnterprise) return "Custom";
-    if (plan.priceMonthly === 0) return "Free";
-    return `$${plan.priceMonthly}`;
-  };
+    const getPrice = (plan: Plan) => {
+        if (plan.isEnterprise) return "Custom";
+        if (plan.priceMonthly === 0) return "Free";
+        return `$${plan.priceMonthly}`;
+    };
 
-  const getPeriod = (plan: Plan) => {
-    if (plan.isEnterprise || plan.priceMonthly === 0) return "";
-    return "/month";
-  };
+    const getPeriod = (plan: Plan) => {
+        if (plan.isEnterprise || plan.priceMonthly === 0) return "";
+        return "/month";
+    };
 
-  const handleSelectPlan = (plan: Plan) => {
-    if (plan.isEnterprise) {
-      // Redirect to contact for enterprise
-      return;
-    }
-    setSelectedPlan(plan);
-    setCheckoutOpen(true);
-  };
+    const handleSelectPlan = (plan: Plan) => {
+        if (plan.isEnterprise) {
+            // Redirect to contact for enterprise
+            return;
+        }
+        setSelectedPlan(plan);
+        setCheckoutOpen(true);
+    };
 
-  return (
-    <>
-      <section className="py-20 md:py-32" id="pricing">
-        <div className="container mx-auto px-4">
-          {/* Section header */}
-          <div className="mx-auto mb-12 max-w-3xl text-center">
-            <span className="mb-4 inline-block rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
-              Pricing
-            </span>
-            <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground md:text-4xl lg:text-5xl">
-              Custom Solutions for Your Business
-            </h2>
-            <p className="text-lg text-muted-foreground">
-              Get a tailored package that fits your organization's unique needs.
-            </p>
-          </div>
+    return (
+        <>
+            <section className="py-20 md:py-32" id="pricing">
+                <div className="container mx-auto px-4">
+                    {/* Section header */}
+                    <div className="mx-auto mb-12 max-w-3xl text-center">
+                        <span className="mb-4 inline-block rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
+                            Pricing
+                        </span>
+                        <h2 className="mb-4 text-3xl font-bold tracking-tight text-foreground md:text-4xl lg:text-5xl">
+                            Custom Solutions for Your Business
+                        </h2>
+                        <p className="text-lg text-muted-foreground">
+                            Get a tailored package that fits your organization's unique needs.
+                        </p>
+                    </div>
 
-          {/* Pricing cards */}
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 lg:gap-6 mb-16 items-start">
-            {plans.map((plan) => (
-              <Card
-                key={plan.slug}
-                className={`relative flex flex-col h-full w-full ${plan.isPopular
-                  ? "border-primary shadow-lg shadow-primary/10 ring-2 ring-primary scale-105 z-10"
-                  : "border-border/50 bg-card/50 hover:border-primary/30 hover:shadow-lg transition-all"
-                  }`}
-              >
-                {plan.isPopular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
-                    Most Popular
-                  </div>
-                )}
+                    {/* Pricing cards */}
+                    <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 lg:gap-6 mb-16 items-start">
+                        {plans.map((plan) => (
+                            <Card
+                                key={plan.slug}
+                                className={`relative flex flex-col h-full w-full ${plan.isPopular
+                                    ? "border-primary shadow-lg shadow-primary/10 ring-2 ring-primary scale-105 z-10"
+                                    : "border-border/50 bg-card/50 hover:border-primary/30 hover:shadow-lg transition-all"
+                                    }`}
+                            >
+                                {plan.isPopular && (
+                                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+                                        Most Popular
+                                    </div>
+                                )}
 
-                <CardHeader className="pb-4">
-                  <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
-                  <p className="text-sm text-muted-foreground">{plan.description}</p>
-                </CardHeader>
+                                <CardHeader className="pb-4">
+                                    <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
+                                    <p className="text-sm text-muted-foreground">{plan.description}</p>
+                                </CardHeader>
 
-                <CardContent className="flex-1 pb-6">
-                  <div className="mb-6">
-                    <span className="text-4xl font-bold text-foreground">{getPrice(plan)}</span>
-                    {getPeriod(plan) && <span className="text-muted-foreground">{getPeriod(plan)}</span>}
-                  </div>
+                                <CardContent className="flex-1 pb-6">
+                                    <div className="mb-6">
+                                        <span className="text-4xl font-bold text-foreground">{getPrice(plan)}</span>
+                                        {getPeriod(plan) && <span className="text-muted-foreground">{getPeriod(plan)}</span>}
+                                    </div>
 
-                  <ul className="space-y-3">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2 text-sm">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
-                        <span className="text-foreground">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
+                                    <ul className="space-y-3">
+                                        {plan.features.map((feature) => (
+                                            <li key={feature} className="flex items-start gap-2 text-sm">
+                                                <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                                                <span className="text-foreground">{feature}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </CardContent>
 
-                <CardFooter>
-                  {plan.isEnterprise ? (
-                    <Button
-                      asChild
-                      className="w-full"
-                      size="lg"
-                      variant="outline"
-                    >
-                      <Link to="/contact-us">Contact Sales</Link>
-                    </Button>
-                  ) : plan.priceMonthly === 0 ? (
-                    <Button
-                      asChild
-                      className="w-full"
-                      size="lg"
-                      variant="outline"
-                    >
-                      <Link to="/auth?mode=signup">Get Started Free</Link>
-                    </Button>
-                  ) : (
-                    <Button
-                      className="w-full"
-                      size="lg"
-                      variant={plan.isPopular ? "default" : "outline"}
-                      onClick={() => handleSelectPlan(plan)}
-                    >
-                      Subscribe Now
-                    </Button>
-                  )}
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+                                <CardFooter>
+                                    {plan.isEnterprise ? (
+                                        <Button
+                                            asChild
+                                            className="w-full"
+                                            size="lg"
+                                            variant="outline"
+                                        >
+                                            <Link to="/contact-us">Contact Sales</Link>
+                                        </Button>
+                                    ) : plan.priceMonthly === 0 ? (
+                                        <Button
+                                            asChild
+                                            className="w-full"
+                                            size="lg"
+                                            variant="outline"
+                                        >
+                                            <Link to="/auth?mode=signup">Get Started Free</Link>
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            className="w-full"
+                                            size="lg"
+                                            variant={plan.isPopular ? "default" : "outline"}
+                                            onClick={() => handleSelectPlan(plan)}
+                                        >
+                                            Subscribe Now
+                                        </Button>
+                                    )}
+                                </CardFooter>
+                            </Card>
+                        ))}
+                    </div>
 
-          {/* Premium Contact Us Section */}
-          <div className="mt-24 relative overflow-hidden rounded-3xl bg-card border border-border p-6 md:p-12 shadow-2xl max-w-4xl mx-auto">
-            {/* Background Effects */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent pointer-events-none" />
+                    {/* Premium Contact Us Section */}
+                    <div className="mt-24 relative overflow-hidden rounded-3xl bg-card border border-border p-6 md:p-12 shadow-2xl max-w-4xl mx-auto">
+                        {/* Background Effects */}
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent pointer-events-none" />
 
-            <div className="relative z-10 mx-auto max-w-3xl text-center mb-10">
-              <h3 className="text-3xl font-bold text-foreground mb-4">Still have questions?</h3>
-              <p className="text-lg text-muted-foreground">
-                Our team is here to help. Reach out to us for a personalized consultation or technical support.
-              </p>
-            </div>
+                        <div className="relative z-10 mx-auto max-w-3xl text-center mb-10">
+                            <h3 className="text-3xl font-bold text-foreground mb-4">Still have questions?</h3>
+                            <p className="text-lg text-muted-foreground">
+                                Our team is here to help. Reach out to us for a personalized consultation or technical support.
+                            </p>
+                        </div>
 
-            <div className="relative z-10 grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-              <a
-                href="mailto:support@planivo.com"
-                className="group relative flex flex-col items-center p-6 rounded-2xl bg-muted/40 hover:bg-muted/80 border border-border transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
-              >
-                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 text-primary group-hover:scale-110 transition-transform duration-300">
-                  <Mail className="h-6 w-6" />
+                        <div className="relative z-10 grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+                            <a
+                                href="mailto:konshedo@gmail.com"
+                                className="group relative flex flex-col items-center p-6 rounded-2xl bg-muted/40 hover:bg-muted/80 border border-border transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
+                            >
+                                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 text-primary group-hover:scale-110 transition-transform duration-300">
+                                    <Mail className="h-6 w-6" />
+                                </div>
+                                <h4 className="text-xl font-semibold text-foreground mb-2">Email Support</h4>
+                                <p className="text-sm text-muted-foreground mb-4">Get a response within 2 hours</p>
+                                <span className="text-primary text-sm font-medium flex items-center group-hover:underline">
+                                    konshedo@gmail.com
+                                </span>
+                            </a>
+
+                            <a
+                                href="tel:+966550555605"
+                                className="group relative flex flex-col items-center p-6 rounded-2xl bg-muted/40 hover:bg-muted/80 border border-border transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
+                            >
+                                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 text-primary group-hover:scale-110 transition-transform duration-300">
+                                    <Phone className="h-6 w-6" />
+                                </div>
+                                <h4 className="text-xl font-semibold text-foreground mb-2">Call Sales</h4>
+                                <p className="text-sm text-muted-foreground mb-4">Mon-Fri 9am-6pm EST</p>
+                                <span className="text-primary text-sm font-medium flex items-center group-hover:underline">
+                                    +966 55 055 5605
+                                </span>
+                            </a>
+                        </div>
+                    </div>
                 </div>
-                <h4 className="text-xl font-semibold text-foreground mb-2">Email Support</h4>
-                <p className="text-sm text-muted-foreground mb-4">Get a response within 2 hours</p>
-                <span className="text-primary text-sm font-medium flex items-center group-hover:underline">
-                  support@planivo.com
-                </span>
-              </a>
+            </section>
 
-              <a
-                href="tel:+1234567890"
-                className="group relative flex flex-col items-center p-6 rounded-2xl bg-muted/40 hover:bg-muted/80 border border-border transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
-              >
-                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 text-primary group-hover:scale-110 transition-transform duration-300">
-                  <Phone className="h-6 w-6" />
-                </div>
-                <h4 className="text-xl font-semibold text-foreground mb-2">Call Sales</h4>
-                <p className="text-sm text-muted-foreground mb-4">Mon-Fri 9am-6pm EST</p>
-                <span className="text-primary text-sm font-medium flex items-center group-hover:underline">
-                  +1 (555) 123-4567
-                </span>
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Checkout Dialog */}
-      <CheckoutDialog
-        open={checkoutOpen}
-        onOpenChange={setCheckoutOpen}
-        plan={selectedPlan}
-      />
-    </>
-  );
+            {/* Checkout Dialog */}
+            <CheckoutDialog
+                open={checkoutOpen}
+                onOpenChange={setCheckoutOpen}
+                plan={selectedPlan}
+            />
+        </>
+    );
 }
