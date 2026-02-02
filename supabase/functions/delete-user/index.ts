@@ -21,9 +21,7 @@ Deno.serve(async (req: Request) => {
         if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
             console.error("Missing environment variables!");
             return new Response(
-                JSON.stringify({
-                    error: "Server configuration error (missing env vars)"
-                }),
+                JSON.stringify({ error: "Server configuration error (missing env vars)" }),
                 { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
@@ -38,7 +36,7 @@ Deno.serve(async (req: Request) => {
 
         const token = authHeader.replace("Bearer ", "");
 
-        // 1. Validate the requesting user (Robust Pattern)
+        // 1. Validate the requesting user
         const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY!, {
             auth: { persistSession: false },
         });
@@ -48,15 +46,12 @@ Deno.serve(async (req: Request) => {
         if (authError || !requestingUser) {
             console.error("Auth error:", authError);
             return new Response(
-                JSON.stringify({
-                    error: "Unauthorized_from_code",
-                    details: authError?.message || "Invalid token",
-                }),
+                JSON.stringify({ error: "Unauthorized", details: authError?.message || "Invalid token" }),
                 { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
-        // 2. Perform the deletion using the ADMIN client
+        // 2. Admin client for deletions
         const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
             auth: { autoRefreshToken: false, persistSession: false },
         });
@@ -71,10 +66,7 @@ Deno.serve(async (req: Request) => {
         if (roleError || !roleRecords || roleRecords.length === 0) {
             console.error("Authorization check failed:", roleError);
             return new Response(
-                JSON.stringify({
-                    error: "Forbidden: Administrative access required",
-                    details: roleError?.message
-                }),
+                JSON.stringify({ error: "Forbidden: Administrative access required" }),
                 { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
@@ -86,8 +78,6 @@ Deno.serve(async (req: Request) => {
             );
         }
 
-        console.log(`Attempting to delete user: ${userId} by admin: ${requestingUser.id}`);
-
         if (userId === requestingUser.id) {
             return new Response(
                 JSON.stringify({ error: "You cannot delete your own account" }),
@@ -95,37 +85,98 @@ Deno.serve(async (req: Request) => {
             );
         }
 
-        // Delete the user using admin API
+        console.log(`Attempting to delete user: ${userId} by admin: ${requestingUser.id}`);
+
+        // 3. MANUALLY DELETE ALL DEPENDENT RECORDS FIRST (to avoid cascade issues)
+        const deletionSteps = [
+            // Clear references TO this user (set to NULL)
+            { table: "training_events", column: "responsible_user_id", action: "nullify" },
+            { table: "schedule_display_tokens", column: "created_by", action: "nullify" },
+            { table: "user_module_access", column: "created_by", action: "nullify" },
+            { table: "tasks", column: "created_by", action: "nullify" },
+            { table: "vacation_plans", column: "created_by", action: "nullify" },
+            { table: "vacation_types", column: "created_by", action: "nullify" },
+            { table: "categories", column: "created_by", action: "nullify" },
+            { table: "workspaces", column: "created_by", action: "nullify" },
+            { table: "facilities", column: "created_by", action: "nullify" },
+            { table: "departments", column: "created_by", action: "nullify" },
+            { table: "organizations", column: "created_by", action: "nullify" },
+            { table: "subscription_overrides", column: "approved_by", action: "nullify" },
+            { table: "audit_logs", column: "performed_by", action: "nullify" },
+
+            // Delete records belonging to user
+            { table: "training_registrations", column: "user_id", action: "delete" },
+            { table: "task_assignments", column: "assigned_to", action: "delete" },
+            { table: "vacation_approvals", column: "approver_id", action: "delete" },
+            { table: "clinic_assignments", column: "staff_id", action: "delete" },
+            { table: "leave_balances", column: "user_id", action: "delete" },
+            { table: "conversation_participants", column: "user_id", action: "delete" },
+            { table: "messages", column: "sender_id", action: "nullify" },
+            { table: "notifications", column: "user_id", action: "delete" },
+            { table: "user_module_access", column: "user_id", action: "delete" },
+            { table: "user_roles", column: "user_id", action: "delete" },
+        ];
+
+        for (const step of deletionSteps) {
+            try {
+                if (step.action === "nullify") {
+                    await adminClient
+                        .from(step.table)
+                        .update({ [step.column]: null })
+                        .eq(step.column, userId);
+                } else if (step.action === "delete") {
+                    await adminClient
+                        .from(step.table)
+                        .delete()
+                        .eq(step.column, userId);
+                }
+                console.log(`Processed ${step.table}.${step.column} (${step.action})`);
+            } catch (stepError: any) {
+                console.log(`Skipped ${step.table}.${step.column}: ${stepError.message}`);
+                // Continue - table might not exist or column might not exist
+            }
+        }
+
+        // 4. Delete the profile directly
+        const { error: profileDeleteError } = await adminClient
+            .from("profiles")
+            .delete()
+            .eq("id", userId);
+
+        if (profileDeleteError) {
+            console.error("Profile deletion failed:", profileDeleteError);
+            return new Response(
+                JSON.stringify({
+                    error: "Failed to delete profile",
+                    details: profileDeleteError.message,
+                    hint: profileDeleteError.hint
+                }),
+                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
+
+        console.log("Profile deleted successfully, now deleting auth user...");
+
+        // 5. Delete the user from Auth
         const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
 
         if (deleteError) {
-            console.error("User deletion error from Auth:", deleteError);
+            console.error("Auth deletion error:", deleteError);
 
-            // If user not found in Auth, they might still have a public profile (orphaned)
-            // Let's try to delete from public.profiles manually to be sure
+            // If user not found in Auth (already deleted or never existed), that's OK
             if (deleteError.message === "User not found") {
-                console.log("User not found in Auth, attempting to remove orphaned public profile...");
-                const { error: profileError } = await adminClient
-                    .from("profiles")
-                    .delete()
-                    .eq("id", userId);
-
-                if (profileError) {
-                    console.error("Failed to delete orphaned profile:", profileError);
-                    return new Response(
-                        JSON.stringify({ error: `User not found in Auth, and profile deletion failed: ${profileError.message}` }),
-                        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-                    );
-                }
-
                 return new Response(
-                    JSON.stringify({ success: true, message: "Orphaned profile successfully removed" }),
+                    JSON.stringify({ success: true, message: "User data cleaned up (auth user already removed)" }),
                     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                 );
             }
 
             return new Response(
-                JSON.stringify({ error: deleteError.message }),
+                JSON.stringify({
+                    error: "Auth deletion failed",
+                    details: deleteError.message,
+                    code: deleteError.code || "unknown"
+                }),
                 { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
