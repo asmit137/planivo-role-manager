@@ -711,7 +711,10 @@ const UnifiedUserHub = ({
             <AlertDialogFooter className="flex-col sm:flex-row gap-2">
               <AlertDialogCancel disabled={deleteUserMutation.isPending} className="w-full sm:w-auto mt-0">Cancel</AlertDialogCancel>
               <AlertDialogAction
-                onClick={handleDeleteConfirm}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDeleteConfirm();
+                }}
                 disabled={deleteUserMutation.isPending}
                 className="w-full sm:w-auto bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
@@ -724,6 +727,7 @@ const UnifiedUserHub = ({
                   isSuperAdmin ? 'Delete Permanently' : 'Remove'
                 )}
               </AlertDialogAction>
+
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

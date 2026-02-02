@@ -395,7 +395,7 @@ Deno.serve(async (req: Request) => {
                 <p style="margin: 10px 0 0 0;"><strong>Password:</strong> ${password}</p>
               </div>
               <p>
-                <a href="${Deno.env.get("PUBLIC_APP_URL") || 'http://localhost:8080'}" 
+                <a href="${Deno.env.get("PUBLIC_APP_URL") || '"https://planivo-role-manager.vercel.app/'}" 
                    style="background-color: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
                   Login to Planivo
                 </a>
